@@ -1,0 +1,59 @@
+# Expo
+.expo/
+dist/
+web-build/
+
+# Node
+node_modules/
+npm-debug.*
+*.log
+*.log.*
+
+# macOS
+.DS_Store
+*.pem
+
+# Local environment
+.env
+.env.local
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Misc
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Temporary
+mobile-temp/
+tmp/
+temp/
+
+# Build artifacts
+*.ipa
+*.apk
+*.aab
+
+# Backend
+backend/app
+backend/coverage.out
+backend/coverage.html
+backend/*.log
+backend/.env
+
+# Husky
+.husky/_
