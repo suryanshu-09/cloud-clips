@@ -1,3 +1,4 @@
+import { memo, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, type PressableProps } from 'react-native';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
@@ -10,21 +11,35 @@ interface IBarberCardProps extends Omit<PressableProps, 'children'> {
   distance?: number;
 }
 
-export function BarberCard({ barber, showDistance = false, distance, ...props }: IBarberCardProps) {
-  const formatDistance = (distanceKm: number) => {
-    if (distanceKm < 1) {
-      return `${Math.round(distanceKm * 1000)}m away`;
+/**
+ * BarberCard - Optimized barber preview card component
+ *
+ * Performance optimizations:
+ * - Wrapped with React.memo to prevent unnecessary re-renders
+ * - Memoized calculations for distance formatting and lowest price
+ * - Stable callback references
+ */
+function BarberCardComponent({
+  barber,
+  showDistance = false,
+  distance,
+  ...props
+}: IBarberCardProps) {
+  // Memoize distance formatting
+  const formattedDistance = useMemo(() => {
+    if (!showDistance || distance === undefined) return null;
+    if (distance < 1) {
+      return `${Math.round(distance * 1000)}m away`;
     }
-    return `${distanceKm.toFixed(1)}km away`;
-  };
+    return `${distance.toFixed(1)}km away`;
+  }, [showDistance, distance]);
 
-  const getLowestPrice = () => {
+  // Memoize lowest price calculation
+  const lowestPrice = useMemo(() => {
     if (!barber.services || barber.services.length === 0) return null;
     const prices = barber.services.map((s) => s.price);
     return Math.min(...prices);
-  };
-
-  const lowestPrice = getLowestPrice();
+  }, [barber.services]);
 
   return (
     <Pressable {...props}>
@@ -98,8 +113,8 @@ export function BarberCard({ barber, showDistance = false, distance, ...props }:
                 )}
 
                 {/* Distance */}
-                {showDistance && distance !== undefined && (
-                  <Text className="text-xs text-gray-500">{formatDistance(distance)}</Text>
+                {formattedDistance && (
+                  <Text className="text-xs text-gray-500">{formattedDistance}</Text>
                 )}
               </View>
 
@@ -127,3 +142,5 @@ export function BarberCard({ barber, showDistance = false, distance, ...props }:
     </Pressable>
   );
 }
+
+export const BarberCard = memo(BarberCardComponent);

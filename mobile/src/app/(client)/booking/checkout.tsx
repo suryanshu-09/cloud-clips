@@ -85,21 +85,23 @@ export default function CheckoutScreen() {
       <ScrollView className="flex-1">
         <View className="p-6 space-y-4">
           {/* Booking Summary */}
-          <BookingSummary
-            barberName={mockBarberName}
-            serviceName={mockServiceName}
-            servicePrice={mockServicePrice}
-            serviceDuration={mockServiceDuration}
-            hairType={bookingForm.hairType}
-            scheduledFor={bookingSchedule.selectedTime}
-            location={{
-              type: bookingForm.locationType || 'in_salon',
-              address: bookingForm.address,
-            }}
-            specialRequests={bookingForm.specialRequests}
-            discount={discount}
-            couponCode={appliedCoupon}
-          />
+          {bookingForm.hairType && bookingSchedule.selectedTime && (
+            <BookingSummary
+              barberName={mockBarberName}
+              serviceName={mockServiceName}
+              servicePrice={mockServicePrice}
+              serviceDuration={mockServiceDuration}
+              hairType={bookingForm.hairType}
+              scheduledFor={bookingSchedule.selectedTime}
+              location={{
+                type: bookingForm.locationType || 'in_salon',
+                address: bookingForm.address,
+              }}
+              specialRequests={bookingForm.specialRequests}
+              discount={discount}
+              couponCode={appliedCoupon}
+            />
+          )}
 
           {/* Coupon Code */}
           <Card className="p-4">

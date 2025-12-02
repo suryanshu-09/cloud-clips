@@ -17,9 +17,10 @@ const (
 type AuthProvider string
 
 const (
-	AuthProviderEmail  AuthProvider = "email"
-	AuthProviderGoogle AuthProvider = "google"
-	AuthProviderApple  AuthProvider = "apple"
+	AuthProviderEmail    AuthProvider = "email"
+	AuthProviderGoogle   AuthProvider = "google"
+	AuthProviderApple    AuthProvider = "apple"
+	AuthProviderFirebase AuthProvider = "firebase"
 )
 
 type User struct {
@@ -28,6 +29,7 @@ type User struct {
 	Phone             string            `json:"phone" bson:"phone"`
 	Name              string            `json:"name" bson:"name"`
 	Avatar            *string           `json:"avatar,omitempty" bson:"avatar,omitempty"`
+	PasswordHash      *string           `json:"-" bson:"passwordHash,omitempty"`
 	Role              UserRole          `json:"role" bson:"role"`
 	Location          Location          `json:"location" bson:"location"`
 	CreatedAt         time.Time         `json:"createdAt" bson:"createdAt"`
@@ -35,6 +37,11 @@ type User struct {
 	NotificationPrefs NotificationPrefs `json:"notificationPrefs" bson:"notificationPrefs"`
 	AuthProvider      AuthProvider      `json:"authProvider" bson:"authProvider"`
 	StripeCustomerID  *string           `json:"stripeCustomerId,omitempty" bson:"stripeCustomerId,omitempty"`
+	FirebaseUID       *string           `json:"firebaseUid,omitempty" bson:"firebaseUid,omitempty"`
+	FCMToken          *string           `json:"fcmToken,omitempty" bson:"fcmToken,omitempty"`
+	EmailVerified     bool              `json:"emailVerified" bson:"emailVerified"`
+	ResetToken        *string           `json:"-" bson:"resetToken,omitempty"`
+	ResetTokenExpires *time.Time        `json:"-" bson:"resetTokenExpires,omitempty"`
 }
 
 type Location struct {

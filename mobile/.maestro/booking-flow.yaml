@@ -1,0 +1,65 @@
+appId: com.cloudclips.app
+
+---
+# E2E Test: Booking Flow
+
+- launchApp
+
+# Login first
+- tapOn: "Login"
+- tapOn: "Email"
+- inputText: "client@example.com"
+- tapOn: "Password"
+- inputText: "Test123!@#"
+- tapOn: "Sign In"
+
+# Wait for home screen
+- assertVisible: "Find Barbers"
+
+# Search for barber
+- tapOn: "Search"
+- inputText: "John's Barbershop"
+- tapOn: "Search Button"
+
+# Select first barber
+- tapOn:
+    id: "barber-card-0"
+
+# Verify barber profile loaded
+- assertVisible: "Services"
+- assertVisible: "Book Appointment"
+
+# Select a service
+- tapOn: "Haircut - $30"
+
+# Select date and time
+- tapOn: "Choose Date"
+- tapOn: "Next Available"
+- tapOn: "10:00 AM"
+
+# Add notes
+- tapOn: "Add Notes"
+- inputText: "Please keep it short on the sides"
+
+# Proceed to checkout
+- tapOn: "Continue"
+
+# Verify booking summary
+- assertVisible: "Booking Summary"
+- assertVisible: "Haircut"
+- assertVisible: "$30"
+
+# Complete booking
+- tapOn: "Confirm & Pay"
+
+# Handle payment (in dev mode, should auto-succeed)
+- assertVisible: "Booking Confirmed"
+- assertVisible: "Your appointment is scheduled"
+
+# Navigate to appointments
+- tapOn: "View Appointment"
+
+# Verify appointment appears in list
+- assertVisible: "Upcoming"
+- assertVisible: "Haircut"
+- assertVisible: "John's Barbershop"

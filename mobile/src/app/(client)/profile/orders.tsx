@@ -20,7 +20,7 @@ const getStatusColor = (status: OrderStatus) => {
     case OrderStatus.DELIVERED:
       return 'success';
     case OrderStatus.CANCELLED:
-      return 'error';
+      return 'danger';
     default:
       return 'secondary';
   }
@@ -114,7 +114,7 @@ export default function OrdersScreen() {
             <EmptyState
               icon="📦"
               title="No orders found"
-              message={
+              description={
                 selectedStatus === 'all'
                   ? "You haven't placed any orders yet"
                   : `No ${selectedStatus} orders`
@@ -187,7 +187,7 @@ export default function OrdersScreen() {
                   <View className="flex-row gap-2">
                     {/* View Details Button */}
                     <Pressable
-                      onPress={() => router.push(`/(client)/profile/orders/${order.id}`)}
+                      onPress={() => router.push(`/(client)/profile/orders/${order.id}` as any)}
                       className="bg-gray-100 active:bg-gray-200 rounded-lg px-4 py-2"
                     >
                       <Text className="text-gray-900 font-semibold text-sm">Details</Text>

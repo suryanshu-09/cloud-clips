@@ -24,7 +24,7 @@ export const Input = forwardRef<TextInput, IInputProps>(
     } ${disabled ? 'bg-gray-100' : 'bg-white'}`;
 
     return (
-      <View className={containerStyles}>
+      <View className={containerStyles} testID="input-container">
         {label && <Text className="text-sm font-medium text-gray-700 mb-2">{label}</Text>}
         <View className={inputWrapperStyles}>
           {leftIcon && <View className="mr-2">{leftIcon}</View>}

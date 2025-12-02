@@ -21,7 +21,7 @@ export default function AppointmentDetailsScreen() {
   const router = useRouter();
 
   const { appointment, isLoading } = useAppointment(id);
-  const { cancelAppointment, isCancelling } = useBooking({
+  const { cancelAppointment, isCanceling } = useBooking({
     onSuccess: () => {
       Alert.alert('Success', 'Appointment cancelled successfully', [
         { text: 'OK', onPress: () => router.back() },
@@ -116,7 +116,7 @@ export default function AppointmentDetailsScreen() {
           <Card className="p-4">
             <Text className="text-sm font-medium text-gray-500 mb-3">Barber</Text>
             <View className="flex-row items-center gap-3">
-              <Avatar source={{ uri: 'https://via.placeholder.com/100' }} size="lg" />
+              <Avatar source="https://via.placeholder.com/100" size="lg" />
               <View className="flex-1">
                 <Text className="text-xl font-semibold text-gray-900">{appointment.barberId}</Text>
                 <Text className="text-gray-600">Professional Barber</Text>
@@ -198,8 +198,8 @@ export default function AppointmentDetailsScreen() {
           </Button>
         )}
         {canCancel && (
-          <Button variant="destructive" onPress={handleCancel} disabled={isCancelling}>
-            {isCancelling ? 'Cancelling...' : 'Cancel Appointment'}
+          <Button variant="danger" onPress={handleCancel} disabled={isCanceling}>
+            {isCanceling ? 'Cancelling...' : 'Cancel Appointment'}
           </Button>
         )}
         {!canCancel && !showContactBarber && (

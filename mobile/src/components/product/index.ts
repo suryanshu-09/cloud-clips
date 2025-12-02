@@ -4,6 +4,7 @@
 
 export { PriceBreakdown } from './PriceBreakdown';
 export { CouponInput } from './CouponInput';
+export { CouponCard } from './CouponCard';
 export { PaymentConfirmation } from './PaymentConfirmation';
 export { ProductCard } from './ProductCard';
 export { ProductGrid } from './ProductGrid';

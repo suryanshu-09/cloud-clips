@@ -3,7 +3,7 @@
  * Handles all product-related API calls
  */
 
-import { apiClient } from '@/services/api/client';
+import apiClient from '@/services/api/client';
 import { endpoints } from '@/services/api/endpoints';
 import type {
   IProduct,

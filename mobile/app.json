@@ -16,10 +16,31 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cloudclips.app",
+      "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to find nearby barbers",
+        "NSLocationAlwaysUsageDescription": "We need your location to find nearby barbers and provide location-based services",
         "NSCameraUsageDescription": "We need camera access to upload photos",
-        "NSPhotoLibraryUsageDescription": "We need photo library access to upload images"
+        "NSPhotoLibraryUsageDescription": "We need photo library access to upload images",
+        "UIBackgroundModes": ["fetch", "remote-notification"],
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["cloudclips"]
+          }
+        ]
+      },
+      "associatedDomains": [
+        "applinks:cloudclips.app",
+        "applinks:www.cloudclips.app"
+      ],
+      "config": {
+        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+      },
+      "entitlements": {
+        "com.apple.developer.associated-domains": [
+          "applinks:cloudclips.app",
+          "applinks:www.cloudclips.app"
+        ]
       }
     },
     "android": {
@@ -28,16 +49,54 @@
         "backgroundColor": "#0ea5e9"
       },
       "package": "com.cloudclips.app",
+      "versionCode": 1,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED"
       ],
       "softwareKeyboardLayoutMode": "resize",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+        }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "cloudclips.app",
+              "pathPrefix": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.cloudclips.app",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "cloudclips"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -63,6 +122,19 @@
         {
           "color": "#0ea5e9"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
+            "buildToolsVersion": "34.0.0"
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
       ]
     ],
     "experiments": {
@@ -75,6 +147,14 @@
       "eas": {
         "projectId": "your-project-id-here"
       }
+    },
+    "owner": "cloudclips",
+    "updates": {
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/your-project-id-here"
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
     }
   }
 }

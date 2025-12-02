@@ -1,16 +1,110 @@
 import '../../global.css';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
+import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as JotaiProvider } from 'jotai';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider, onlineManager } from '@tanstack/react-query';
 import { queryClient } from '@/services/api/queryClient';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { OfflineBanner } from '@/components/ui/OfflineBanner';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { initSentry, errorTrackingService } from '@/services/errorTracking/sentry';
+import { offlineSyncService } from '@/services/offline/offlineSync';
+import apiClient from '@/services/api/client';
 
+/**
+ * Inner component that uses hooks requiring providers
+ */
+function AppContent() {
+  const { isOffline, wasOffline, acknowledgeOnline } = useNetworkStatus();
+
+  // Sync TanStack Query's online status with our network status
+  useEffect(() => {
+    onlineManager.setOnline(!isOffline);
+  }, [isOffline]);
+
+  // Sync pending actions when back online
+  useEffect(() => {
+    if (!isOffline && wasOffline) {
+      const syncPendingActions = async () => {
+        console.log('[App] Back online, syncing pending actions...');
+        const pendingCount = offlineSyncService.getPendingCount();
+
+        if (pendingCount > 0) {
+          const result = await offlineSyncService.syncAll(async (action) => {
+            try {
+              await apiClient({
+                method: action.method,
+                url: action.endpoint,
+                data: action.data,
+              });
+              return true;
+            } catch (error) {
+              console.error('[App] Failed to sync action:', action.id, error);
+              return false;
+            }
+          });
+
+          console.log('[App] Sync complete:', result);
+
+          // Invalidate relevant queries to refresh data
+          queryClient.invalidateQueries();
+        }
+
+        acknowledgeOnline();
+      };
+
+      syncPendingActions();
+    }
+  }, [isOffline, wasOffline, acknowledgeOnline]);
+
+  const handleRetry = useCallback(() => {
+    queryClient.invalidateQueries();
+  }, []);
+
+  return (
+    <View style={{ flex: 1 }}>
+      <OfflineBanner onRetry={handleRetry} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(client)" />
+        <Stack.Screen name="(barber)" />
+      </Stack>
+      <StatusBar style="auto" />
+    </View>
+  );
+}
+
+/**
+ * Root Layout Component
+ *
+ * Performance optimizations included:
+ * - Sentry error tracking and performance monitoring initialized
+ * - Query client with optimized cache settings
+ * - Error boundary for graceful error handling
+ * - Offline support with automatic sync when back online
+ */
 export default function RootLayout() {
   useEffect(() => {
-    console.log('[RootLayout] Mounted successfully');
+    // Initialize Sentry for error tracking and performance monitoring
+    initSentry();
+
+    // Set initial context
+    errorTrackingService.setTag('app_version', '1.0.0');
+    errorTrackingService.addBreadcrumb({
+      category: 'app',
+      message: 'App initialized',
+      level: 'info',
+    });
+
+    console.log('[RootLayout] Mounted successfully with performance monitoring');
   }, []);
 
   return (
@@ -18,17 +112,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <JotaiProvider>
           <QueryClientProvider client={queryClient}>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-              }}
-            >
-              <Stack.Screen name="index" />
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(client)" />
-              <Stack.Screen name="(barber)" />
-            </Stack>
-            <StatusBar style="auto" />
+            <AppContent />
           </QueryClientProvider>
         </JotaiProvider>
       </SafeAreaProvider>

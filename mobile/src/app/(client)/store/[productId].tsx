@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { ImageZoomModal } from '@/components/ui/ImageZoomModal';
 
 const { width } = Dimensions.get('window');
 
@@ -14,6 +15,7 @@ export default function ProductDetailsScreen() {
   const { productId } = useLocalSearchParams<{ productId: string }>();
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  const [showImageZoom, setShowImageZoom] = useState(false);
 
   const { data: product, isLoading } = useProduct(productId);
   const { addProduct, isInCart, getProductQuantity } = useCart();
@@ -86,12 +88,20 @@ export default function ProductDetailsScreen() {
                 }}
               >
                 {product.images.map((image, index) => (
-                  <Image
+                  <Pressable
                     key={index}
-                    source={{ uri: image }}
-                    style={{ width, height: 400 }}
-                    resizeMode="cover"
-                  />
+                    onPress={() => {
+                      setSelectedImage(index);
+                      setShowImageZoom(true);
+                    }}
+                    className="active:opacity-90"
+                  >
+                    <Image
+                      source={{ uri: image }}
+                      style={{ width, height: 400 }}
+                      resizeMode="cover"
+                    />
+                  </Pressable>
                 ))}
               </ScrollView>
 
@@ -126,7 +136,7 @@ export default function ProductDetailsScreen() {
           {/* Stock Badge */}
           {isOutOfStock && (
             <View className="absolute top-4 right-4">
-              <Badge variant="error" size="lg">
+              <Badge variant="danger" size="lg">
                 Out of Stock
               </Badge>
             </View>
@@ -236,6 +246,16 @@ export default function ProductDetailsScreen() {
             </Button>
           </View>
         </View>
+      )}
+
+      {/* Image Zoom Modal */}
+      {product?.images && product.images.length > 0 && (
+        <ImageZoomModal
+          visible={showImageZoom}
+          imageUrls={product.images}
+          initialIndex={selectedImage}
+          onClose={() => setShowImageZoom(false)}
+        />
       )}
     </SafeView>
   );

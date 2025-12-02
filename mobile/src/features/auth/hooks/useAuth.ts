@@ -87,6 +87,37 @@ export const useAuth = () => {
     },
   });
 
+  // Update profile mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: (updates: Partial<IAuthUser>) => authService.updateProfile(updates),
+    onSuccess: (updatedUser: IAuthUser) => {
+      // Update the auth atom with new user data
+      setAuth((prev) => ({
+        ...prev,
+        user: updatedUser,
+      }));
+
+      // Invalidate auth queries to refresh user data
+      queryClient.invalidateQueries({ queryKey: ['auth'] });
+    },
+    onError: (error: Error) => {
+      console.error('Update profile error:', error.message);
+    },
+  });
+
+  // Delete account mutation
+  const deleteAccountMutation = useMutation({
+    mutationFn: () => authService.deleteAccount(),
+    onSuccess: () => {
+      setLogout();
+      router.replace('/(auth)/login');
+      queryClient.clear();
+    },
+    onError: (error: Error) => {
+      console.error('Delete account error:', error.message);
+    },
+  });
+
   return {
     // State
     isAuthenticated,
@@ -99,13 +130,20 @@ export const useAuth = () => {
     login: loginMutation.mutate,
     logout: logoutMutation.mutate,
     refreshToken: refreshTokenMutation.mutate,
+    updateProfile: updateProfileMutation.mutate,
+    updateProfileAsync: updateProfileMutation.mutateAsync,
+    deleteAccount: deleteAccountMutation.mutate,
 
     // Loading states
     isLoggingIn: loginMutation.isPending,
     isLoggingOut: logoutMutation.isPending,
+    isUpdatingProfile: updateProfileMutation.isPending,
+    isDeletingAccount: deleteAccountMutation.isPending,
 
     // Errors
     loginError: loginMutation.error,
     logoutError: logoutMutation.error,
+    updateProfileError: updateProfileMutation.error,
+    deleteAccountError: deleteAccountMutation.error,
   };
 };

@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 func TestIntegration_UserWorkflow(t *testing.T) {
 	// Setup
+	ctx := context.Background()
 	store := storage.NewMemoryStorage()
 
 	// Create a user
@@ -29,40 +31,41 @@ func TestIntegration_UserWorkflow(t *testing.T) {
 	}
 
 	// Test: Create user
-	err := store.CreateUser(user)
+	err := store.CreateUser(ctx, user)
 	assert.NoError(t, err)
 
 	// Test: Get user
-	retrievedUser, err := store.GetUser(user.ID)
+	retrievedUser, err := store.GetUser(ctx, user.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, user.Email, retrievedUser.Email)
 	assert.Equal(t, user.Name, retrievedUser.Name)
 
 	// Test: Update user
 	user.Name = "Updated Integration User"
-	err = store.UpdateUser(user)
+	err = store.UpdateUser(ctx, user)
 	assert.NoError(t, err)
 
-	updatedUser, err := store.GetUser(user.ID)
+	updatedUser, err := store.GetUser(ctx, user.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, "Updated Integration User", updatedUser.Name)
 
 	// Test: Get all users
-	allUsers, err := store.GetUsers()
+	allUsers, err := store.GetUsers(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, allUsers, 1)
 
 	// Test: Delete user
-	err = store.DeleteUser(user.ID)
+	err = store.DeleteUser(ctx, user.ID)
 	assert.NoError(t, err)
 
-	_, err = store.GetUser(user.ID)
+	_, err = store.GetUser(ctx, user.ID)
 	assert.Error(t, err)
 	assert.Equal(t, storage.ErrUserNotFound, err)
 }
 
 func TestIntegration_BarberWorkflow(t *testing.T) {
 	// Setup
+	ctx := context.Background()
 	store := storage.NewMemoryStorage()
 
 	// Create a barber user
@@ -78,16 +81,18 @@ func TestIntegration_BarberWorkflow(t *testing.T) {
 		AuthProvider:      models.AuthProviderEmail,
 	}
 
-	err := store.CreateUser(barberUser)
+	err := store.CreateUser(ctx, barberUser)
 	require.NoError(t, err)
 
 	// Create barber profile
 	businessName := "Elite Cuts"
+	bio := "10+ years of experience in modern cuts"
+	address := "123 Main St, NYC, NY 10001"
 	barberProfile := &models.BarberProfile{
 		ID:               barberUser.ID,
 		UserID:           barberUser.ID,
 		BusinessName:     &businessName,
-		Bio:              "10+ years of experience in modern cuts",
+		Bio:              &bio,
 		Specialties:      []string{"Fade", "Beard Trim", "Classic Cut"},
 		Experience:       10,
 		ServiceLocations: []models.ServiceLocation{models.ServiceLocationInSalon, models.ServiceLocationInHome},
@@ -105,37 +110,40 @@ func TestIntegration_BarberWorkflow(t *testing.T) {
 		Rating:       4.8,
 		TotalReviews: 127,
 		IsVerified:   true,
-		Location: models.LocationWithAddress{
+		Location: models.Location{
 			Type:        "Point",
-			Coordinates: []float64{40.7128, -74.0060},
-			Address:     "123 Main St, NYC, NY 10001",
+			Coordinates: []float64{-74.0060, 40.7128}, // GeoJSON: [lng, lat]
 		},
+		Address:   &address,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
 	// Test: Create barber profile
-	err = store.CreateBarberProfile(barberProfile)
+	err = store.CreateBarberProfile(ctx, barberProfile)
 	assert.NoError(t, err)
 
 	// Test: Get barber profile
-	retrievedProfile, err := store.GetBarberProfile(barberProfile.ID)
+	retrievedProfile, err := store.GetBarberProfile(ctx, barberProfile.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, *barberProfile.BusinessName, *retrievedProfile.BusinessName)
-	assert.Equal(t, barberProfile.Bio, retrievedProfile.Bio)
+	assert.Equal(t, *barberProfile.Bio, *retrievedProfile.Bio)
 
 	// Test: Search barbers
-	barbers, err := store.SearchBarbers(40.7128, -74.0060, 10.0)
+	barbers, err := store.SearchBarbers(ctx, 40.7128, -74.0060, 10.0)
 	assert.NoError(t, err)
 	assert.Len(t, barbers, 1)
 	assert.Equal(t, barberProfile.ID, barbers[0].ID)
 
 	// Test: Get all barber profiles
-	allProfiles, err := store.GetBarberProfiles()
+	allProfiles, err := store.GetBarberProfiles(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, allProfiles, 1)
 }
 
 func TestIntegration_AppointmentWorkflow(t *testing.T) {
 	// Setup
+	ctx := context.Background()
 	store := storage.NewMemoryStorage()
 
 	// Create client user
@@ -151,7 +159,7 @@ func TestIntegration_AppointmentWorkflow(t *testing.T) {
 		AuthProvider:      models.AuthProviderEmail,
 	}
 
-	err := store.CreateUser(clientUser)
+	err := store.CreateUser(ctx, clientUser)
 	require.NoError(t, err)
 
 	// Create barber user
@@ -167,18 +175,21 @@ func TestIntegration_AppointmentWorkflow(t *testing.T) {
 		AuthProvider:      models.AuthProviderEmail,
 	}
 
-	err = store.CreateUser(barberUser)
+	err = store.CreateUser(ctx, barberUser)
 	require.NoError(t, err)
 
 	// Create barber profile
+	bio := "Professional barber"
 	barberProfile := &models.BarberProfile{
-		ID:     barberUser.ID,
-		UserID: barberUser.ID,
-		Bio:    "Professional barber",
-		Rating: 4.5,
+		ID:        barberUser.ID,
+		UserID:    barberUser.ID,
+		Bio:       &bio,
+		Rating:    4.5,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
-	err = store.CreateBarberProfile(barberProfile)
+	err = store.CreateBarberProfile(ctx, barberProfile)
 	require.NoError(t, err)
 
 	// Create appointment
@@ -204,45 +215,46 @@ func TestIntegration_AppointmentWorkflow(t *testing.T) {
 	}
 
 	// Test: Create appointment
-	err = store.CreateAppointment(appointment)
+	err = store.CreateAppointment(ctx, appointment)
 	assert.NoError(t, err)
 
 	// Test: Get appointment
-	retrievedAppointment, err := store.GetAppointment(appointment.ID)
+	retrievedAppointment, err := store.GetAppointment(ctx, appointment.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, appointment.ClientID, retrievedAppointment.ClientID)
 	assert.Equal(t, appointment.BarberID, retrievedAppointment.BarberID)
 	assert.Equal(t, appointment.ServiceType, retrievedAppointment.ServiceType)
 
 	// Test: Get user appointments
-	userAppointments, err := store.GetUserAppointments(clientUser.ID)
+	userAppointments, err := store.GetUserAppointments(ctx, clientUser.ID)
 	assert.NoError(t, err)
 	assert.Len(t, userAppointments, 1)
 	assert.Equal(t, appointment.ID, userAppointments[0].ID)
 
 	// Test: Get barber appointments
-	barberAppointments, err := store.GetBarberAppointments(barberUser.ID)
+	barberAppointments, err := store.GetBarberAppointments(ctx, barberUser.ID)
 	assert.NoError(t, err)
 	assert.Len(t, barberAppointments, 1)
 	assert.Equal(t, appointment.ID, barberAppointments[0].ID)
 
 	// Test: Update appointment status
 	appointment.Status = models.AppointmentStatusConfirmed
-	err = store.UpdateAppointment(appointment)
+	err = store.UpdateAppointment(ctx, appointment)
 	assert.NoError(t, err)
 
-	updatedAppointment, err := store.GetAppointment(appointment.ID)
+	updatedAppointment, err := store.GetAppointment(ctx, appointment.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, models.AppointmentStatusConfirmed, updatedAppointment.Status)
 
 	// Test: Get all appointments
-	allAppointments, err := store.GetAppointments()
+	allAppointments, err := store.GetAppointments(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, allAppointments, 1)
 }
 
 func TestIntegration_ComplexWorkflow(t *testing.T) {
 	// Setup
+	ctx := context.Background()
 	store := storage.NewMemoryStorage()
 
 	// Create multiple users
@@ -295,41 +307,49 @@ func TestIntegration_ComplexWorkflow(t *testing.T) {
 	}
 
 	// Create users
-	err := store.CreateUser(client1)
+	err := store.CreateUser(ctx, client1)
 	require.NoError(t, err)
-	err = store.CreateUser(client2)
+	err = store.CreateUser(ctx, client2)
 	require.NoError(t, err)
-	err = store.CreateUser(barber1)
+	err = store.CreateUser(ctx, barber1)
 	require.NoError(t, err)
-	err = store.CreateUser(barber2)
+	err = store.CreateUser(ctx, barber2)
 	require.NoError(t, err)
 
 	// Create barber profiles
 	businessName1 := "Elite Cuts"
+	bio1 := "Expert in modern styles"
 	barberProfile1 := &models.BarberProfile{
 		ID:           barber1.ID,
 		UserID:       barber1.ID,
 		BusinessName: &businessName1,
-		Bio:          "Expert in modern styles",
+		Bio:          &bio1,
 		Rating:       4.8,
 		TotalReviews: 150,
 		IsVerified:   true,
+		Location:     models.Location{Type: "Point", Coordinates: []float64{-74.0060, 40.7128}}, // GeoJSON: [lng, lat]
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
 	businessName2 := "Classic Barber"
+	bio2 := "Traditional barber with 20 years experience"
 	barberProfile2 := &models.BarberProfile{
 		ID:           barber2.ID,
 		UserID:       barber2.ID,
 		BusinessName: &businessName2,
-		Bio:          "Traditional barber with 20 years experience",
+		Bio:          &bio2,
 		Rating:       4.6,
 		TotalReviews: 200,
 		IsVerified:   true,
+		Location:     models.Location{Type: "Point", Coordinates: []float64{-74.0062, 40.7130}}, // GeoJSON: [lng, lat]
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
-	err = store.CreateBarberProfile(barberProfile1)
+	err = store.CreateBarberProfile(ctx, barberProfile1)
 	require.NoError(t, err)
-	err = store.CreateBarberProfile(barberProfile2)
+	err = store.CreateBarberProfile(ctx, barberProfile2)
 	require.NoError(t, err)
 
 	// Create appointments for different clients
@@ -363,46 +383,46 @@ func TestIntegration_ComplexWorkflow(t *testing.T) {
 		UpdatedAt:     time.Now(),
 	}
 
-	err = store.CreateAppointment(appointment1)
+	err = store.CreateAppointment(ctx, appointment1)
 	require.NoError(t, err)
-	err = store.CreateAppointment(appointment2)
+	err = store.CreateAppointment(ctx, appointment2)
 	require.NoError(t, err)
 
 	// Test: Verify all data is correctly stored
-	allUsers, err := store.GetUsers()
+	allUsers, err := store.GetUsers(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, allUsers, 4)
 
-	allBarbers, err := store.GetBarberProfiles()
+	allBarbers, err := store.GetBarberProfiles(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, allBarbers, 2)
 
-	allAppointments, err := store.GetAppointments()
+	allAppointments, err := store.GetAppointments(ctx)
 	assert.NoError(t, err)
 	assert.Len(t, allAppointments, 2)
 
 	// Test: Search barbers in specific area
-	nycBarbers, err := store.SearchBarbers(40.7128, -74.0060, 5.0)
+	nycBarbers, err := store.SearchBarbers(ctx, 40.7128, -74.0060, 5.0)
 	assert.NoError(t, err)
 	assert.Len(t, nycBarbers, 2) // Both barbers should be in range
 
 	// Test: Get appointments for specific users
-	client1Appointments, err := store.GetUserAppointments(client1.ID)
+	client1Appointments, err := store.GetUserAppointments(ctx, client1.ID)
 	assert.NoError(t, err)
 	assert.Len(t, client1Appointments, 1)
 	assert.Equal(t, appointment1.ID, client1Appointments[0].ID)
 
-	barber1Appointments, err := store.GetBarberAppointments(barber1.ID)
+	barber1Appointments, err := store.GetBarberAppointments(ctx, barber1.ID)
 	assert.NoError(t, err)
 	assert.Len(t, barber1Appointments, 1)
 	assert.Equal(t, appointment1.ID, barber1Appointments[0].ID)
 
 	// Test: Verify relationships
-	barber1Profile, err := store.GetBarberProfile(barber1.ID)
+	barber1Profile, err := store.GetBarberProfile(ctx, barber1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, barber1.ID, barber1Profile.UserID)
 
-	appointment1Data, err := store.GetAppointment(appointment1.ID)
+	appointment1Data, err := store.GetAppointment(ctx, appointment1.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, client1.ID, appointment1Data.ClientID)
 	assert.Equal(t, barber1.ID, appointment1Data.BarberID)

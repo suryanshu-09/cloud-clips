@@ -21,6 +21,7 @@ const (
 	PaymentStatusPending   PaymentStatus = "pending"
 	PaymentStatusCompleted PaymentStatus = "completed"
 	PaymentStatusRefunded  PaymentStatus = "refunded"
+	PaymentStatusFailed    PaymentStatus = "failed"
 )
 
 type HairType string

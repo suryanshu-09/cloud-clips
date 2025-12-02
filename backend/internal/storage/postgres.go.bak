@@ -1,0 +1,664 @@
+package storage
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"cloud-clips/internal/interfaces"
+	"cloud-clips/internal/models"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Ensure PostgresStorage implements StorageInterface
+var _ interfaces.StorageInterface = (*PostgresStorage)(nil)
+
+// PostgresStorage implements StorageInterface using PostgreSQL
+type PostgresStorage struct {
+	pool *pgxpool.Pool
+}
+
+// NewPostgresStorage creates a new PostgreSQL storage instance
+func NewPostgresStorage(connString string) (*PostgresStorage, error) {
+	ctx := context.Background()
+
+	config, err := pgxpool.ParseConfig(connString)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse connection string: %w", err)
+	}
+
+	// Configure connection pool
+	config.MaxConns = 25
+	config.MinConns = 5
+	config.MaxConnLifetime = time.Hour
+	config.MaxConnIdleTime = time.Minute * 30
+	config.HealthCheckPeriod = time.Minute
+
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create connection pool: %w", err)
+	}
+
+	// Test the connection
+	if err := pool.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("unable to ping database: %w", err)
+	}
+
+	return &PostgresStorage{pool: pool}, nil
+}
+
+// Close closes the database connection pool
+func (p *PostgresStorage) Close() error {
+	p.pool.Close()
+	return nil
+}
+
+// Ping checks if the database is accessible
+func (p *PostgresStorage) Ping(ctx context.Context) error {
+	return p.pool.Ping(ctx)
+}
+
+// Helper function to scan user from database row
+func scanUser(row pgx.Row) (*models.User, error) {
+	var user models.User
+	var lat, lng sql.NullFloat64
+	var phone sql.NullString
+	var avatar, passwordHash, stripeCustomerID, firebaseUID, fcmToken, resetToken sql.NullString
+	var resetTokenExpires sql.NullTime
+
+	err := row.Scan(
+		&user.ID, &user.Email, &phone, &user.Name, &avatar, &passwordHash, &user.Role,
+		&lat, &lng,
+		&user.CreatedAt, &user.LastActive,
+		&user.NotificationPrefs.Push, &user.NotificationPrefs.SMS, &user.NotificationPrefs.Email,
+		&user.AuthProvider, &stripeCustomerID, &firebaseUID,
+		&fcmToken, &user.EmailVerified, &resetToken, &resetTokenExpires,
+	)
+
+	if err == pgx.ErrNoRows {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle nullable fields
+	if phone.Valid {
+		user.Phone = phone.String
+	}
+	if avatar.Valid {
+		user.Avatar = &avatar.String
+	}
+	if passwordHash.Valid {
+		user.PasswordHash = &passwordHash.String
+	}
+	if stripeCustomerID.Valid {
+		user.StripeCustomerID = &stripeCustomerID.String
+	}
+	if firebaseUID.Valid {
+		user.FirebaseUID = &firebaseUID.String
+	}
+	if fcmToken.Valid {
+		user.FCMToken = &fcmToken.String
+	}
+	if resetToken.Valid {
+		user.ResetToken = &resetToken.String
+	}
+	if resetTokenExpires.Valid {
+		user.ResetTokenExpires = &resetTokenExpires.Time
+	}
+
+	// Handle location - GeoJSON format
+	if lat.Valid && lng.Valid {
+		user.Location = models.Location{
+			Type:        "Point",
+			Coordinates: []float64{lng.Float64, lat.Float64},
+		}
+	} else {
+		user.Location = models.Location{
+			Type:        "Point",
+			Coordinates: []float64{0, 0},
+		}
+	}
+
+	return &user, nil
+}
+
+// ========== User Operations ==========
+
+func (p *PostgresStorage) GetUser(ctx context.Context, id uuid.UUID) (*models.User, error) {
+	query := `
+		SELECT id, email, phone, name, avatar, password_hash, role, 
+		       ST_Y(location::geometry) as latitude, ST_X(location::geometry) as longitude,
+		       created_at, last_active, notification_push, notification_sms, notification_email,
+		       auth_provider, stripe_customer_id, firebase_uid, fcm_token, email_verified,
+		       reset_token, reset_token_expires
+		FROM users WHERE id = $1
+	`
+
+	return scanUser(p.pool.QueryRow(ctx, query, id))
+}
+
+func (p *PostgresStorage) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+	query := `
+		SELECT id, email, phone, name, avatar, password_hash, role, 
+		       ST_Y(location::geometry) as latitude, ST_X(location::geometry) as longitude,
+		       created_at, last_active, notification_push, notification_sms, notification_email,
+		       auth_provider, stripe_customer_id, firebase_uid, fcm_token, email_verified,
+		       reset_token, reset_token_expires
+		FROM users WHERE email = $1
+	`
+
+	return scanUser(p.pool.QueryRow(ctx, query, email))
+}
+
+func (p *PostgresStorage) GetUserByFirebaseUID(ctx context.Context, firebaseUID string) (*models.User, error) {
+	query := `
+		SELECT id, email, phone, name, avatar, password_hash, role, 
+		       ST_Y(location::geometry) as latitude, ST_X(location::geometry) as longitude,
+		       created_at, last_active, notification_push, notification_sms, notification_email,
+		       auth_provider, stripe_customer_id, firebase_uid, fcm_token, email_verified,
+		       reset_token, reset_token_expires
+		FROM users WHERE firebase_uid = $1
+	`
+
+	return scanUser(p.pool.QueryRow(ctx, query, firebaseUID))
+}
+
+func (p *PostgresStorage) GetUsers(ctx context.Context) ([]*models.User, error) {
+	query := `
+		SELECT id, email, phone, name, avatar, password_hash, role, 
+		       ST_Y(location::geometry) as latitude, ST_X(location::geometry) as longitude,
+		       created_at, last_active, notification_push, notification_sms, notification_email,
+		       auth_provider, stripe_customer_id, firebase_uid, fcm_token, email_verified,
+		       reset_token, reset_token_expires
+		FROM users
+		ORDER BY created_at DESC
+	`
+
+	rows, err := p.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		user, err := scanUser(rows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan user: %w", err)
+		}
+		users = append(users, user)
+	}
+
+	return users, rows.Err()
+}
+
+func (p *PostgresStorage) CreateUser(ctx context.Context, user *models.User) error {
+	query := `
+		INSERT INTO users (id, email, phone, name, avatar, password_hash, role, 
+		                   location, created_at, last_active, notification_push, 
+		                   notification_sms, notification_email, auth_provider, 
+		                   stripe_customer_id, firebase_uid, fcm_token, email_verified,
+		                   reset_token, reset_token_expires)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 
+		        ST_SetSRID(ST_MakePoint($8, $9), 4326), 
+		        $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+	`
+
+	var lng, lat interface{}
+	if len(user.Location.Coordinates) >= 2 {
+		lng = user.Location.Coordinates[0]
+		lat = user.Location.Coordinates[1]
+	}
+
+	_, err := p.pool.Exec(ctx, query,
+		user.ID, user.Email, user.Phone, user.Name, user.Avatar, user.PasswordHash, user.Role,
+		lng, lat,
+		user.CreatedAt, user.LastActive,
+		user.NotificationPrefs.Push, user.NotificationPrefs.SMS, user.NotificationPrefs.Email,
+		user.AuthProvider, user.StripeCustomerID, user.FirebaseUID,
+		user.FCMToken, user.EmailVerified, user.ResetToken, user.ResetTokenExpires,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to create user: %w", err)
+	}
+
+	return nil
+}
+
+func (p *PostgresStorage) UpdateUser(ctx context.Context, user *models.User) error {
+	query := `
+		UPDATE users 
+		SET email = $2, phone = $3, name = $4, avatar = $5, password_hash = $6, 
+		    role = $7, location = ST_SetSRID(ST_MakePoint($8, $9), 4326),
+		    last_active = $10, notification_push = $11, notification_sms = $12,
+		    notification_email = $13, auth_provider = $14, stripe_customer_id = $15,
+		    firebase_uid = $16, fcm_token = $17, email_verified = $18,
+		    reset_token = $19, reset_token_expires = $20
+		WHERE id = $1
+	`
+
+	var lng, lat interface{}
+	if len(user.Location.Coordinates) >= 2 {
+		lng = user.Location.Coordinates[0]
+		lat = user.Location.Coordinates[1]
+	}
+
+	result, err := p.pool.Exec(ctx, query,
+		user.ID, user.Email, user.Phone, user.Name, user.Avatar, user.PasswordHash, user.Role,
+		lng, lat,
+		user.LastActive,
+		user.NotificationPrefs.Push, user.NotificationPrefs.SMS, user.NotificationPrefs.Email,
+		user.AuthProvider, user.StripeCustomerID, user.FirebaseUID, user.FCMToken,
+		user.EmailVerified, user.ResetToken, user.ResetTokenExpires,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to update user: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
+}
+
+func (p *PostgresStorage) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	query := `DELETE FROM users WHERE id = $1`
+
+	result, err := p.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
+}
+
+// ========== Barber Profile Operations ==========
+
+func (p *PostgresStorage) GetBarberProfile(ctx context.Context, id uuid.UUID) (*models.BarberProfile, error) {
+	query := `
+		SELECT id, user_id, business_name, bio, specialties, experience, 
+		       service_locations, working_hours, services, gallery, rating, 
+		       total_reviews, is_verified, 
+		       ST_Y(location::geometry) as latitude, ST_X(location::geometry) as longitude,
+		       address, created_at, updated_at
+		FROM barber_profiles WHERE id = $1
+	`
+
+	var profile models.BarberProfile
+	var lat, lng sql.NullFloat64
+	var businessName, bio, address sql.NullString
+	var workingHoursJSON, servicesJSON, galleryJSON []byte
+
+	err := p.pool.QueryRow(ctx, query, id).Scan(
+		&profile.ID, &profile.UserID, &businessName, &bio, &profile.Specialties, &profile.Experience,
+		&profile.ServiceLocations, &workingHoursJSON, &servicesJSON, &galleryJSON,
+		&profile.Rating, &profile.TotalReviews, &profile.IsVerified,
+		&lat, &lng, &address, &profile.CreatedAt, &profile.UpdatedAt,
+	)
+
+	if err == pgx.ErrNoRows {
+		return nil, ErrBarberProfileNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get barber profile: %w", err)
+	}
+
+	// Handle nullable fields
+	if businessName.Valid {
+		profile.BusinessName = &businessName.String
+	}
+	if bio.Valid {
+		profile.Bio = &bio.String
+	}
+	if address.Valid {
+		profile.Address = &address.String
+	}
+
+	// Parse JSON fields
+	if len(workingHoursJSON) > 0 {
+		json.Unmarshal(workingHoursJSON, &profile.WorkingHours)
+	}
+	if len(servicesJSON) > 0 {
+		json.Unmarshal(servicesJSON, &profile.Services)
+	}
+	if len(galleryJSON) > 0 {
+		json.Unmarshal(galleryJSON, &profile.Gallery)
+	}
+
+	// Handle location
+	if lat.Valid && lng.Valid {
+		profile.Location = models.Location{
+			Type:        "Point",
+			Coordinates: []float64{lng.Float64, lat.Float64},
+		}
+	} else {
+		profile.Location = models.Location{
+			Type:        "Point",
+			Coordinates: []float64{0, 0},
+		}
+	}
+
+	return &profile, nil
+}
+
+func (p *PostgresStorage) GetBarberProfileByUserID(ctx context.Context, userID uuid.UUID) (*models.BarberProfile, error) {
+	query := `
+		SELECT id, user_id, business_name, bio, specialties, experience, 
+		       service_locations, working_hours, services, gallery, rating, 
+		       total_reviews, is_verified, 
+		       ST_Y(location::geometry) as latitude, ST_X(location::geometry) as longitude,
+		       address, created_at, updated_at
+		FROM barber_profiles WHERE user_id = $1
+	`
+
+	var profile models.BarberProfile
+	var lat, lng sql.NullFloat64
+	var businessName, bio, address sql.NullString
+	var workingHoursJSON, servicesJSON, galleryJSON []byte
+
+	err := p.pool.QueryRow(ctx, query, userID).Scan(
+		&profile.ID, &profile.UserID, &businessName, &bio, &profile.Specialties, &profile.Experience,
+		&profile.ServiceLocations, &workingHoursJSON, &servicesJSON, &galleryJSON,
+		&profile.Rating, &profile.TotalReviews, &profile.IsVerified,
+		&lat, &lng, &address, &profile.CreatedAt, &profile.UpdatedAt,
+	)
+
+	if err == pgx.ErrNoRows {
+		return nil, ErrBarberProfileNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get barber profile by user ID: %w", err)
+	}
+
+	// Handle nullable fields
+	if businessName.Valid {
+		profile.BusinessName = &businessName.String
+	}
+	if bio.Valid {
+		profile.Bio = &bio.String
+	}
+	if address.Valid {
+		profile.Address = &address.String
+	}
+
+	// Parse JSON fields
+	if len(workingHoursJSON) > 0 {
+		json.Unmarshal(workingHoursJSON, &profile.WorkingHours)
+	}
+	if len(servicesJSON) > 0 {
+		json.Unmarshal(servicesJSON, &profile.Services)
+	}
+	if len(galleryJSON) > 0 {
+		json.Unmarshal(galleryJSON, &profile.Gallery)
+	}
+
+	// Handle location
+	if lat.Valid && lng.Valid {
+		profile.Location = models.Location{
+			Type:        "Point",
+			Coordinates: []float64{lng.Float64, lat.Float64},
+		}
+	} else {
+		profile.Location = models.Location{
+			Type:        "Point",
+			Coordinates: []float64{0, 0},
+		}
+	}
+
+	return &profile, nil
+}
+
+func (p *PostgresStorage) GetBarberProfiles(ctx context.Context) ([]*models.BarberProfile, error) {
+	query := `
+		SELECT id, user_id, business_name, bio, specialties, experience, 
+		       service_locations, working_hours, services, gallery, rating, 
+		       total_reviews, is_verified, 
+		       ST_Y(location::geometry) as latitude, ST_X(location::geometry) as longitude,
+		       address, created_at, updated_at
+		FROM barber_profiles
+		ORDER BY rating DESC, total_reviews DESC
+	`
+
+	rows, err := p.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get barber profiles: %w", err)
+	}
+	defer rows.Close()
+
+	var profiles []*models.BarberProfile
+	for rows.Next() {
+		var profile models.BarberProfile
+		var lat, lng sql.NullFloat64
+		var businessName, bio, address sql.NullString
+		var workingHoursJSON, servicesJSON, galleryJSON []byte
+
+		err := rows.Scan(
+			&profile.ID, &profile.UserID, &businessName, &bio, &profile.Specialties, &profile.Experience,
+			&profile.ServiceLocations, &workingHoursJSON, &servicesJSON, &galleryJSON,
+			&profile.Rating, &profile.TotalReviews, &profile.IsVerified,
+			&lat, &lng, &address, &profile.CreatedAt, &profile.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan barber profile: %w", err)
+		}
+
+		// Handle nullable fields
+		if businessName.Valid {
+			profile.BusinessName = &businessName.String
+		}
+		if bio.Valid {
+			profile.Bio = &bio.String
+		}
+		if address.Valid {
+			profile.Address = &address.String
+		}
+
+		// Parse JSON fields
+		if len(workingHoursJSON) > 0 {
+			json.Unmarshal(workingHoursJSON, &profile.WorkingHours)
+		}
+		if len(servicesJSON) > 0 {
+			json.Unmarshal(servicesJSON, &profile.Services)
+		}
+		if len(galleryJSON) > 0 {
+			json.Unmarshal(galleryJSON, &profile.Gallery)
+		}
+
+		// Handle location
+		if lat.Valid && lng.Valid {
+			profile.Location = models.Location{
+				Type:        "Point",
+				Coordinates: []float64{lng.Float64, lat.Float64},
+			}
+		} else {
+			profile.Location = models.Location{
+				Type:        "Point",
+				Coordinates: []float64{0, 0},
+			}
+		}
+
+		profiles = append(profiles, &profile)
+	}
+
+	return profiles, rows.Err()
+}
+
+func (p *PostgresStorage) CreateBarberProfile(ctx context.Context, profile *models.BarberProfile) error {
+	// Convert JSON fields to bytes
+	workingHoursJSON, _ := json.Marshal(profile.WorkingHours)
+	servicesJSON, _ := json.Marshal(profile.Services)
+	galleryJSON, _ := json.Marshal(profile.Gallery)
+
+	query := `
+		INSERT INTO barber_profiles (id, user_id, business_name, bio, specialties, experience,
+		                              service_locations, working_hours, services, gallery,
+		                              rating, total_reviews, is_verified, location, address,
+		                              created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+		        ST_SetSRID(ST_MakePoint($14, $15), 4326), $16, $17, $18)
+	`
+
+	var lng, lat interface{}
+	if len(profile.Location.Coordinates) >= 2 {
+		lng = profile.Location.Coordinates[0]
+		lat = profile.Location.Coordinates[1]
+	}
+
+	_, err := p.pool.Exec(ctx, query,
+		profile.ID, profile.UserID, profile.BusinessName, profile.Bio, profile.Specialties,
+		profile.Experience, profile.ServiceLocations, workingHoursJSON, servicesJSON, galleryJSON,
+		profile.Rating, profile.TotalReviews, profile.IsVerified, lng, lat, profile.Address,
+		profile.CreatedAt, profile.UpdatedAt,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to create barber profile: %w", err)
+	}
+
+	return nil
+}
+
+func (p *PostgresStorage) UpdateBarberProfile(ctx context.Context, profile *models.BarberProfile) error {
+	// Convert JSON fields to bytes
+	workingHoursJSON, _ := json.Marshal(profile.WorkingHours)
+	servicesJSON, _ := json.Marshal(profile.Services)
+	galleryJSON, _ := json.Marshal(profile.Gallery)
+
+	query := `
+		UPDATE barber_profiles
+		SET user_id = $2, business_name = $3, bio = $4, specialties = $5, experience = $6,
+		    service_locations = $7, working_hours = $8, services = $9, gallery = $10,
+		    rating = $11, total_reviews = $12, is_verified = $13,
+		    location = ST_SetSRID(ST_MakePoint($14, $15), 4326), address = $16
+		WHERE id = $1
+	`
+
+	var lng, lat interface{}
+	if len(profile.Location.Coordinates) >= 2 {
+		lng = profile.Location.Coordinates[0]
+		lat = profile.Location.Coordinates[1]
+	}
+
+	result, err := p.pool.Exec(ctx, query,
+		profile.ID, profile.UserID, profile.BusinessName, profile.Bio, profile.Specialties,
+		profile.Experience, profile.ServiceLocations, workingHoursJSON, servicesJSON, galleryJSON,
+		profile.Rating, profile.TotalReviews, profile.IsVerified, lng, lat, profile.Address,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to update barber profile: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrBarberProfileNotFound
+	}
+
+	return nil
+}
+
+func (p *PostgresStorage) DeleteBarberProfile(ctx context.Context, id uuid.UUID) error {
+	query := `DELETE FROM barber_profiles WHERE id = $1`
+
+	result, err := p.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete barber profile: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrBarberProfileNotFound
+	}
+
+	return nil
+}
+
+func (p *PostgresStorage) SearchBarbers(ctx context.Context, lat, lng, radiusKm float64) ([]*models.BarberProfile, error) {
+	query := `
+		SELECT id, user_id, business_name, bio, specialties, experience, 
+		       service_locations, working_hours, services, gallery, rating, 
+		       total_reviews, is_verified, 
+		       ST_Y(location::geometry) as latitude, ST_X(location::geometry) as longitude,
+		       address, created_at, updated_at,
+		       ST_Distance(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000 as distance_km
+		FROM barber_profiles
+		WHERE ST_DWithin(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, $3 * 1000)
+		ORDER BY distance_km ASC, rating DESC
+	`
+
+	rows, err := p.pool.Query(ctx, query, lng, lat, radiusKm)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search barbers: %w", err)
+	}
+	defer rows.Close()
+
+	var profiles []*models.BarberProfile
+	for rows.Next() {
+		var profile models.BarberProfile
+		var profileLat, profileLng sql.NullFloat64
+		var businessName, bio, address sql.NullString
+		var workingHoursJSON, servicesJSON, galleryJSON []byte
+		var distance float64
+
+		err := rows.Scan(
+			&profile.ID, &profile.UserID, &businessName, &bio, &profile.Specialties, &profile.Experience,
+			&profile.ServiceLocations, &workingHoursJSON, &servicesJSON, &galleryJSON,
+			&profile.Rating, &profile.TotalReviews, &profile.IsVerified,
+			&profileLat, &profileLng, &address, &profile.CreatedAt, &profile.UpdatedAt, &distance,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan barber profile: %w", err)
+		}
+
+		// Handle nullable fields
+		if businessName.Valid {
+			profile.BusinessName = &businessName.String
+		}
+		if bio.Valid {
+			profile.Bio = &bio.String
+		}
+		if address.Valid {
+			profile.Address = &address.String
+		}
+
+		// Parse JSON fields
+		if len(workingHoursJSON) > 0 {
+			json.Unmarshal(workingHoursJSON, &profile.WorkingHours)
+		}
+		if len(servicesJSON) > 0 {
+			json.Unmarshal(servicesJSON, &profile.Services)
+		}
+		if len(galleryJSON) > 0 {
+			json.Unmarshal(galleryJSON, &profile.Gallery)
+		}
+
+		// Handle location
+		if profileLat.Valid && profileLng.Valid {
+			profile.Location = models.Location{
+				Type:        "Point",
+				Coordinates: []float64{profileLng.Float64, profileLat.Float64},
+			}
+		} else {
+			profile.Location = models.Location{
+				Type:        "Point",
+				Coordinates: []float64{0, 0},
+			}
+		}
+
+		profiles = append(profiles, &profile)
+	}
+
+	return profiles, rows.Err()
+}

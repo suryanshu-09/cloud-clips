@@ -10,6 +10,14 @@ export {
   useTransaction,
 } from './hooks/usePayment';
 export { useCoupon } from './hooks/useCoupon';
+export {
+  useCoupons,
+  useAvailableCoupons,
+  useSavedCoupons,
+  useSaveCoupon,
+  COUPON_QUERY_KEYS,
+  type ICouponWithMeta,
+} from './hooks/useCoupons';
 
 // Services
 export { paymentService } from './services/paymentService';

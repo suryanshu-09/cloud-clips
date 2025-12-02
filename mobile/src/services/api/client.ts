@@ -36,16 +36,19 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor - Add auth token
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // Get auth token from storage
-    const authData = storageHelpers.getObject<{ token: string }>('auth');
-    const token = authData?.token;
+    // Skip auth header for refresh requests
+    if (!(config as any)._isRefreshRequest) {
+      // Get auth token from storage
+      const authData = storageHelpers.getObject<{ token: string }>('auth');
+      const token = authData?.token;
 
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
 
     // Log requests in development
-    if (__DEV__) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
       console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, {
         params: config.params,
         data: config.data,
@@ -64,7 +67,7 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => {
     // Log responses in development
-    if (__DEV__) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
       console.log(
         `[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`,
         {
@@ -78,10 +81,11 @@ apiClient.interceptors.response.use(
   async (error: AxiosError<IApiError>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
+      _isRefreshRequest?: boolean;
     };
 
     // Log errors in development
-    if (__DEV__) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
       console.error('[API Response Error]', {
         url: originalRequest?.url,
         status: error.response?.status,
@@ -90,7 +94,13 @@ apiClient.interceptors.response.use(
     }
 
     // Handle 401 Unauthorized - Try to refresh token
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+    // Skip refresh logic for refresh requests to prevent infinite loops
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !originalRequest._isRefreshRequest
+    ) {
       originalRequest._retry = true;
 
       try {
@@ -101,14 +111,16 @@ apiClient.interceptors.response.use(
         const refreshToken = authData?.refreshToken;
 
         if (refreshToken) {
-          // Attempt to refresh the token
-          const response = await axios.post(
-            `${API_BASE_URL}/auth/refresh`,
-            { refreshToken },
-            {
-              headers: { 'Content-Type': 'application/json' },
-            }
-          );
+          // Attempt to refresh the token using a special flag
+          const refreshConfig = {
+            method: 'POST',
+            url: '/auth/refresh',
+            data: { refreshToken },
+            headers: { 'Content-Type': 'application/json' },
+            _isRefreshRequest: true,
+          };
+
+          const response = await apiClient(refreshConfig);
 
           const { token: newToken, refreshToken: newRefreshToken } = response.data;
 
@@ -130,7 +142,6 @@ apiClient.interceptors.response.use(
         storageHelpers.delete('auth');
         storageHelpers.delete('userProfile');
         // Note: Navigation to login should be handled by the app's auth context
-        console.error('[Token Refresh Failed]', refreshError);
         return Promise.reject(refreshError);
       }
     }

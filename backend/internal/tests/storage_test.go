@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 func TestMemoryStorage_GetUser(t *testing.T) {
 	// Setup
+	ctx := context.Background()
 	store := storage.NewMemoryStorage()
 
 	userID := uuid.New()
@@ -28,11 +30,11 @@ func TestMemoryStorage_GetUser(t *testing.T) {
 		AuthProvider:      models.AuthProviderEmail,
 	}
 
-	err := store.CreateUser(testUser)
+	err := store.CreateUser(ctx, testUser)
 	require.NoError(t, err)
 
 	// Test
-	retrievedUser, err := store.GetUser(userID)
+	retrievedUser, err := store.GetUser(ctx, userID)
 
 	// Assert
 	assert.NoError(t, err)
@@ -45,11 +47,12 @@ func TestMemoryStorage_GetUser(t *testing.T) {
 
 func TestMemoryStorage_GetUser_NotFound(t *testing.T) {
 	// Setup
+	ctx := context.Background()
 	store := storage.NewMemoryStorage()
 	nonExistentID := uuid.New()
 
 	// Test
-	user, err := store.GetUser(nonExistentID)
+	user, err := store.GetUser(ctx, nonExistentID)
 
 	// Assert
 	assert.Error(t, err)
@@ -59,6 +62,7 @@ func TestMemoryStorage_GetUser_NotFound(t *testing.T) {
 
 func TestMemoryStorage_GetUsers(t *testing.T) {
 	// Setup
+	ctx := context.Background()
 	store := storage.NewMemoryStorage()
 
 	user1 := &models.User{
@@ -85,13 +89,13 @@ func TestMemoryStorage_GetUsers(t *testing.T) {
 		AuthProvider:      models.AuthProviderGoogle,
 	}
 
-	err := store.CreateUser(user1)
+	err := store.CreateUser(ctx, user1)
 	require.NoError(t, err)
-	err = store.CreateUser(user2)
+	err = store.CreateUser(ctx, user2)
 	require.NoError(t, err)
 
 	// Test
-	users, err := store.GetUsers()
+	users, err := store.GetUsers(ctx)
 
 	// Assert
 	assert.NoError(t, err)
@@ -100,6 +104,7 @@ func TestMemoryStorage_GetUsers(t *testing.T) {
 
 func TestMemoryStorage_CreateUser(t *testing.T) {
 	// Setup
+	ctx := context.Background()
 	store := storage.NewMemoryStorage()
 
 	user := &models.User{
@@ -115,19 +120,20 @@ func TestMemoryStorage_CreateUser(t *testing.T) {
 	}
 
 	// Test
-	err := store.CreateUser(user)
+	err := store.CreateUser(ctx, user)
 
 	// Assert
 	assert.NoError(t, err)
 
 	// Verify user was created
-	retrievedUser, err := store.GetUser(user.ID)
+	retrievedUser, err := store.GetUser(ctx, user.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, user.Email, retrievedUser.Email)
 }
 
 func TestMemoryStorage_CreateUser_Duplicate(t *testing.T) {
 	// Setup
+	ctx := context.Background()
 	store := storage.NewMemoryStorage()
 
 	userID := uuid.New()
@@ -144,11 +150,11 @@ func TestMemoryStorage_CreateUser_Duplicate(t *testing.T) {
 	}
 
 	// Create first user
-	err := store.CreateUser(user)
+	err := store.CreateUser(ctx, user)
 	require.NoError(t, err)
 
 	// Test - try to create duplicate
-	err = store.CreateUser(user)
+	err = store.CreateUser(ctx, user)
 
 	// Assert
 	assert.Error(t, err)
@@ -157,6 +163,7 @@ func TestMemoryStorage_CreateUser_Duplicate(t *testing.T) {
 
 func TestMemoryStorage_UpdateUser(t *testing.T) {
 	// Setup
+	ctx := context.Background()
 	store := storage.NewMemoryStorage()
 
 	user := &models.User{
@@ -171,7 +178,7 @@ func TestMemoryStorage_UpdateUser(t *testing.T) {
 		AuthProvider:      models.AuthProviderEmail,
 	}
 
-	err := store.CreateUser(user)
+	err := store.CreateUser(ctx, user)
 	require.NoError(t, err)
 
 	// Update user
@@ -179,13 +186,13 @@ func TestMemoryStorage_UpdateUser(t *testing.T) {
 	user.Email = "updated@example.com"
 
 	// Test
-	err = store.UpdateUser(user)
+	err = store.UpdateUser(ctx, user)
 
 	// Assert
 	assert.NoError(t, err)
 
 	// Verify update
-	retrievedUser, err := store.GetUser(user.ID)
+	retrievedUser, err := store.GetUser(ctx, user.ID)
 	assert.NoError(t, err)
 	assert.Equal(t, "Updated Name", retrievedUser.Name)
 	assert.Equal(t, "updated@example.com", retrievedUser.Email)
@@ -193,6 +200,7 @@ func TestMemoryStorage_UpdateUser(t *testing.T) {
 
 func TestMemoryStorage_UpdateUser_NotFound(t *testing.T) {
 	// Setup
+	ctx := context.Background()
 	store := storage.NewMemoryStorage()
 
 	user := &models.User{
@@ -208,7 +216,7 @@ func TestMemoryStorage_UpdateUser_NotFound(t *testing.T) {
 	}
 
 	// Test - try to update non-existent user
-	err := store.UpdateUser(user)
+	err := store.UpdateUser(ctx, user)
 
 	// Assert
 	assert.Error(t, err)
@@ -217,6 +225,7 @@ func TestMemoryStorage_UpdateUser_NotFound(t *testing.T) {
 
 func TestMemoryStorage_DeleteUser(t *testing.T) {
 	// Setup
+	ctx := context.Background()
 	store := storage.NewMemoryStorage()
 
 	user := &models.User{
@@ -231,28 +240,29 @@ func TestMemoryStorage_DeleteUser(t *testing.T) {
 		AuthProvider:      models.AuthProviderEmail,
 	}
 
-	err := store.CreateUser(user)
+	err := store.CreateUser(ctx, user)
 	require.NoError(t, err)
 
 	// Test
-	err = store.DeleteUser(user.ID)
+	err = store.DeleteUser(ctx, user.ID)
 
 	// Assert
 	assert.NoError(t, err)
 
 	// Verify deletion
-	_, err = store.GetUser(user.ID)
+	_, err = store.GetUser(ctx, user.ID)
 	assert.Error(t, err)
 	assert.Equal(t, storage.ErrUserNotFound, err)
 }
 
 func TestMemoryStorage_DeleteUser_NotFound(t *testing.T) {
 	// Setup
+	ctx := context.Background()
 	store := storage.NewMemoryStorage()
 	nonExistentID := uuid.New()
 
 	// Test
-	err := store.DeleteUser(nonExistentID)
+	err := store.DeleteUser(ctx, nonExistentID)
 
 	// Assert
 	assert.Error(t, err)

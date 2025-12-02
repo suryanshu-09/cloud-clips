@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -193,7 +194,8 @@ func TestGraphQLSchema_UserByIDQuery(t *testing.T) {
 	})
 
 	// Get first user ID
-	users, err := store.GetUsers()
+	ctx := context.Background()
+	users, err := store.GetUsers(ctx)
 	require.NoError(t, err)
 	require.Greater(t, len(users), 0)
 	userID := users[0].ID.String()

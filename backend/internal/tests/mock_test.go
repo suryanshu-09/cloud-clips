@@ -99,11 +99,12 @@ func TestMockStorage_GetBarberProfiles(t *testing.T) {
 	mockStorage := NewMockStorageInterface(ctrl)
 
 	barberID := uuid.New()
+	bio := "Professional barber"
 	expectedProfiles := []*models.BarberProfile{
 		{
 			ID:         barberID,
 			UserID:     barberID,
-			Bio:        "Professional barber",
+			Bio:        &bio,
 			Rating:     4.5,
 			IsVerified: true,
 		},
@@ -133,10 +134,11 @@ func TestMockStorage_SearchBarbers(t *testing.T) {
 	mockStorage := NewMockStorageInterface(ctrl)
 
 	lat, lng, radius := 40.7128, -74.0060, 10.0
+	nycBio := "Barber in NYC"
 	expectedProfiles := []*models.BarberProfile{
 		{
 			ID:     uuid.New(),
-			Bio:    "Barber in NYC",
+			Bio:    &nycBio,
 			Rating: 4.8,
 		},
 	}
@@ -281,11 +283,12 @@ func TestComplexWorkflow_WithMocks(t *testing.T) {
 	mockAuth.EXPECT().ValidateToken(token).Return(userID, nil).Times(1)
 
 	// Mock barber profiles search
+	expertBio := "Expert Barber"
 	barbers := []*models.BarberProfile{
 		{
 			ID:     barberID,
 			UserID: barberID,
-			Bio:    "Expert Barber",
+			Bio:    &expertBio,
 			Rating: 4.9,
 		},
 	}

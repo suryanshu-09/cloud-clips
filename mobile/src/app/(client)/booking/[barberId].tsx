@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Text, View, ScrollView, ActivityIndicator, Pressable, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeView } from '@/components/ui/SafeView';
@@ -7,19 +8,28 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ImageZoomModal } from '@/components/ui/ImageZoomModal';
 import { ServiceList } from '@/components/barber/ServiceList';
 import { useBarberProfile } from '@/features/barbers';
+import { useBarberReviews } from '@/features/reviews';
+import { ReviewCard } from '@/components/review';
+import { RatingStars } from '@/components/shared/RatingStars';
 
 export default function BarberProfileScreen() {
   const { barberId } = useLocalSearchParams<{ barberId: string }>();
   const router = useRouter();
+  const [showGalleryZoom, setShowGalleryZoom] = useState(false);
+  const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0);
 
   const { data: barber, isLoading, isError, error, refetch } = useBarberProfile(barberId || '');
+  const { data: reviewsData, isLoading: reviewsLoading } = useBarberReviews(barberId || '', {
+    limit: 5,
+  });
 
   if (isLoading) {
     return (
       <SafeView>
-        <Header title="Barber Profile" showBackButton />
+        <Header title="Barber Profile" showBack />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#0066CC" />
           <Text className="text-gray-600 mt-4">Loading barber profile...</Text>
@@ -31,7 +41,7 @@ export default function BarberProfileScreen() {
   if (isError || !barber) {
     return (
       <SafeView>
-        <Header title="Barber Profile" showBackButton />
+        <Header title="Barber Profile" showBack />
         <View className="flex-1 items-center justify-center p-6">
           <EmptyState
             title="Failed to load profile"
@@ -59,9 +69,14 @@ export default function BarberProfileScreen() {
     return days.length > 0 ? days.join(', ') : 'Hours not available';
   };
 
+  const handleGalleryImagePress = (index: number) => {
+    setSelectedGalleryIndex(index);
+    setShowGalleryZoom(true);
+  };
+
   return (
     <SafeView>
-      <Header title="Barber Profile" showBackButton />
+      <Header title="Barber Profile" showBack />
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* Header Section */}
         <View className="bg-white p-6 border-b border-gray-200">
@@ -87,14 +102,13 @@ export default function BarberProfileScreen() {
               </View>
 
               {/* Rating */}
-              <View className="flex-row items-center gap-2 mb-2">
-                <View className="flex-row items-center gap-1">
-                  <Text className="text-yellow-500 text-lg">⭐</Text>
-                  <Text className="text-base font-semibold text-gray-900">
-                    {barber.rating.toFixed(1)}
-                  </Text>
-                </View>
-                <Text className="text-sm text-gray-500">({barber.totalReviews} reviews)</Text>
+              <View className="mb-2">
+                <RatingStars
+                  rating={barber.rating}
+                  size="md"
+                  showCount
+                  reviewCount={barber.totalReviews}
+                />
               </View>
 
               {/* Experience */}
@@ -195,16 +209,106 @@ export default function BarberProfileScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              className="flex-row gap-3"
+              contentContainerStyle={{ gap: 12 }}
             >
               {barber.gallery.map((item, index) => (
-                <View key={index} className="w-32 h-32 rounded-lg overflow-hidden">
-                  <Image source={{ uri: item.url }} className="w-full h-full" resizeMode="cover" />
-                </View>
+                <Pressable
+                  key={index}
+                  onPress={() => handleGalleryImagePress(index)}
+                  className="active:opacity-80"
+                >
+                  <View className="w-32 h-32 rounded-lg overflow-hidden">
+                    <Image
+                      source={{ uri: item.url }}
+                      className="w-full h-full"
+                      resizeMode="cover"
+                    />
+                  </View>
+                </Pressable>
               ))}
             </ScrollView>
+
+            {/* Gallery Zoom Modal */}
+            <ImageZoomModal
+              visible={showGalleryZoom}
+              imageUrls={barber.gallery.map((item) => item.url)}
+              initialIndex={selectedGalleryIndex}
+              onClose={() => setShowGalleryZoom(false)}
+            />
           </View>
         )}
+
+        {/* Reviews Section */}
+        <View className="p-6 border-t border-gray-200">
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-lg font-bold text-gray-900">Reviews</Text>
+            {reviewsData && reviewsData.reviews.length > 0 && (
+              <Pressable onPress={() => {}}>
+                <Text className="text-sm text-blue-600 font-semibold">See All</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {reviewsLoading ? (
+            <View className="items-center py-8">
+              <ActivityIndicator size="small" color="#0066CC" />
+              <Text className="text-gray-600 mt-2">Loading reviews...</Text>
+            </View>
+          ) : reviewsData && reviewsData.reviews.length > 0 ? (
+            <View className="gap-3">
+              {/* Review Stats Summary */}
+              <Card variant="outlined" padding="md">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1">
+                    <View className="flex-row items-center gap-2 mb-2">
+                      <RatingStars rating={reviewsData.stats.averageRating} size="md" />
+                      <Text className="text-sm text-gray-600">
+                        based on {reviewsData.stats.totalReviews} reviews
+                      </Text>
+                    </View>
+
+                    {/* Rating Distribution */}
+                    <View className="gap-1 mt-2">
+                      {[5, 4, 3, 2, 1].map((star) => {
+                        const count =
+                          reviewsData.stats.ratingDistribution[
+                            star as keyof typeof reviewsData.stats.ratingDistribution
+                          ];
+                        const percentage =
+                          reviewsData.stats.totalReviews > 0
+                            ? (count / reviewsData.stats.totalReviews) * 100
+                            : 0;
+
+                        return (
+                          <View key={star} className="flex-row items-center gap-2">
+                            <Text className="text-xs text-gray-600 w-8">{star} ★</Text>
+                            <View className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <View
+                                className="h-full bg-yellow-400 rounded-full"
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </View>
+                            <Text className="text-xs text-gray-600 w-8 text-right">{count}</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </View>
+              </Card>
+
+              {/* Review Cards */}
+              {reviewsData.reviews.map((review) => (
+                <ReviewCard key={review.id} review={review} />
+              ))}
+            </View>
+          ) : (
+            <EmptyState
+              title="No reviews yet"
+              description="Be the first to review this barber after your appointment"
+            />
+          )}
+        </View>
 
         <View className="h-24" />
       </ScrollView>

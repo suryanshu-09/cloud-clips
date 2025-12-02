@@ -1,4 +1,6 @@
-import { View, Image, Text, type ViewProps } from 'react-native';
+import { memo, useMemo } from 'react';
+import { View, Text, type ViewProps } from 'react-native';
+import { Image } from 'expo-image';
 
 interface IAvatarProps extends ViewProps {
   source?: string | null;
@@ -8,7 +10,26 @@ interface IAvatarProps extends ViewProps {
   badgeColor?: string;
 }
 
-export function Avatar({
+// Blurhash placeholder for avatars - a neutral gray circle
+const AVATAR_BLURHASH = 'L6PZfSi_.AyE_3t7t7R**0o#DgR4';
+
+// Size configurations (in pixels)
+const SIZE_MAP = {
+  sm: 32,
+  md: 48,
+  lg: 64,
+  xl: 96,
+};
+
+/**
+ * Avatar - Optimized avatar component with expo-image
+ *
+ * Performance optimizations:
+ * - Uses expo-image for fast image loading and caching
+ * - Wrapped with React.memo to prevent unnecessary re-renders
+ * - Memoized style computations
+ */
+function AvatarComponent({
   source,
   size = 'md',
   fallback = 'U',
@@ -37,6 +58,12 @@ export function Avatar({
     xl: 'w-5 h-5',
   };
 
+  // Memoize the pixel size for expo-image
+  const pixelSize = useMemo(() => SIZE_MAP[size], [size]);
+
+  // Memoize the fallback text
+  const fallbackChar = useMemo(() => fallback.charAt(0).toUpperCase(), [fallback]);
+
   const baseStyles = 'rounded-full items-center justify-center overflow-hidden';
   const badgeStyles = 'absolute bottom-0 right-0 rounded-full border-2 border-white';
 
@@ -44,10 +71,18 @@ export function Avatar({
     <View {...props} className="relative">
       <View className={`${baseStyles} ${sizeStyles[size]} bg-gray-300`}>
         {source ? (
-          <Image source={{ uri: source }} className={`${sizeStyles[size]}`} resizeMode="cover" />
+          <Image
+            source={{ uri: source }}
+            style={{ width: pixelSize, height: pixelSize }}
+            contentFit="cover"
+            transition={150}
+            placeholder={{ blurhash: AVATAR_BLURHASH }}
+            cachePolicy="memory-disk"
+            recyclingKey={source}
+          />
         ) : (
           <Text className={`${textSizeStyles[size]} font-semibold text-gray-700`}>
-            {fallback.charAt(0).toUpperCase()}
+            {fallbackChar}
           </Text>
         )}
       </View>
@@ -55,3 +90,5 @@ export function Avatar({
     </View>
   );
 }
+
+export const Avatar = memo(AvatarComponent);

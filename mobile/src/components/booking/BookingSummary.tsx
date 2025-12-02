@@ -82,7 +82,7 @@ export function BookingSummary({
         {/* Barber Info */}
         <Card>
           <View className="flex-row items-center gap-3">
-            <Avatar source={barberAvatar} size="lg" name={barberName} />
+            <Avatar source={barberAvatar} size="lg" fallback={barberName.charAt(0)} />
             <View className="flex-1">
               <Text className="text-sm font-medium text-gray-500">Barber</Text>
               <Text className="text-lg font-semibold text-gray-900">{barberName}</Text>

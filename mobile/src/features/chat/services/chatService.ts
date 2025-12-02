@@ -226,8 +226,11 @@ class ChatService {
       return () => {};
     }
 
+    // Capture db in a const for TypeScript narrowing inside the callback
+    const database = db;
+
     // Get user's conversation IDs
-    const userConversationsRef = ref(db, `userConversations/${userId}`);
+    const userConversationsRef = ref(database, `userConversations/${userId}`);
 
     const listener = onValue(userConversationsRef, async (snapshot: DataSnapshot) => {
       if (snapshot.exists()) {
@@ -235,7 +238,7 @@ class ChatService {
 
         // Fetch each conversation
         for (const conversationId of conversationIds) {
-          const conversationRef = ref(db, `conversations/${conversationId}`);
+          const conversationRef = ref(database, `conversations/${conversationId}`);
           const conversationSnapshot = await get(conversationRef);
 
           if (conversationSnapshot.exists()) {

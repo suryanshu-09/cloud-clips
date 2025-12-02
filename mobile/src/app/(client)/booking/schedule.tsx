@@ -28,10 +28,7 @@ export default function ScheduleScreen() {
   const serviceDuration = 60;
   const { availability, isLoading } = useWeekAvailability(
     bookingForm.barberId || '',
-    serviceDuration,
-    {
-      enabled: !!bookingForm.barberId,
-    }
+    serviceDuration
   );
 
   const handleContinue = () => {
@@ -60,7 +57,7 @@ export default function ScheduleScreen() {
       <ScrollView className="flex-1">
         <View className="p-6">
           <DateTimePicker
-            availability={availability || []}
+            availability={availability?.availability || []}
             selectedDate={selectedDate}
             selectedTime={selectedTime}
             onDateSelect={setSelectedDate}

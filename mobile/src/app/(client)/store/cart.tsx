@@ -71,7 +71,7 @@ export default function CartScreen() {
           <EmptyState
             icon="🛒"
             title="Your cart is empty"
-            message="Add some products to get started"
+            description="Add some products to get started"
           />
           <Button onPress={() => router.push('/(client)/store')} variant="primary" className="mt-4">
             Browse Products
@@ -116,14 +116,11 @@ export default function CartScreen() {
         {/* Coupon Section */}
         <View className="px-4 pb-4">
           <CouponInput
-            value={couponCode}
-            onChangeText={setCouponCode}
-            onApply={(validatedCoupon) => {
-              if (validatedCoupon?.discountAmount) {
-                setDiscount(validatedCoupon.discountAmount);
-              }
+            amount={total}
+            onCouponApplied={(coupon, discountAmount) => {
+              setCouponCode(coupon.code);
+              setDiscount(discountAmount);
             }}
-            totalAmount={total}
           />
         </View>
 

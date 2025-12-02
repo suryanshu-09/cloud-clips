@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -15,7 +17,7 @@ type BarberProfile struct {
 	ID               uuid.UUID              `json:"id" bson:"_id"`
 	UserID           uuid.UUID              `json:"userId" bson:"userId"`
 	BusinessName     *string                `json:"businessName,omitempty" bson:"businessName,omitempty"`
-	Bio              string                 `json:"bio" bson:"bio"`
+	Bio              *string                `json:"bio,omitempty" bson:"bio,omitempty"`
 	Specialties      []string               `json:"specialties" bson:"specialties"`
 	Experience       int                    `json:"experience" bson:"experience"`
 	ServiceLocations []ServiceLocation      `json:"serviceLocations" bson:"serviceLocations"`
@@ -25,7 +27,10 @@ type BarberProfile struct {
 	Rating           float64                `json:"rating" bson:"rating"`
 	TotalReviews     int                    `json:"totalReviews" bson:"totalReviews"`
 	IsVerified       bool                   `json:"isVerified" bson:"isVerified"`
-	Location         LocationWithAddress    `json:"location" bson:"location"`
+	Location         Location               `json:"location" bson:"location"`
+	Address          *string                `json:"address,omitempty" bson:"address,omitempty"`
+	CreatedAt        time.Time              `json:"createdAt" bson:"createdAt"`
+	UpdatedAt        time.Time              `json:"updatedAt" bson:"updatedAt"`
 }
 
 type WorkingHour struct {
@@ -44,10 +49,4 @@ type Service struct {
 type GalleryItem struct {
 	URL  string `json:"url" bson:"url"`
 	Type string `json:"type" bson:"type"`
-}
-
-type LocationWithAddress struct {
-	Type        string    `json:"type" bson:"type"`
-	Coordinates []float64 `json:"coordinates" bson:"coordinates"`
-	Address     string    `json:"address" bson:"address"`
 }

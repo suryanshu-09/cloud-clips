@@ -68,10 +68,14 @@ func NewSchema(storage *storage.MemoryStorage) (graphql.Schema, error) {
 				Type: locationType,
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 					if barberProfile, ok := p.Source.(*models.BarberProfile); ok {
+						var address interface{}
+						if barberProfile.Address != nil {
+							address = *barberProfile.Address
+						}
 						return map[string]interface{}{
 							"type":        barberProfile.Location.Type,
 							"coordinates": barberProfile.Location.Coordinates,
-							"address":     barberProfile.Location.Address,
+							"address":     address,
 						}, nil
 					}
 					return nil, nil

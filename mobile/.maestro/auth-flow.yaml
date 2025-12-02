@@ -1,0 +1,59 @@
+appId: com.cloudclips.app
+
+---
+# E2E Test: User Authentication Flow
+
+- launchApp
+
+# Test: User Registration
+- tapOn: "Get Started"
+- tapOn: "Sign Up"
+
+# Fill registration form
+- tapOn: "Full Name"
+- inputText: "John Doe"
+
+- tapOn: "Email"
+- inputText: "john.doe@example.com"
+
+- tapOn: "Phone Number"
+- inputText: "+1234567890"
+
+- tapOn: "Password"
+- inputText: "Test123!@#"
+
+- tapOn: "Confirm Password"
+- inputText: "Test123!@#"
+
+# Select role
+- tapOn: "I'm a Client"
+
+# Submit registration
+- tapOn: "Create Account"
+
+# Verify successful registration
+- assertVisible: "Welcome"
+- assertVisible: "john.doe@example.com"
+
+# Logout
+- tapOn: "Profile"
+- tapOn: "Logout"
+
+---
+# Test: User Login
+
+- tapOn: "Login"
+
+# Fill login form
+- tapOn: "Email"
+- inputText: "john.doe@example.com"
+
+- tapOn: "Password"
+- inputText: "Test123!@#"
+
+# Submit login
+- tapOn: "Sign In"
+
+# Verify successful login
+- assertVisible: "Home"
+- assertVisible: "Find Barbers"

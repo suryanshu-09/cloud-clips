@@ -1,6 +1,6 @@
-import { useQuery, UseQueryOptions } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { barberService } from '../services/barberService';
-import type { IBarberProfile, IBarberAvailability } from '../types';
+import type { IBarberProfile, IBarberAvailability, IBarberUpdateData } from '../types';
 
 /**
  * Hook to fetch a single barber profile by ID
@@ -64,5 +64,45 @@ export function useBarberPortfolio(
     enabled: !!barberId,
     staleTime: 10 * 60 * 1000, // 10 minutes
     ...options,
+  });
+}
+
+/**
+ * Hook to update barber profile
+ */
+export function useBarberProfileUpdate(barberId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: IBarberUpdateData) => barberService.updateBarberProfile(data),
+    onSuccess: (updatedProfile: IBarberProfile) => {
+      // Update the cache with new data
+      queryClient.setQueryData(['barber', barberId], updatedProfile);
+
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: ['barber', barberId] });
+      queryClient.invalidateQueries({ queryKey: ['barbers'] });
+    },
+    onError: (error: Error) => {
+      console.error('Update barber profile error:', error.message);
+    },
+  });
+}
+
+/**
+ * Hook to upload portfolio image
+ */
+export function useBarberPortfolioUpload(barberId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (imageUri: string) => barberService.uploadPortfolioImage(imageUri),
+    onSuccess: () => {
+      // Invalidate portfolio query to refetch
+      queryClient.invalidateQueries({ queryKey: ['barber', barberId, 'portfolio'] });
+    },
+    onError: (error: Error) => {
+      console.error('Upload portfolio image error:', error.message);
+    },
   });
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   FlatList,
@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Text,
   Alert,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useChat, useChatList, chatService } from '@/features/chat';
@@ -16,6 +17,9 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { ChatHeader } from '@/components/chat/ChatHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SafeView } from '@/components/ui/SafeView';
+
+// Estimated message height for getItemLayout optimization
+const MESSAGE_HEIGHT = 80;
 
 /**
  * Chat Conversation Screen
@@ -30,6 +34,12 @@ import { SafeView } from '@/components/ui/SafeView';
  * - Message status
  * - Auto-scroll to bottom
  * - Mark messages as read
+ *
+ * Performance optimizations:
+ * - Memoized message data
+ * - Memoized renderItem callback
+ * - getItemLayout for faster scrolling
+ * - removeClippedSubviews for memory efficiency
  */
 
 export default function ChatConversationScreen() {
@@ -56,6 +66,9 @@ export default function ChatConversationScreen() {
     setIsTyping,
     markAsRead,
   } = useChat(conversationId || '', currentUserId);
+
+  // Memoized reversed messages to avoid recalculating on every render
+  const reversedMessages = useMemo(() => [...messages].reverse(), [messages]);
 
   /**
    * Load or create conversation
@@ -115,39 +128,91 @@ export default function ChatConversationScreen() {
   /**
    * Handle send message
    */
-  const handleSendMessage = async (content: string) => {
-    try {
-      await sendMessage(content);
-    } catch (err) {
-      console.error('[ChatConversation] Error sending message:', err);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
-    }
-  };
+  const handleSendMessage = useCallback(
+    async (content: string) => {
+      try {
+        await sendMessage(content);
+      } catch (err) {
+        console.error('[ChatConversation] Error sending message:', err);
+        Alert.alert('Error', 'Failed to send message. Please try again.');
+      }
+    },
+    [sendMessage]
+  );
 
   /**
    * Handle image press (for future image message support)
    */
-  const handleImagePress = () => {
+  const handleImagePress = useCallback(() => {
     // TODO: Implement image picker and send image message
     Alert.alert('Coming Soon', 'Image messages will be available soon!');
-  };
+  }, []);
 
   /**
    * Handle message long press
    */
-  const handleMessageLongPress = (message: IMessage) => {
+  const handleMessageLongPress = useCallback((message: IMessage) => {
     // TODO: Show options menu (copy, delete, etc.)
     Alert.alert('Message Options', 'Copy or delete this message?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Copy', onPress: () => {} },
       { text: 'Delete', style: 'destructive', onPress: () => {} },
     ]);
-  };
+  }, []);
+
+  // Memoized key extractor
+  const keyExtractor = useCallback((item: IMessage) => item.id, []);
+
+  // Memoized render item function
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<IMessage>) => (
+      <MessageBubble
+        message={item}
+        isCurrentUser={item.senderId === currentUserId}
+        onImagePress={handleImagePress}
+        onLongPress={handleMessageLongPress}
+      />
+    ),
+    [currentUserId, handleImagePress, handleMessageLongPress]
+  );
+
+  // Memoized getItemLayout for message items
+  const getItemLayout = useCallback(
+    (_: ArrayLike<IMessage> | null | undefined, index: number) => ({
+      length: MESSAGE_HEIGHT,
+      offset: MESSAGE_HEIGHT * index,
+      index,
+    }),
+    []
+  );
+
+  // Memoized empty component
+  const renderEmptyComponent = useMemo(() => {
+    if (isLoadingMessages) {
+      return (
+        <View
+          className="flex-1 items-center justify-center"
+          style={{ transform: [{ scaleY: -1 }] }}
+        >
+          <ActivityIndicator size="large" color="#3B82F6" />
+        </View>
+      );
+    }
+    return (
+      <View style={{ transform: [{ scaleY: -1 }] }}>
+        <EmptyState
+          icon="💬"
+          title="No messages yet"
+          description="Start the conversation by sending a message"
+        />
+      </View>
+    );
+  }, [isLoadingMessages]);
 
   /**
    * Get other user info
    */
-  const getOtherUser = (): IChatUser | null => {
+  const otherUser = useMemo((): IChatUser | null => {
     if (!conversation) return null;
 
     const isClient = userType === 'client';
@@ -159,9 +224,7 @@ export default function ChatConversationScreen() {
         : conversation.participants.clientAvatar,
       online: false, // TODO: Implement online status
     };
-  };
-
-  const otherUser = getOtherUser();
+  }, [conversation, userType]);
 
   if (isLoadingConversation || !otherUser) {
     return (
@@ -187,16 +250,10 @@ export default function ChatConversationScreen() {
         {/* Messages */}
         <FlatList
           ref={flatListRef}
-          data={[...messages].reverse()}
-          renderItem={({ item }) => (
-            <MessageBubble
-              message={item}
-              isCurrentUser={item.senderId === currentUserId}
-              onImagePress={handleImagePress}
-              onLongPress={handleMessageLongPress}
-            />
-          )}
-          keyExtractor={(item) => item.id}
+          data={reversedMessages}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          getItemLayout={getItemLayout}
           inverted
           className="flex-1 bg-gray-50"
           contentContainerStyle={{
@@ -205,24 +262,13 @@ export default function ChatConversationScreen() {
           }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
-          ListEmptyComponent={
-            isLoadingMessages ? (
-              <View
-                className="flex-1 items-center justify-center"
-                style={{ transform: [{ scaleY: -1 }] }}
-              >
-                <ActivityIndicator size="large" color="#3B82F6" />
-              </View>
-            ) : (
-              <View style={{ transform: [{ scaleY: -1 }] }}>
-                <EmptyState
-                  icon="💬"
-                  title="No messages yet"
-                  description="Start the conversation by sending a message"
-                />
-              </View>
-            )
-          }
+          ListEmptyComponent={renderEmptyComponent}
+          // Performance optimizations
+          removeClippedSubviews={true}
+          initialNumToRender={15}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          updateCellsBatchingPeriod={50}
         />
 
         {/* Input */}
