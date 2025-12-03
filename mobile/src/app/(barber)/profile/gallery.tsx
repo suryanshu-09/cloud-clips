@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   ScrollView,
   Text,
@@ -15,6 +15,14 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useBarberPortfolio } from '@/features/barbers/hooks/useBarberProfile';
 import { barberService } from '@/features/barbers/services/barberService';
 import { Card, Button } from '@/components/ui';
+import {
+  mediaService,
+  pickImageFromCamera,
+  pickImageFromGallery,
+  pickMultipleImages,
+  showImagePickerOptions,
+  IUploadProgress,
+} from '@/services/media';
 import type { IGalleryItem } from '@/features/barbers/types';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -97,6 +105,9 @@ export default function GalleryScreen() {
   const [selectedImage, setSelectedImage] = useState<IGalleryItem | null>(null);
   const [showViewer, setShowViewer] = useState(false);
   const [localGallery, setLocalGallery] = useState<IGalleryItem[]>(MOCK_GALLERY);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
+  const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
 
   // Fetch portfolio data
   const { data: portfolioData, isLoading } = useBarberPortfolio(currentUser?.id || '');
@@ -110,45 +121,148 @@ export default function GalleryScreen() {
       ? galleryItems
       : galleryItems.filter((item: IGalleryItem) => item.type === selectedCategory);
 
+  // Handle upload progress
+  const handleUploadProgress = useCallback((progress: IUploadProgress) => {
+    setUploadProgress(progress.progress);
+  }, []);
+
   // Upload image mutation
   const uploadMutation = useMutation({
-    mutationFn: (imageUri: string) => barberService.uploadPortfolioImage(imageUri),
+    mutationFn: async ({ uri, imageType }: { uri: string; imageType: string }) => {
+      return mediaService.uploadGalleryImage(uri, imageType, {
+        onProgress: handleUploadProgress,
+      });
+    },
     onSuccess: (data) => {
       // Add new image to local gallery
       const newImage: IGalleryItem = {
         url: data.url,
-        type: 'after', // Default type
+        type: data.type as IGalleryItem['type'],
       };
       setLocalGallery((prev) => [newImage, ...prev]);
 
       // Invalidate portfolio query
       queryClient.invalidateQueries({ queryKey: ['barber', currentUser?.id, 'portfolio'] });
 
+      setUploadProgress(0);
       Alert.alert('Success', 'Image uploaded successfully!');
     },
     onError: (error: Error) => {
+      setUploadProgress(0);
       Alert.alert('Error', error.message || 'Failed to upload image');
     },
   });
 
+  // Batch upload mutation
+  const batchUploadMutation = useMutation({
+    mutationFn: async (uris: string[]) => {
+      return mediaService.uploadGalleryBatch(uris, {
+        onProgress: handleUploadProgress,
+      });
+    },
+    onSuccess: (data) => {
+      // Add new images to local gallery
+      const newImages: IGalleryItem[] = data.uploaded.map((item) => ({
+        url: item.url,
+        type: 'after' as const,
+      }));
+      setLocalGallery((prev) => [...newImages, ...prev]);
+
+      // Invalidate portfolio query
+      queryClient.invalidateQueries({ queryKey: ['barber', currentUser?.id, 'portfolio'] });
+
+      setUploadProgress(0);
+
+      if (data.failed.length > 0) {
+        Alert.alert(
+          'Partial Upload',
+          `${data.uploaded.length} images uploaded. ${data.failed.length} failed.`
+        );
+      } else {
+        Alert.alert('Success', `${data.uploaded.length} images uploaded successfully!`);
+      }
+    },
+    onError: (error: Error) => {
+      setUploadProgress(0);
+      Alert.alert('Error', error.message || 'Failed to upload images');
+    },
+  });
+
+  // Handle camera press
+  const handleCameraPress = async () => {
+    try {
+      const image = await pickImageFromCamera({
+        allowsEditing: true,
+        aspect: [4, 5],
+        quality: 0.9,
+      });
+      if (image) {
+        setPendingImageUri(image.uri);
+        setShowTypeSelector(true);
+      }
+    } catch (error) {
+      console.error('Camera error:', error);
+      Alert.alert('Error', 'Failed to access camera');
+    }
+  };
+
+  // Handle gallery press
+  const handleGalleryPress = async () => {
+    try {
+      const image = await pickImageFromGallery({
+        allowsEditing: true,
+        aspect: [4, 5],
+        quality: 0.9,
+      });
+      if (image) {
+        setPendingImageUri(image.uri);
+        setShowTypeSelector(true);
+      }
+    } catch (error) {
+      console.error('Gallery error:', error);
+      Alert.alert('Error', 'Failed to access photo library');
+    }
+  };
+
+  // Handle multiple images
+  const handleMultipleImagesPress = async () => {
+    try {
+      const images = await pickMultipleImages({
+        quality: 0.9,
+        selectionLimit: 10,
+      });
+      if (images.length > 0) {
+        const uris = images.map((img) => img.uri);
+        batchUploadMutation.mutate(uris);
+      }
+    } catch (error) {
+      console.error('Multiple images error:', error);
+      Alert.alert('Error', 'Failed to select images');
+    }
+  };
+
+  // Handle type selection and upload
+  const handleTypeSelect = (imageType: string) => {
+    setShowTypeSelector(false);
+    if (pendingImageUri) {
+      uploadMutation.mutate({ uri: pendingImageUri, imageType });
+      setPendingImageUri(null);
+    }
+  };
+
   const handleAddPhoto = () => {
-    Alert.alert('Add Photo', 'Choose where to add photo from', [
+    Alert.alert('Add Photo', 'Choose how to add photos', [
       {
         text: 'Camera',
-        onPress: () => {
-          // Simulate camera capture
-          Alert.alert('Camera', 'Camera integration coming soon. Simulating upload...');
-          // Simulate upload with a mock image
-          uploadMutation.mutate('mock://camera/image.jpg');
-        },
+        onPress: handleCameraPress,
       },
       {
-        text: 'Gallery',
-        onPress: () => {
-          // Simulate gallery selection
-          Alert.alert('Gallery', 'Gallery integration coming soon. Simulating upload...');
-          uploadMutation.mutate('mock://gallery/image.jpg');
-        },
+        text: 'Single Photo',
+        onPress: handleGalleryPress,
+      },
+      {
+        text: 'Multiple Photos',
+        onPress: handleMultipleImagesPress,
       },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -156,6 +270,12 @@ export default function GalleryScreen() {
 
   const handleDeleteImage = () => {
     if (selectedImage) {
+      // Delete from server
+      mediaService.deleteImage(selectedImage.url).catch((error) => {
+        console.error('Failed to delete from server:', error);
+      });
+
+      // Remove from local state
       setLocalGallery((prev) => prev.filter((img) => img.url !== selectedImage.url));
       Alert.alert('Deleted', 'Image has been removed from your portfolio');
     }
@@ -165,6 +285,8 @@ export default function GalleryScreen() {
     setSelectedImage(image);
     setShowViewer(true);
   };
+
+  const isUploadingAny = uploadMutation.isPending || batchUploadMutation.isPending;
 
   if (isLoading) {
     return (
@@ -183,15 +305,25 @@ export default function GalleryScreen() {
             <Text className="text-3xl font-bold text-gray-900 mb-2">Portfolio Gallery</Text>
             <Text className="text-gray-600">Showcase your best work to attract clients</Text>
           </View>
-          <Button
-            variant="primary"
-            size="sm"
-            onPress={handleAddPhoto}
-            disabled={uploadMutation.isPending}
-          >
-            {uploadMutation.isPending ? 'Uploading...' : '+ Add'}
+          <Button variant="primary" size="sm" onPress={handleAddPhoto} disabled={isUploadingAny}>
+            {isUploadingAny ? 'Uploading...' : '+ Add'}
           </Button>
         </View>
+
+        {/* Upload Progress */}
+        {isUploadingAny && uploadProgress > 0 && (
+          <View className="mt-4">
+            <View className="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <View
+                className="h-full bg-blue-500 rounded-full"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </View>
+            <Text className="text-xs text-gray-500 text-center mt-1">
+              Uploading... {Math.round(uploadProgress)}%
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Category Filters */}
@@ -301,6 +433,62 @@ export default function GalleryScreen() {
         }}
         onDelete={handleDeleteImage}
       />
+
+      {/* Image Type Selector Modal */}
+      <Modal
+        visible={showTypeSelector}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setShowTypeSelector(false);
+          setPendingImageUri(null);
+        }}
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-3xl p-6">
+            <Text className="text-xl font-bold text-gray-900 mb-4">Select Image Type</Text>
+            <Text className="text-gray-600 mb-6">
+              Choose a category for this image to help organize your portfolio
+            </Text>
+
+            <View className="space-y-3">
+              <Pressable
+                onPress={() => handleTypeSelect('after')}
+                className="bg-blue-50 border border-blue-200 rounded-xl p-4"
+              >
+                <Text className="text-lg font-semibold text-blue-900">Finished Cuts</Text>
+                <Text className="text-sm text-blue-700">Show off your completed haircuts</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => handleTypeSelect('before_after')}
+                className="bg-purple-50 border border-purple-200 rounded-xl p-4"
+              >
+                <Text className="text-lg font-semibold text-purple-900">Before & After</Text>
+                <Text className="text-sm text-purple-700">Transformation photos</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => handleTypeSelect('space')}
+                className="bg-green-50 border border-green-200 rounded-xl p-4"
+              >
+                <Text className="text-lg font-semibold text-green-900">Workspace</Text>
+                <Text className="text-sm text-green-700">Your shop or setup</Text>
+              </Pressable>
+            </View>
+
+            <Pressable
+              onPress={() => {
+                setShowTypeSelector(false);
+                setPendingImageUri(null);
+              }}
+              className="mt-6 py-4"
+            >
+              <Text className="text-center text-gray-500 font-medium">Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

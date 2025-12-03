@@ -199,8 +199,8 @@ export function useNotificationListener(options?: {
   onNotificationTapped?: (response: Notifications.NotificationResponse) => void;
 }) {
   const queryClient = useQueryClient();
-  const receivedListenerRef = useRef<Notifications.Subscription | undefined>(undefined);
-  const responseListenerRef = useRef<Notifications.Subscription | undefined>(undefined);
+  const receivedListenerRef = useRef<Notifications.Subscription | null>(null);
+  const responseListenerRef = useRef<Notifications.Subscription | null>(null);
 
   useEffect(() => {
     // Set up notification received listener
@@ -232,12 +232,8 @@ export function useNotificationListener(options?: {
 
     // Cleanup listeners on unmount
     return () => {
-      if (receivedListenerRef.current) {
-        notificationService.removeNotificationSubscription(receivedListenerRef.current);
-      }
-      if (responseListenerRef.current) {
-        notificationService.removeNotificationSubscription(responseListenerRef.current);
-      }
+      notificationService.removeNotificationSubscription(receivedListenerRef.current);
+      notificationService.removeNotificationSubscription(responseListenerRef.current);
     };
   }, [options?.onNotificationReceived, options?.onNotificationTapped, queryClient]);
 }

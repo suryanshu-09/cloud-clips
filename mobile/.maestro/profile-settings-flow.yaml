@@ -1,0 +1,793 @@
+appId: com.cloudclips.app
+
+---
+# E2E Test: Profile & Settings Flow
+# Tests: View profile, Edit profile, Upload avatar, Notification settings,
+#        Language settings, Privacy settings, Help/Support, Delete account
+# Phase 32.5 - Profile & Settings (27 test scenarios)
+
+# ==============================
+# Test 1: View Profile
+# ==============================
+- launchApp:
+    clearState: true
+
+# Login first
+- tapOn: "Login"
+- tapOn: "Email"
+- inputText: "client@test.com"
+- tapOn: "Password"
+- inputText: "Test123!@#"
+- tapOn: "Sign In"
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 10000
+
+# Navigate to profile
+- tapOn: "Profile"
+
+# Verify profile info displayed
+- assertVisible: "Profile"
+- assertVisible: "client@test.com"
+- assertVisible: "Edit Profile"
+- assertVisible: "Settings"
+- assertVisible: "Payment Methods"
+- assertVisible: "Addresses"
+- assertVisible: "Notifications"
+- assertVisible: "Language"
+- assertVisible: "Help"
+- assertVisible: "Logout"
+
+---
+# ==============================
+# Test 2: Edit Profile - Name
+# ==============================
+- tapOn: "Edit Profile"
+
+# Verify edit profile screen
+- assertVisible: "Edit Profile"
+- assertVisible: "Full Name"
+- assertVisible: "Email"
+- assertVisible: "Phone Number"
+
+# Edit name
+- tapOn: "Full Name"
+- clearText
+- inputText: "Test User Updated"
+
+# Save changes
+- tapOn: "Save"
+
+# Verify success
+- extendedWaitUntil:
+    visible: "Profile updated successfully"
+    timeout: 5000
+
+# Verify name updated
+- assertVisible: "Test User Updated"
+
+---
+# ==============================
+# Test 3: Edit Profile - Email
+# ==============================
+- tapOn: "Edit Profile"
+
+# Edit email
+- tapOn: "Email"
+- clearText
+- inputText: "newemail@test.com"
+
+# Save changes
+- tapOn: "Save"
+
+# Verify email verification required
+- extendedWaitUntil:
+    visible: "Verification email sent"
+    timeout: 5000
+
+# Go back
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 4: Edit Profile - Validation
+# ==============================
+- tapOn: "Edit Profile"
+
+# Test invalid email
+- tapOn: "Email"
+- clearText
+- inputText: "invalid-email"
+- tapOn: "Full Name"
+
+# Verify validation error
+- assertVisible: "Invalid email format"
+
+# Test empty name
+- tapOn: "Full Name"
+- clearText
+- tapOn: "Save"
+
+# Verify validation error
+- assertVisible: "Name is required"
+
+# Cancel changes
+- tapOn: "Cancel"
+
+---
+# ==============================
+# Test 5: Upload Avatar
+# ==============================
+- tapOn: "Edit Profile"
+
+# Tap on avatar area
+- tapOn: "Change Photo"
+
+# Verify photo options
+- assertVisible: "Take Photo"
+- assertVisible: "Choose from Gallery"
+- assertVisible: "Remove Photo"
+
+# Select from gallery
+- tapOn: "Choose from Gallery"
+
+# Wait for image picker (simulated - will select first image)
+- extendedWaitUntil:
+    visible: "Photos"
+    timeout: 5000
+    optional: true
+
+# Note: In real test, would select an image here
+# For testing purposes, cancel
+- tapOn:
+    text: "Cancel"
+    optional: true
+
+---
+# ==============================
+# Test 6: Remove Avatar
+# ==============================
+- tapOn: "Change Photo"
+- tapOn: "Remove Photo"
+
+# Confirm removal
+- tapOn: "Remove"
+
+# Verify default avatar shown
+- extendedWaitUntil:
+    visible: "Photo removed"
+    timeout: 3000
+
+# Cancel edit
+- tapOn: "Cancel"
+
+---
+# ==============================
+# Test 7: Notification Settings
+# ==============================
+- scrollUntilVisible:
+    element: "Notifications"
+    direction: DOWN
+
+- tapOn: "Notifications"
+
+# Verify notification settings screen
+- assertVisible: "Notification Settings"
+- assertVisible: "Push Notifications"
+- assertVisible: "Email Notifications"
+
+# Verify individual notification toggles
+- assertVisible: "Booking Reminders"
+- assertVisible: "Chat Messages"
+- assertVisible: "Promotional Offers"
+- assertVisible: "Order Updates"
+- assertVisible: "Loyalty Updates"
+
+# Toggle booking reminders off
+- tapOn: "Booking Reminders"
+
+# Verify toggle state changed
+- extendedWaitUntil:
+    visible: "Settings saved"
+    timeout: 3000
+
+# Toggle chat messages off
+- tapOn: "Chat Messages"
+
+# Toggle promotional offers off
+- tapOn: "Promotional Offers"
+
+# Go back
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 8: Re-enable Notifications
+# ==============================
+- tapOn: "Notifications"
+
+# Toggle all back on
+- tapOn: "Booking Reminders"
+- tapOn: "Chat Messages"
+- tapOn: "Promotional Offers"
+
+# Verify all enabled
+- extendedWaitUntil:
+    visible: "Settings saved"
+    timeout: 3000
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 9: Email Notifications
+# ==============================
+- tapOn: "Notifications"
+
+# Scroll to email section
+- scrollUntilVisible:
+    element: "Email Notifications"
+    direction: DOWN
+
+# Verify email notification options
+- assertVisible: "Booking Confirmations"
+- assertVisible: "Receipts"
+- assertVisible: "Weekly Summary"
+- assertVisible: "Marketing Emails"
+
+# Toggle marketing emails off
+- tapOn: "Marketing Emails"
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 10: Language Settings
+# ==============================
+- scrollUntilVisible:
+    element: "Language"
+    direction: DOWN
+
+- tapOn: "Language"
+
+# Verify language options
+- assertVisible: "Language"
+- assertVisible: "English"
+- assertVisible: "Spanish"
+- assertVisible: "French"
+
+# Current language should be marked
+- assertVisible:
+    text: "English"
+    enabled: true
+
+# Change to Spanish
+- tapOn: "Spanish"
+
+# Verify language changed prompt
+- extendedWaitUntil:
+    visible: "Language changed"
+    timeout: 3000
+
+# Verify app shows Spanish text (some labels)
+- assertVisible:
+    text: "Idioma"
+    optional: true
+
+# Change back to English
+- tapOn: "English"
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 11: Privacy Settings
+# ==============================
+- scrollUntilVisible:
+    element: "Settings"
+    direction: DOWN
+
+- tapOn: "Settings"
+
+# Verify settings options
+- assertVisible: "Settings"
+- assertVisible: "Privacy"
+- assertVisible: "Security"
+- assertVisible: "About"
+
+- tapOn: "Privacy"
+
+# Verify privacy options
+- assertVisible: "Privacy Settings"
+- assertVisible: "Profile Visibility"
+- assertVisible: "Show Online Status"
+- assertVisible: "Data Sharing"
+- assertVisible: "Analytics"
+
+# Toggle profile visibility
+- tapOn: "Profile Visibility"
+
+# Verify options
+- assertVisible: "Public"
+- assertVisible: "Private"
+- assertVisible: "Friends Only"
+
+# Select private
+- tapOn: "Private"
+
+# Toggle online status off
+- tapOn: "Show Online Status"
+
+# Toggle analytics off
+- tapOn: "Analytics"
+
+# Save privacy settings
+- extendedWaitUntil:
+    visible: "Settings saved"
+    timeout: 3000
+
+- tapOn: "Back"
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 12: Security Settings
+# ==============================
+- tapOn: "Settings"
+- tapOn: "Security"
+
+# Verify security options
+- assertVisible: "Security"
+- assertVisible: "Change Password"
+- assertVisible: "Two-Factor Authentication"
+- assertVisible: "Biometric Login"
+- assertVisible: "Active Sessions"
+
+# Test change password
+- tapOn: "Change Password"
+
+# Verify password change screen
+- assertVisible: "Current Password"
+- assertVisible: "New Password"
+- assertVisible: "Confirm New Password"
+
+# Test validation - wrong current password
+- tapOn: "Current Password"
+- inputText: "wrongpassword"
+- tapOn: "New Password"
+- inputText: "NewTest123!@#"
+- tapOn: "Confirm New Password"
+- inputText: "NewTest123!@#"
+- tapOn: "Update Password"
+
+# Verify error
+- extendedWaitUntil:
+    visible: "Current password is incorrect"
+    timeout: 5000
+
+# Cancel
+- tapOn: "Cancel"
+- tapOn: "Back"
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 13: Enable Biometrics
+# ==============================
+- tapOn: "Settings"
+- tapOn: "Security"
+- tapOn: "Biometric Login"
+
+# Verify biometric options
+- assertVisible: "Enable Fingerprint"
+- assertVisible: "Enable Face ID"
+
+# Note: Actual biometric enrollment requires device interaction
+# This test verifies the UI is present
+
+- tapOn: "Back"
+- tapOn: "Back"
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 14: Help & Support
+# ==============================
+- scrollUntilVisible:
+    element: "Help"
+    direction: DOWN
+
+- tapOn: "Help"
+
+# Verify help options
+- assertVisible: "Help & Support"
+- assertVisible: "FAQ"
+- assertVisible: "Contact Us"
+- assertVisible: "Report a Problem"
+- assertVisible: "Terms of Service"
+- assertVisible: "Privacy Policy"
+
+# Test FAQ
+- tapOn: "FAQ"
+
+# Verify FAQ categories
+- assertVisible: "Frequently Asked Questions"
+- assertVisible: "Booking"
+- assertVisible: "Payments"
+- assertVisible: "Account"
+
+# Open a FAQ category
+- tapOn: "Booking"
+
+# Verify FAQ questions
+- assertVisible: "How do I book an appointment?"
+- assertVisible: "How do I cancel a booking?"
+- assertVisible: "What is the cancellation policy?"
+
+# Expand a question
+- tapOn: "How do I book an appointment?"
+
+# Verify answer is shown
+- assertVisible: "To book an appointment"
+
+- tapOn: "Back"
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 15: Contact Support
+# ==============================
+- tapOn: "Contact Us"
+
+# Verify contact options
+- assertVisible: "Contact Support"
+- assertVisible: "Email"
+- assertVisible: "Phone"
+- assertVisible: "Live Chat"
+
+# Test email support
+- tapOn: "Email"
+
+# Verify email form
+- assertVisible: "Subject"
+- assertVisible: "Message"
+
+- tapOn: "Subject"
+- inputText: "Test Support Request"
+
+- tapOn: "Message"
+- inputText: "This is a test message for support"
+
+- tapOn: "Send"
+
+# Verify confirmation
+- extendedWaitUntil:
+    visible: "Message sent"
+    timeout: 5000
+
+- tapOn: "Back"
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 16: Report a Problem
+# ==============================
+- tapOn: "Report a Problem"
+
+# Verify report form
+- assertVisible: "Report a Problem"
+- assertVisible: "Problem Type"
+- assertVisible: "Description"
+- assertVisible: "Include Screenshots"
+
+# Select problem type
+- tapOn: "Problem Type"
+- assertVisible: "App Crash"
+- assertVisible: "Payment Issue"
+- assertVisible: "Booking Issue"
+- assertVisible: "Other"
+
+- tapOn: "App Crash"
+
+# Add description
+- tapOn: "Description"
+- inputText: "The app crashed when I tried to book an appointment"
+
+# Submit report
+- tapOn: "Submit"
+
+# Verify confirmation
+- extendedWaitUntil:
+    visible: "Report submitted"
+    timeout: 5000
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 17: Terms of Service
+# ==============================
+- tapOn: "Terms of Service"
+
+# Verify terms screen
+- assertVisible: "Terms of Service"
+- assertVisible: "Last Updated"
+
+# Scroll through terms
+- scrollUntilVisible:
+    element: "Contact Information"
+    direction: DOWN
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 18: Privacy Policy
+# ==============================
+- tapOn: "Privacy Policy"
+
+# Verify privacy policy screen
+- assertVisible: "Privacy Policy"
+- assertVisible: "Information We Collect"
+
+# Scroll through policy
+- scrollUntilVisible:
+    element: "Your Rights"
+    direction: DOWN
+
+- tapOn: "Back"
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 19: About App
+# ==============================
+- tapOn: "Settings"
+- tapOn: "About"
+
+# Verify about screen
+- assertVisible: "About"
+- assertVisible: "Cloud Clips"
+- assertVisible: "Version"
+- assertVisible: "Build"
+- assertVisible: "Licenses"
+
+# Check version info is present
+- assertVisible:
+    text: "1."
+    
+- tapOn: "Licenses"
+
+# Verify open source licenses
+- assertVisible: "Open Source Licenses"
+
+- tapOn: "Back"
+- tapOn: "Back"
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 20: Delete Account - Cancel
+# ==============================
+- scrollUntilVisible:
+    element: "Settings"
+    direction: DOWN
+
+- tapOn: "Settings"
+
+- scrollUntilVisible:
+    element: "Delete Account"
+    direction: DOWN
+
+- tapOn: "Delete Account"
+
+# Verify delete account warning
+- assertVisible: "Delete Account"
+- assertVisible: "This action cannot be undone"
+- assertVisible: "All your data will be permanently deleted"
+- assertVisible: "Cancel"
+- assertVisible: "Delete My Account"
+
+# Cancel deletion
+- tapOn: "Cancel"
+
+# Verify back on settings
+- assertVisible: "Settings"
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 21: Delete Account - Validation
+# ==============================
+- tapOn: "Settings"
+
+- scrollUntilVisible:
+    element: "Delete Account"
+    direction: DOWN
+
+- tapOn: "Delete Account"
+
+# Try to delete without confirmation
+- tapOn: "Delete My Account"
+
+# Verify confirmation required
+- assertVisible: "Enter your password to confirm"
+
+# Enter wrong password
+- tapOn: "Password"
+- inputText: "wrongpassword"
+- tapOn: "Confirm Delete"
+
+# Verify error
+- extendedWaitUntil:
+    visible: "Incorrect password"
+    timeout: 5000
+
+# Cancel
+- tapOn: "Cancel"
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 22: Payment Methods Navigation
+# ==============================
+- scrollUntilVisible:
+    element: "Payment Methods"
+    direction: DOWN
+
+- tapOn: "Payment Methods"
+
+# Verify payment methods screen
+- assertVisible: "Payment Methods"
+- assertVisible: "Add Payment Method"
+
+# Note: Payment method tests are in payment-flow.yaml
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 23: Addresses Navigation
+# ==============================
+- scrollUntilVisible:
+    element: "Addresses"
+    direction: DOWN
+
+- tapOn: "Addresses"
+
+# Verify addresses screen
+- assertVisible: "My Addresses"
+- assertVisible: "Add Address"
+
+# Test add address
+- tapOn: "Add Address"
+
+# Verify address form
+- assertVisible: "Street Address"
+- assertVisible: "City"
+- assertVisible: "State"
+- assertVisible: "ZIP Code"
+- assertVisible: "Country"
+
+# Fill address
+- tapOn: "Street Address"
+- inputText: "123 Test Street"
+
+- tapOn: "City"
+- inputText: "Test City"
+
+- tapOn: "State"
+- inputText: "CA"
+
+- tapOn: "ZIP Code"
+- inputText: "90210"
+
+# Save address
+- tapOn: "Save Address"
+
+# Verify success
+- extendedWaitUntil:
+    visible: "Address saved"
+    timeout: 5000
+
+# Verify address appears in list
+- assertVisible: "123 Test Street"
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 24: Edit Address
+# ==============================
+- tapOn: "Addresses"
+
+# Tap on existing address
+- tapOn: "123 Test Street"
+
+# Verify edit mode
+- assertVisible: "Edit Address"
+
+# Update city
+- tapOn: "City"
+- clearText
+- inputText: "New City"
+
+# Save changes
+- tapOn: "Save Address"
+
+# Verify success
+- extendedWaitUntil:
+    visible: "Address updated"
+    timeout: 5000
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 25: Delete Address
+# ==============================
+- tapOn: "Addresses"
+
+# Swipe to delete
+- swipe:
+    from:
+      text: "123 Test Street"
+    direction: LEFT
+
+- tapOn: "Delete"
+
+# Confirm deletion
+- tapOn: "Confirm"
+
+# Verify address removed
+- extendedWaitUntil:
+    visible: "Address deleted"
+    timeout: 5000
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 26: Set Default Address
+# ==============================
+- tapOn: "Addresses"
+- tapOn: "Add Address"
+
+# Add new address
+- tapOn: "Street Address"
+- inputText: "456 Default Street"
+- tapOn: "City"
+- inputText: "Default City"
+- tapOn: "State"
+- inputText: "NY"
+- tapOn: "ZIP Code"
+- inputText: "10001"
+- tapOn: "Set as Default"
+- tapOn: "Save Address"
+
+# Verify default badge
+- extendedWaitUntil:
+    visible: "Default"
+    timeout: 5000
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 27: Orders History Navigation
+# ==============================
+- scrollUntilVisible:
+    element: "Orders"
+    direction: DOWN
+
+- tapOn: "Orders"
+
+# Verify orders screen
+- assertVisible: "My Orders"
+- assertVisible: "Active"
+- assertVisible: "Completed"
+
+# Note: Order details tests are in product-flow.yaml
+- tapOn: "Back"

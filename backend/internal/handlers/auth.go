@@ -1,12 +1,20 @@
 package handlers
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"cloud-clips/internal/models"
+	"cloud-clips/internal/services"
 	"cloud-clips/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -16,11 +24,23 @@ import (
 )
 
 type AuthHandler struct {
-	storage *storage.MemoryStorage
+	storage      *storage.MemoryStorage
+	emailService *services.EmailService
 }
 
 func NewAuthHandler(storage *storage.MemoryStorage) *AuthHandler {
-	return &AuthHandler{storage: storage}
+	return &AuthHandler{
+		storage:      storage,
+		emailService: services.NewEmailService(nil),
+	}
+}
+
+// NewAuthHandlerWithEmail creates an auth handler with email service
+func NewAuthHandlerWithEmail(storage *storage.MemoryStorage, emailService *services.EmailService) *AuthHandler {
+	return &AuthHandler{
+		storage:      storage,
+		emailService: emailService,
+	}
 }
 
 // JWT Claims structure
@@ -72,6 +92,14 @@ type FirebaseSyncRequest struct {
 	Avatar      string `json:"avatar"`
 }
 
+type VerifyEmailRequest struct {
+	Token string `json:"token" binding:"required"`
+}
+
+type ResendVerificationRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
 // Helper functions
 func getJWTSecret() []byte {
 	secret := os.Getenv("JWT_SECRET")
@@ -89,6 +117,15 @@ func hashPassword(password string) (string, error) {
 func checkPassword(password, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
+}
+
+// generateSecureToken generates a cryptographically secure random token
+func generateSecureToken(length int) (string, error) {
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(bytes), nil
 }
 
 func (h *AuthHandler) generateTokens(user *models.User) (accessToken, refreshToken string, expiresAt int64, err error) {
@@ -138,6 +175,21 @@ func (h *AuthHandler) generateTokens(user *models.User) (accessToken, refreshTok
 // UserCredentials stores password hashes (in production, this would be in the database)
 var userCredentials = make(map[string]string) // email -> password hash
 
+// Token storage for verification and password reset
+var (
+	verificationTokens     = make(map[string]tokenData) // token -> tokenData
+	passwordResetTokens    = make(map[string]tokenData) // token -> tokenData
+	tokenMutex             sync.RWMutex
+	passwordResetRateLimit = make(map[string]time.Time) // email -> last request time
+	rateLimitMutex         sync.RWMutex
+)
+
+type tokenData struct {
+	UserID    uuid.UUID
+	Email     string
+	ExpiresAt time.Time
+}
+
 // POST /api/auth/register - Create new user
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req RegisterRequest
@@ -169,15 +221,16 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	// Create user
 	user := &models.User{
-		ID:           uuid.New(),
-		Email:        req.Email,
-		Phone:        req.Phone,
-		Name:         req.Name,
-		Role:         role,
-		Location:     models.Location{Type: "Point", Coordinates: []float64{0, 0}},
-		CreatedAt:    time.Now(),
-		LastActive:   time.Now(),
-		AuthProvider: models.AuthProviderEmail,
+		ID:            uuid.New(),
+		Email:         req.Email,
+		Phone:         req.Phone,
+		Name:          req.Name,
+		Role:          role,
+		Location:      models.Location{Type: "Point", Coordinates: []float64{0, 0}},
+		CreatedAt:     time.Now(),
+		LastActive:    time.Now(),
+		AuthProvider:  models.AuthProviderEmail,
+		EmailVerified: false,
 		NotificationPrefs: models.NotificationPrefs{
 			Push:  true,
 			SMS:   true,
@@ -206,6 +259,25 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			IsVerified:       false,
 			Location:         models.Location{Type: "Point", Coordinates: []float64{0, 0}},
 		}
+	}
+
+	// Generate email verification token
+	verifyToken, err := generateSecureToken(32)
+	if err == nil {
+		tokenMutex.Lock()
+		verificationTokens[verifyToken] = tokenData{
+			UserID:    user.ID,
+			Email:     user.Email,
+			ExpiresAt: time.Now().Add(24 * time.Hour), // 24 hour expiry
+		}
+		tokenMutex.Unlock()
+
+		// Send verification email (non-blocking)
+		go func() {
+			if h.emailService != nil {
+				h.emailService.SendVerificationEmail(user.Email, user.Name, verifyToken)
+			}
+		}()
 	}
 
 	// Generate tokens
@@ -242,6 +314,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	if user == nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		return
+	}
+
+	// Check if user is banned
+	if user.Banned {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Account is suspended", "reason": user.BannedReason})
 		return
 	}
 
@@ -286,7 +364,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	}
 
 	// Parse and validate refresh token
-	token, err := jwt.ParseWithClaims(req.RefreshToken, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(req.RefreshToken, &Claims{}, func(token *jwt.Token) (any, error) {
 		return getJWTSecret(), nil
 	})
 
@@ -337,6 +415,19 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
+	// Rate limiting: only allow one request per email per 60 seconds
+	rateLimitMutex.RLock()
+	lastRequest, exists := passwordResetRateLimit[strings.ToLower(req.Email)]
+	rateLimitMutex.RUnlock()
+
+	if exists && time.Since(lastRequest) < 60*time.Second {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error":      "Please wait before requesting another reset email",
+			"retryAfter": 60 - int(time.Since(lastRequest).Seconds()),
+		})
+		return
+	}
+
 	// Find user by email
 	var user *models.User
 	for _, u := range h.storage.Users {
@@ -352,14 +443,49 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	// Generate reset token (in production, store this and send via email)
-	resetToken := uuid.New().String()
-	_ = resetToken // TODO: Store token and send email
+	// Update rate limit
+	rateLimitMutex.Lock()
+	passwordResetRateLimit[strings.ToLower(req.Email)] = time.Now()
+	rateLimitMutex.Unlock()
+
+	// Generate reset token
+	resetToken, err := generateSecureToken(32)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate reset token"})
+		return
+	}
+
+	// Store token with 1 hour expiry
+	tokenMutex.Lock()
+	// Remove any existing tokens for this user
+	for token, data := range passwordResetTokens {
+		if data.UserID == user.ID {
+			delete(passwordResetTokens, token)
+		}
+	}
+	passwordResetTokens[resetToken] = tokenData{
+		UserID:    user.ID,
+		Email:     user.Email,
+		ExpiresAt: time.Now().Add(1 * time.Hour),
+	}
+	tokenMutex.Unlock()
+
+	// Store token in user model as well (for reference)
+	user.ResetToken = &resetToken
+	expiry := time.Now().Add(1 * time.Hour)
+	user.ResetTokenExpires = &expiry
+
+	// Send reset email (non-blocking)
+	go func() {
+		if h.emailService != nil {
+			h.emailService.SendPasswordResetEmail(user.Email, user.Name, resetToken)
+		}
+	}()
 
 	c.JSON(http.StatusOK, gin.H{"message": "If the email exists, a reset link will be sent"})
 }
 
-// POST /api/auth/reset - Reset password with token
+// POST /api/auth/reset-password - Reset password with token
 func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	var req ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -367,21 +493,163 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	// TODO: Validate reset token and get associated user
-	// For now, return an error as this needs token storage
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "Password reset via token not yet implemented"})
-}
+	// Validate token
+	tokenMutex.RLock()
+	data, exists := passwordResetTokens[req.Token]
+	tokenMutex.RUnlock()
 
-// POST /api/auth/verify - Verify email
-func (h *AuthHandler) VerifyEmail(c *gin.Context) {
-	token := c.Query("token")
-	if token == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Verification token required"})
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired reset token"})
 		return
 	}
 
-	// TODO: Validate verification token
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "Email verification not yet implemented"})
+	// Check expiry
+	if time.Now().After(data.ExpiresAt) {
+		// Clean up expired token
+		tokenMutex.Lock()
+		delete(passwordResetTokens, req.Token)
+		tokenMutex.Unlock()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Reset token has expired"})
+		return
+	}
+
+	// Get user
+	user, exists := h.storage.Users[data.UserID]
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Hash new password
+	hashedPassword, err := hashPassword(req.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	// Update password
+	userCredentials[user.Email] = hashedPassword
+
+	// Clear reset token
+	user.ResetToken = nil
+	user.ResetTokenExpires = nil
+
+	// Remove token from storage
+	tokenMutex.Lock()
+	delete(passwordResetTokens, req.Token)
+	tokenMutex.Unlock()
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password has been reset successfully"})
+}
+
+// POST /api/auth/verify-email - Verify email with token
+func (h *AuthHandler) VerifyEmail(c *gin.Context) {
+	var req VerifyEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// Try to get token from query parameter as fallback
+		req.Token = c.Query("token")
+		if req.Token == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Verification token required"})
+			return
+		}
+	}
+
+	// Validate token
+	tokenMutex.RLock()
+	data, exists := verificationTokens[req.Token]
+	tokenMutex.RUnlock()
+
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired verification token"})
+		return
+	}
+
+	// Check expiry
+	if time.Now().After(data.ExpiresAt) {
+		// Clean up expired token
+		tokenMutex.Lock()
+		delete(verificationTokens, req.Token)
+		tokenMutex.Unlock()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Verification token has expired"})
+		return
+	}
+
+	// Get user
+	user, exists := h.storage.Users[data.UserID]
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Mark email as verified
+	user.EmailVerified = true
+
+	// Remove token from storage
+	tokenMutex.Lock()
+	delete(verificationTokens, req.Token)
+	tokenMutex.Unlock()
+
+	c.JSON(http.StatusOK, gin.H{"message": "Email verified successfully", "emailVerified": true})
+}
+
+// POST /api/auth/resend-verification - Resend verification email
+func (h *AuthHandler) ResendVerification(c *gin.Context) {
+	var req ResendVerificationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Find user by email
+	var user *models.User
+	for _, u := range h.storage.Users {
+		if strings.EqualFold(u.Email, req.Email) {
+			user = u
+			break
+		}
+	}
+
+	// Always return success to prevent email enumeration
+	if user == nil {
+		c.JSON(http.StatusOK, gin.H{"message": "If the email exists and is unverified, a verification link will be sent"})
+		return
+	}
+
+	// Check if already verified
+	if user.EmailVerified {
+		c.JSON(http.StatusOK, gin.H{"message": "Email is already verified"})
+		return
+	}
+
+	// Generate new verification token
+	verifyToken, err := generateSecureToken(32)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate verification token"})
+		return
+	}
+
+	// Remove any existing verification tokens for this user
+	tokenMutex.Lock()
+	for token, data := range verificationTokens {
+		if data.UserID == user.ID {
+			delete(verificationTokens, token)
+		}
+	}
+	verificationTokens[verifyToken] = tokenData{
+		UserID:    user.ID,
+		Email:     user.Email,
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+	}
+	tokenMutex.Unlock()
+
+	// Send verification email (non-blocking)
+	go func() {
+		if h.emailService != nil {
+			h.emailService.SendVerificationEmail(user.Email, user.Name, verifyToken)
+		}
+	}()
+
+	c.JSON(http.StatusOK, gin.H{"message": "If the email exists and is unverified, a verification link will be sent"})
 }
 
 // GET /api/auth/me - Get current user
@@ -432,15 +700,16 @@ func (h *AuthHandler) FirebaseSync(c *gin.Context) {
 
 	// Create new user
 	user := &models.User{
-		ID:           uuid.New(),
-		Email:        req.Email,
-		Name:         req.Name,
-		Avatar:       &req.Avatar,
-		Role:         models.RoleClient,
-		Location:     models.Location{Type: "Point", Coordinates: []float64{0, 0}},
-		CreatedAt:    time.Now(),
-		LastActive:   time.Now(),
-		AuthProvider: models.AuthProviderGoogle, // Default to Google for Firebase sync
+		ID:            uuid.New(),
+		Email:         req.Email,
+		Name:          req.Name,
+		Avatar:        &req.Avatar,
+		Role:          models.RoleClient,
+		Location:      models.Location{Type: "Point", Coordinates: []float64{0, 0}},
+		CreatedAt:     time.Now(),
+		LastActive:    time.Now(),
+		AuthProvider:  models.AuthProviderGoogle, // Default to Google for Firebase sync
+		EmailVerified: true,                      // Firebase users are considered verified
 		NotificationPrefs: models.NotificationPrefs{
 			Push:  true,
 			SMS:   true,
@@ -454,7 +723,7 @@ func (h *AuthHandler) FirebaseSync(c *gin.Context) {
 
 // ValidateToken validates a JWT token and returns the claims
 func ValidateToken(tokenString string) (*Claims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (any, error) {
 		return getJWTSecret(), nil
 	})
 
@@ -488,6 +757,26 @@ type OAuthResponse struct {
 	IsNewUser    bool         `json:"isNewUser"`
 }
 
+// GoogleTokenInfo represents the response from Google's tokeninfo endpoint
+type GoogleTokenInfo struct {
+	Iss           string `json:"iss"`
+	Azp           string `json:"azp"`
+	Aud           string `json:"aud"`
+	Sub           string `json:"sub"`
+	Email         string `json:"email"`
+	EmailVerified string `json:"email_verified"`
+	Name          string `json:"name"`
+	Picture       string `json:"picture"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
+	Locale        string `json:"locale"`
+	Iat           string `json:"iat"`
+	Exp           string `json:"exp"`
+	Alg           string `json:"alg"`
+	Kid           string `json:"kid"`
+	Typ           string `json:"typ"`
+}
+
 // POST /api/auth/google - Sign in with Google
 func (h *AuthHandler) GoogleAuth(c *gin.Context) {
 	var req GoogleAuthRequest
@@ -496,31 +785,94 @@ func (h *AuthHandler) GoogleAuth(c *gin.Context) {
 		return
 	}
 
-	// In production, verify the ID token with Google's tokeninfo endpoint
-	// or use the Google Auth library to validate the token
-	// For now, we'll provide a placeholder that can be extended
+	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
+	if googleClientID == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":   "Google OAuth not configured",
+			"message": "Set GOOGLE_CLIENT_ID environment variable to enable Google authentication",
+		})
+		return
+	}
 
-	// TODO: Verify Google ID token
-	// 1. Use google.golang.org/api/oauth2/v2 to verify token
-	// 2. Extract user info from verified token
-	// Example verification:
-	// tokenInfo, err := oauth2Service.Tokeninfo().IdToken(req.IDToken).Do()
-	// if err != nil {
-	//     c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Google ID token"})
-	//     return
-	// }
+	// Verify the ID token with Google's tokeninfo endpoint
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
 
-	// For development, return an error indicating full implementation is needed
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"error":   "Google OAuth not fully configured",
-		"message": "To enable Google authentication, configure GOOGLE_CLIENT_ID and verify the ID token using Google's OAuth2 API",
-		"steps": []string{
-			"1. Set GOOGLE_CLIENT_ID environment variable",
-			"2. Add google.golang.org/api/oauth2/v2 dependency",
-			"3. Verify ID token with Google's tokeninfo endpoint",
-			"4. Extract user email and profile from verified token",
-		},
+	tokenInfoURL := fmt.Sprintf("https://oauth2.googleapis.com/tokeninfo?id_token=%s", req.IDToken)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", tokenInfoURL, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create verification request"})
+		return
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify Google token"})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Google ID token", "details": string(body)})
+		return
+	}
+
+	var tokenInfo GoogleTokenInfo
+	if err := json.NewDecoder(resp.Body).Decode(&tokenInfo); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse Google token info"})
+		return
+	}
+
+	// Verify the audience matches our client ID
+	if tokenInfo.Aud != googleClientID {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token was not issued for this application"})
+		return
+	}
+
+	// Verify the issuer
+	if tokenInfo.Iss != "https://accounts.google.com" && tokenInfo.Iss != "accounts.google.com" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token issuer"})
+		return
+	}
+
+	// Find or create user
+	user, isNewUser := h.findOrCreateOAuthUser(
+		tokenInfo.Email,
+		tokenInfo.Name,
+		tokenInfo.Picture,
+		models.AuthProviderGoogle,
+	)
+
+	// Generate tokens
+	accessToken, refreshToken, expiresAt, err := h.generateTokens(user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+		return
+	}
+
+	c.JSON(http.StatusOK, OAuthResponse{
+		User:         user,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		ExpiresAt:    expiresAt,
+		IsNewUser:    isNewUser,
 	})
+}
+
+// AppleTokenClaims represents the claims in an Apple identity token
+type AppleTokenClaims struct {
+	Iss            string `json:"iss"`
+	Aud            string `json:"aud"`
+	Exp            int64  `json:"exp"`
+	Iat            int64  `json:"iat"`
+	Sub            string `json:"sub"`
+	Email          string `json:"email"`
+	EmailVerified  any    `json:"email_verified"` // Can be bool or string
+	IsPrivateEmail any    `json:"is_private_email"`
+	RealUserStatus int    `json:"real_user_status"`
+	jwt.RegisteredClaims
 }
 
 // POST /api/auth/apple - Sign in with Apple
@@ -531,24 +883,84 @@ func (h *AuthHandler) AppleAuth(c *gin.Context) {
 		return
 	}
 
-	// In production, verify the identity token with Apple's public keys
-	// For now, we'll provide a placeholder
+	appleClientID := os.Getenv("APPLE_CLIENT_ID")
+	if appleClientID == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error":   "Apple Sign-In not configured",
+			"message": "Set APPLE_CLIENT_ID environment variable to enable Apple authentication",
+		})
+		return
+	}
 
-	// TODO: Verify Apple Identity Token
-	// 1. Fetch Apple's public keys from https://appleid.apple.com/auth/keys
-	// 2. Verify JWT signature using the public keys
-	// 3. Validate token claims (iss, aud, exp)
-	// 4. Extract user info from verified token
+	// Parse the identity token (without verification for now - in production, verify with Apple's public keys)
+	// The token is a JWT that we need to decode
+	token, _, err := jwt.NewParser().ParseUnverified(req.IdentityToken, &AppleTokenClaims{})
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Failed to parse Apple identity token"})
+		return
+	}
 
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"error":   "Apple Sign-In not fully configured",
-		"message": "To enable Apple authentication, configure Apple Sign-In credentials and verify the identity token",
-		"steps": []string{
-			"1. Configure Apple Developer account with Sign In with Apple",
-			"2. Set APPLE_CLIENT_ID environment variable",
-			"3. Fetch and cache Apple's public keys",
-			"4. Verify identity token JWT signature and claims",
-		},
+	claims, ok := token.Claims.(*AppleTokenClaims)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Apple token claims"})
+		return
+	}
+
+	// Verify the issuer
+	if claims.Iss != "https://appleid.apple.com" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token issuer"})
+		return
+	}
+
+	// Verify the audience matches our client ID
+	if claims.Aud != appleClientID {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token was not issued for this application"})
+		return
+	}
+
+	// Check expiration
+	if time.Now().Unix() > claims.Exp {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Apple identity token has expired"})
+		return
+	}
+
+	// Get email - Apple may not provide email on subsequent sign-ins
+	email := claims.Email
+	if email == "" && req.Email != "" {
+		email = req.Email
+	}
+
+	if email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email is required for Apple Sign-In"})
+		return
+	}
+
+	// Get name - Apple only provides name on first sign-in
+	name := req.FullName
+	if name == "" {
+		name = "Apple User"
+	}
+
+	// Find or create user
+	user, isNewUser := h.findOrCreateOAuthUser(email, name, "", models.AuthProviderApple)
+
+	// Store Apple's unique user identifier
+	appleUserID := claims.Sub
+	user.FirebaseUID = &appleUserID // Reusing this field for Apple's sub claim
+
+	// Generate tokens
+	accessToken, refreshToken, expiresAt, err := h.generateTokens(user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+		return
+	}
+
+	c.JSON(http.StatusOK, OAuthResponse{
+		User:         user,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		ExpiresAt:    expiresAt,
+		IsNewUser:    isNewUser,
 	})
 }
 
@@ -558,27 +970,32 @@ func (h *AuthHandler) findOrCreateOAuthUser(email, name, avatar string, provider
 	for _, user := range h.storage.Users {
 		if strings.EqualFold(user.Email, email) {
 			// Update existing user with latest OAuth info
-			if name != "" {
+			if name != "" && name != "Apple User" {
 				user.Name = name
 			}
 			if avatar != "" {
 				user.Avatar = &avatar
 			}
 			user.LastActive = time.Now()
+			// Update auth provider if not already set or if linking
+			if user.AuthProvider == models.AuthProviderEmail {
+				// Keep as email but note the OAuth provider was used
+			}
 			return user, false // Not a new user
 		}
 	}
 
 	// Create new user
 	user := &models.User{
-		ID:           uuid.New(),
-		Email:        email,
-		Name:         name,
-		Role:         models.RoleClient,
-		Location:     models.Location{Type: "Point", Coordinates: []float64{0, 0}},
-		CreatedAt:    time.Now(),
-		LastActive:   time.Now(),
-		AuthProvider: provider,
+		ID:            uuid.New(),
+		Email:         email,
+		Name:          name,
+		Role:          models.RoleClient,
+		Location:      models.Location{Type: "Point", Coordinates: []float64{0, 0}},
+		CreatedAt:     time.Now(),
+		LastActive:    time.Now(),
+		AuthProvider:  provider,
+		EmailVerified: true, // OAuth users have verified emails
 		NotificationPrefs: models.NotificationPrefs{
 			Push:  true,
 			SMS:   true,

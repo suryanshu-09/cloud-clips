@@ -1,6 +1,6 @@
 import '../../global.css';
 import { useEffect, useCallback } from 'react';
-import { View } from 'react-native';
+import { View, I18nManager } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -12,7 +12,12 @@ import { OfflineBanner } from '@/components/ui/OfflineBanner';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { initSentry, errorTrackingService } from '@/services/errorTracking/sentry';
 import { offlineSyncService } from '@/services/offline/offlineSync';
+import { StripeProviderWrapper } from '@/services/stripe/provider';
+import { initializeStripe } from '@/features/payments/services/stripeService';
 import apiClient from '@/services/api/client';
+// Initialize i18n - must be imported before using translations
+import '@/services/i18n';
+import { i18nService } from '@/services/i18n';
 
 /**
  * Inner component that uses hooks requiring providers
@@ -29,6 +34,7 @@ function AppContent() {
   useEffect(() => {
     if (!isOffline && wasOffline) {
       const syncPendingActions = async () => {
+        // eslint-disable-next-line no-console
         console.log('[App] Back online, syncing pending actions...');
         const pendingCount = offlineSyncService.getPendingCount();
 
@@ -47,6 +53,7 @@ function AppContent() {
             }
           });
 
+          // eslint-disable-next-line no-console
           console.log('[App] Sync complete:', result);
 
           // Invalidate relevant queries to refresh data
@@ -96,6 +103,16 @@ export default function RootLayout() {
     // Initialize Sentry for error tracking and performance monitoring
     initSentry();
 
+    // Initialize Stripe SDK
+    initializeStripe().then((success) => {
+      if (success) {
+        // eslint-disable-next-line no-console
+        console.log('[RootLayout] Stripe initialized successfully');
+      } else {
+        console.warn('[RootLayout] Stripe not configured - payment features disabled');
+      }
+    });
+
     // Set initial context
     errorTrackingService.setTag('app_version', '1.0.0');
     errorTrackingService.addBreadcrumb({
@@ -104,7 +121,14 @@ export default function RootLayout() {
       level: 'info',
     });
 
-    console.log('[RootLayout] Mounted successfully with performance monitoring');
+    // Set RTL layout direction if needed
+    const isRTL = i18nService.isRTL(i18nService.getCurrentLanguage());
+    if (I18nManager.isRTL !== isRTL) {
+      I18nManager.forceRTL(isRTL);
+    }
+
+    // eslint-disable-next-line no-console
+    console.log('[RootLayout] Mounted successfully with i18n and performance monitoring');
   }, []);
 
   return (
@@ -112,7 +136,9 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <JotaiProvider>
           <QueryClientProvider client={queryClient}>
-            <AppContent />
+            <StripeProviderWrapper>
+              <AppContent />
+            </StripeProviderWrapper>
           </QueryClientProvider>
         </JotaiProvider>
       </SafeAreaProvider>

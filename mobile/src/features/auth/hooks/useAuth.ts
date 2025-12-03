@@ -1,3 +1,4 @@
+import { useEffect, useCallback, useRef } from 'react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -10,15 +11,23 @@ import {
   userRoleAtom,
 } from '@/store/atoms/authAtom';
 import { authService } from '../services/authService';
+import {
+  authService as firebaseAuthService,
+  IGoogleSignInResult,
+  IAppleSignInResult,
+} from '@/services/firebase/auth';
+import { initializeNotifications, cleanupNotifications } from '@/services/notifications';
+import { messagingService } from '@/services/firebase/messaging';
 import type { ILoginCredentials, IAuthResponse, IAuthUser } from '../types';
 
 /**
  * Main authentication hook
- * Provides auth state and methods
+ * Provides auth state and methods with Firebase integration
  */
 export const useAuth = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const isInitializing = useRef(true);
 
   // Atoms
   const [auth, setAuth] = useAtom(authAtom);
@@ -28,14 +37,61 @@ export const useAuth = () => {
   const currentUser = useAtomValue(currentUserAtom);
   const userRole = useAtomValue(userRoleAtom);
 
-  // Login mutation
-  const loginMutation = useMutation({
-    mutationFn: (credentials: ILoginCredentials) => authService.login(credentials),
-    onSuccess: (data: IAuthResponse) => {
+  // Subscribe to Firebase auth state changes
+  useEffect(() => {
+    if (!firebaseAuthService.isInitialized()) {
+      isInitializing.current = false;
+      return;
+    }
+
+    const unsubscribe = firebaseAuthService.onAuthStateChanged(async (firebaseUser) => {
+      if (isInitializing.current) {
+        // Skip first callback during initialization to avoid duplicate login
+        isInitializing.current = false;
+        return;
+      }
+
+      if (firebaseUser && !isAuthenticated) {
+        // Firebase user exists but app state shows logged out
+        // This can happen after app restart - try to sync
+        try {
+          const token = await firebaseUser.getIdToken();
+          // The existing stored auth should handle this case
+          console.log('[useAuth] Firebase user detected, syncing state');
+        } catch (error) {
+          console.error('[useAuth] Error syncing Firebase state:', error);
+        }
+      }
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [isAuthenticated]);
+
+  // Initialize notifications when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      initializeNotifications().catch((error) => {
+        console.warn('[useAuth] Failed to initialize notifications:', error);
+      });
+    }
+  }, [isAuthenticated]);
+
+  // Handle successful login
+  const handleLoginSuccess = useCallback(
+    async (data: IAuthResponse) => {
       setLogin({
         user: data.user,
         token: data.token,
         refreshToken: data.refreshToken,
+      });
+
+      // Register push token after login
+      messagingService.registerTokenWithBackend().catch((error) => {
+        console.warn('[useAuth] Failed to register push token:', error);
       });
 
       // Navigate based on user role
@@ -48,14 +104,110 @@ export const useAuth = () => {
       // Invalidate queries
       queryClient.invalidateQueries({ queryKey: ['auth'] });
     },
+    [setLogin, router, queryClient]
+  );
+
+  // Login mutation
+  const loginMutation = useMutation({
+    mutationFn: (credentials: ILoginCredentials) => authService.login(credentials),
+    onSuccess: handleLoginSuccess,
     onError: (error: Error) => {
       console.error('Login error:', error.message);
     },
   });
 
+  // Google Sign-In mutation
+  const googleSignInMutation = useMutation({
+    mutationFn: async (googleResult: IGoogleSignInResult) => {
+      // First sign in with Firebase
+      const userCredential = await firebaseAuthService.signInWithGoogle(googleResult);
+
+      // Get Firebase token
+      const firebaseToken = await userCredential.user.getIdToken();
+
+      // Sync with backend
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/auth/firebase-sync`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${firebaseToken}`,
+          },
+          body: JSON.stringify({
+            firebaseUid: userCredential.user.uid,
+            email: userCredential.user.email,
+            name: userCredential.user.displayName,
+            avatar: userCredential.user.photoURL,
+            provider: 'google',
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to sync with backend');
+      }
+
+      return response.json() as Promise<IAuthResponse>;
+    },
+    onSuccess: handleLoginSuccess,
+    onError: (error: Error) => {
+      console.error('Google Sign-In error:', error.message);
+    },
+  });
+
+  // Apple Sign-In mutation
+  const appleSignInMutation = useMutation({
+    mutationFn: async (appleResult: IAppleSignInResult) => {
+      // First sign in with Firebase
+      const userCredential = await firebaseAuthService.signInWithApple(appleResult);
+
+      // Get Firebase token
+      const firebaseToken = await userCredential.user.getIdToken();
+
+      // Sync with backend
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/auth/firebase-sync`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${firebaseToken}`,
+          },
+          body: JSON.stringify({
+            firebaseUid: userCredential.user.uid,
+            email: userCredential.user.email || appleResult.email,
+            name:
+              userCredential.user.displayName ||
+              [appleResult.fullName?.givenName, appleResult.fullName?.familyName]
+                .filter(Boolean)
+                .join(' '),
+            provider: 'apple',
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to sync with backend');
+      }
+
+      return response.json() as Promise<IAuthResponse>;
+    },
+    onSuccess: handleLoginSuccess,
+    onError: (error: Error) => {
+      console.error('Apple Sign-In error:', error.message);
+    },
+  });
+
   // Logout mutation
   const logoutMutation = useMutation({
-    mutationFn: () => authService.logout(),
+    mutationFn: async () => {
+      // Cleanup notifications first
+      await cleanupNotifications();
+
+      // Then logout from services
+      return authService.logout();
+    },
     onSuccess: () => {
       setLogout();
       router.replace('/(auth)/login');
@@ -65,6 +217,10 @@ export const useAuth = () => {
     },
     onError: (error: Error) => {
       console.error('Logout error:', error.message);
+      // Still logout locally even if API call fails
+      setLogout();
+      router.replace('/(auth)/login');
+      queryClient.clear();
     },
   });
 
@@ -107,7 +263,12 @@ export const useAuth = () => {
 
   // Delete account mutation
   const deleteAccountMutation = useMutation({
-    mutationFn: () => authService.deleteAccount(),
+    mutationFn: async () => {
+      // Cleanup notifications first
+      await cleanupNotifications();
+
+      return authService.deleteAccount();
+    },
     onSuccess: () => {
       setLogout();
       router.replace('/(auth)/login');
@@ -128,6 +289,11 @@ export const useAuth = () => {
 
     // Methods
     login: loginMutation.mutate,
+    loginAsync: loginMutation.mutateAsync,
+    loginWithGoogle: googleSignInMutation.mutate,
+    loginWithGoogleAsync: googleSignInMutation.mutateAsync,
+    loginWithApple: appleSignInMutation.mutate,
+    loginWithAppleAsync: appleSignInMutation.mutateAsync,
     logout: logoutMutation.mutate,
     refreshToken: refreshTokenMutation.mutate,
     updateProfile: updateProfileMutation.mutate,
@@ -136,12 +302,16 @@ export const useAuth = () => {
 
     // Loading states
     isLoggingIn: loginMutation.isPending,
+    isLoggingInWithGoogle: googleSignInMutation.isPending,
+    isLoggingInWithApple: appleSignInMutation.isPending,
     isLoggingOut: logoutMutation.isPending,
     isUpdatingProfile: updateProfileMutation.isPending,
     isDeletingAccount: deleteAccountMutation.isPending,
 
     // Errors
     loginError: loginMutation.error,
+    googleSignInError: googleSignInMutation.error,
+    appleSignInError: appleSignInMutation.error,
     logoutError: logoutMutation.error,
     updateProfileError: updateProfileMutation.error,
     deleteAccountError: deleteAccountMutation.error,

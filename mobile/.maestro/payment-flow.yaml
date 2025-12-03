@@ -1,0 +1,423 @@
+appId: com.cloudclips.app
+
+---
+# E2E Test: Payment Flow
+# Tests: Payment Methods, Checkout, Coupons, Refunds
+
+# ==============================
+# Setup: Login first
+# ==============================
+- launchApp:
+    clearState: true
+
+# Login with test account
+- tapOn: "Login"
+- tapOn: "Email"
+- inputText: "client@test.com"
+- tapOn: "Password"
+- inputText: "Test123!@#"
+- tapOn: "Sign In"
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible: "Find Barbers"
+    timeout: 10000
+
+---
+# ==============================
+# Test 1: View Payment Methods
+# ==============================
+- tapOn: "Profile"
+
+# Navigate to payment methods
+- tapOn: "Payment Methods"
+
+# Verify payment methods screen
+- assertVisible: "Payment Methods"
+
+# Check for add card button
+- assertVisible: "Add Card"
+
+---
+# ==============================
+# Test 2: Add Credit Card
+# ==============================
+- tapOn: "Add Card"
+
+# Verify add card screen
+- assertVisible: "Add Payment Method"
+
+# Enter card number (test Visa)
+- tapOn: "Card Number"
+- inputText: "4242424242424242"
+
+# Enter expiry date
+- tapOn: "Expiry Date"
+- inputText: "1228"
+
+# Enter CVV
+- tapOn: "CVV"
+- inputText: "123"
+
+# Enter cardholder name
+- tapOn: "Cardholder Name"
+- inputText: "John Doe"
+
+# Save card
+- tapOn: "Save Card"
+
+# Verify card saved
+- extendedWaitUntil:
+    visible: "Card saved"
+    timeout: 5000
+
+# Verify card appears in list
+- assertVisible: "•••• 4242"
+
+---
+# ==============================
+# Test 3: Add Invalid Card
+# ==============================
+- tapOn: "Add Card"
+
+# Enter invalid card number
+- tapOn: "Card Number"
+- inputText: "1234567890123456"
+
+- tapOn: "Expiry Date"
+- inputText: "1228"
+
+- tapOn: "CVV"
+- inputText: "123"
+
+- tapOn: "Cardholder Name"
+- inputText: "Test User"
+
+- tapOn: "Save Card"
+
+# Verify error message
+- assertVisible:
+    text: "Invalid card number"
+    optional: true
+
+# Go back
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 4: Set Default Card
+# ==============================
+# Long press on card to see options
+- longPressOn:
+    text: "•••• 4242"
+    optional: true
+
+# Set as default
+- tapOn:
+    text: "Set as Default"
+    optional: true
+
+# Verify default indicator
+- assertVisible:
+    text: "Default"
+    optional: true
+
+---
+# ==============================
+# Test 5: Delete Card
+# ==============================
+# Swipe to delete or use menu
+- swipe:
+    start: "•••• 4242"
+    direction: LEFT
+    optional: true
+
+- tapOn:
+    text: "Delete"
+    optional: true
+
+# Confirm deletion
+- tapOn:
+    text: "Confirm"
+    optional: true
+
+---
+# ==============================
+# Test 6: Checkout with Payment
+# ==============================
+# Go back to home
+- tapOn: "Home"
+
+# Select a barber
+- tapOn:
+    id: "barber-card-0"
+
+# Start booking
+- tapOn: "Book Appointment"
+
+# Select service
+- tapOn:
+    id: "service-item-0"
+
+- tapOn: "Continue"
+
+# Select date
+- tapOn:
+    id: "available-date-0"
+    optional: true
+
+# Select time
+- tapOn:
+    text: "10:00 AM"
+    optional: true
+
+- tapOn: "Continue"
+
+---
+# ==============================
+# Test 7: Apply Coupon Code
+# ==============================
+# On booking summary, apply coupon
+- tapOn: "Add Coupon"
+
+# Enter invalid coupon first
+- inputText: "INVALIDCODE123"
+- tapOn: "Apply"
+
+# Verify error
+- assertVisible:
+    text: "Invalid coupon"
+    optional: true
+
+# Clear and enter valid coupon
+- clearText
+- inputText: "FIRST10"
+- tapOn: "Apply"
+
+# Verify discount applied
+- assertVisible:
+    text: "10% off"
+    optional: true
+
+# Verify total is updated
+- assertVisible: "Total"
+
+---
+# ==============================
+# Test 8: Remove Coupon
+# ==============================
+- tapOn:
+    text: "Remove"
+    optional: true
+
+# Verify coupon removed (original total restored)
+- assertVisible: "Add Coupon"
+
+---
+# ==============================
+# Test 9: Apply Loyalty Points
+# ==============================
+# Toggle use points
+- tapOn:
+    text: "Use Points"
+    optional: true
+
+# Verify points applied
+- assertVisible:
+    text: "Points Applied"
+    optional: true
+
+# Verify new total
+- assertVisible: "Total"
+
+---
+# ==============================
+# Test 10: Complete Payment
+# ==============================
+- tapOn: "Confirm & Pay"
+
+# Wait for payment sheet
+- extendedWaitUntil:
+    visible: "Payment"
+    timeout: 5000
+
+# Add new card for payment
+- tapOn:
+    text: "Add Card"
+    optional: true
+
+# Or select saved card
+- tapOn:
+    id: "saved-card-0"
+    optional: true
+
+# In test mode, use test card
+- tapOn:
+    id: "card-number-input"
+    optional: true
+- inputText:
+    text: "4242424242424242"
+    optional: true
+
+- tapOn:
+    text: "Pay"
+    optional: true
+
+# Verify payment success
+- extendedWaitUntil:
+    visible: "Booking Confirmed"
+    timeout: 10000
+
+---
+# ==============================
+# Test 11: 3D Secure Flow
+# ==============================
+# Start new booking for 3DS test
+- tapOn: "Home"
+- tapOn:
+    id: "barber-card-0"
+- tapOn: "Book Appointment"
+- tapOn:
+    id: "service-item-0"
+- tapOn: "Continue"
+- tapOn:
+    id: "available-date-1"
+    optional: true
+- tapOn:
+    text: "2:00 PM"
+    optional: true
+- tapOn: "Continue"
+- tapOn: "Confirm & Pay"
+
+# Use 3DS test card
+- tapOn:
+    text: "Add Card"
+    optional: true
+
+# Note: 3DS flow opens web view which may need manual verification
+# The test card 4000000000003220 requires 3DS authentication
+- assertVisible:
+    text: "3D Secure"
+    optional: true
+
+# Complete 3DS (test mode auto-completes)
+- tapOn:
+    text: "Complete"
+    optional: true
+
+---
+# ==============================
+# Test 12: Payment Declined
+# ==============================
+# Start another booking
+- tapOn: "Home"
+- tapOn:
+    id: "barber-card-0"
+- tapOn: "Book Appointment"
+- tapOn:
+    id: "service-item-0"
+- tapOn: "Continue"
+- tapOn:
+    id: "available-date-2"
+    optional: true
+- tapOn:
+    text: "3:00 PM"
+    optional: true
+- tapOn: "Continue"
+- tapOn: "Confirm & Pay"
+
+# Use decline test card (simulated in dev mode)
+# Card 4000000000000002 = generic decline
+- assertVisible:
+    text: "Payment"
+    optional: true
+
+# Verify decline error appears
+- assertVisible:
+    text: "declined"
+    optional: true
+
+# Verify can retry
+- assertVisible:
+    text: "Try Again"
+    optional: true
+
+---
+# ==============================
+# Test 13: View Payment History
+# ==============================
+- tapOn: "Profile"
+- tapOn:
+    text: "Payment History"
+    optional: true
+
+# Verify payment history screen
+- assertVisible:
+    text: "Transactions"
+    optional: true
+
+# Verify transactions listed
+- assertVisible:
+    id: "transaction-item-0"
+    optional: true
+
+# Tap to view details
+- tapOn:
+    id: "transaction-item-0"
+    optional: true
+
+# Verify transaction details
+- assertVisible:
+    text: "Amount"
+    optional: true
+
+---
+# ==============================
+# Test 14: Refund Flow
+# ==============================
+# Navigate to appointments
+- tapOn: "Appointments"
+
+# Tap on recent appointment
+- tapOn:
+    id: "appointment-card-0"
+
+# Cancel appointment
+- tapOn: "Cancel Appointment"
+
+# Confirm cancellation
+- tapOn: "Yes, Cancel"
+
+# Verify refund notice
+- assertVisible:
+    text: "Refund"
+    optional: true
+
+# Check refund status
+- assertVisible:
+    text: "Processing"
+    optional: true
+
+---
+# ==============================
+# Test 15: Download Receipt
+# ==============================
+- tapOn: "Profile"
+- tapOn:
+    text: "Payment History"
+    optional: true
+
+# Select a transaction
+- tapOn:
+    id: "transaction-item-0"
+    optional: true
+
+# Download receipt
+- tapOn:
+    text: "Download Receipt"
+    optional: true
+
+# Verify download started or completed
+- assertVisible:
+    text: "Downloaded"
+    optional: true

@@ -12,20 +12,18 @@ export default function Index() {
   const userRole = useAtomValue(userRoleAtom);
 
   useEffect(() => {
+    // eslint-disable-next-line no-console
     console.log('[Index] Auth state:', { isAuthenticated, userRole });
   }, [isAuthenticated, userRole]);
 
   // Redirect to appropriate screen based on auth state and role
   if (!isAuthenticated) {
-    console.log('[Index] Redirecting to onboarding');
     return <Redirect href="/(auth)/onboarding" />;
   }
 
   if (userRole === 'barber') {
-    console.log('[Index] Redirecting to barber dashboard');
     return <Redirect href="/(barber)" />;
   }
 
-  console.log('[Index] Redirecting to client dashboard');
   return <Redirect href="/(client)" />;
 }

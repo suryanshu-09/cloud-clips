@@ -1,0 +1,827 @@
+appId: com.cloudclips.app
+
+---
+# E2E Test: Products & Shop Flow
+# Tests: Browse, Search, Cart, Checkout, Orders
+
+# ==============================
+# Setup: Login first
+# ==============================
+- launchApp:
+    clearState: true
+
+# Login with test account
+- tapOn: "Login"
+- tapOn: "Email"
+- inputText: "client@test.com"
+- tapOn: "Password"
+- inputText: "Test123!@#"
+- tapOn: "Sign In"
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible: "Find Barbers"
+    timeout: 10000
+
+---
+# ==============================
+# Test 1: Navigate to Shop
+# ==============================
+# Tap on Shop tab
+- tapOn: "Shop"
+
+# Verify shop screen loaded
+- extendedWaitUntil:
+    visible: "Products"
+    timeout: 5000
+
+# Verify products are displayed
+- assertVisible:
+    id: "product-card-0"
+
+---
+# ==============================
+# Test 2: Browse by Category
+# ==============================
+# View categories
+- tapOn: "Categories"
+
+# Verify categories displayed
+- assertVisible: "Hair Care"
+- assertVisible: "Styling"
+- assertVisible: "Beard Care"
+
+# Select a category
+- tapOn: "Hair Care"
+
+# Verify filtered products
+- assertVisible: "Hair Care"
+- assertVisible:
+    id: "product-card-0"
+
+# Clear category filter
+- tapOn: "All Products"
+
+---
+# ==============================
+# Test 3: Search Products
+# ==============================
+# Tap search bar
+- tapOn: "Search products..."
+
+# Search by product name
+- inputText: "Pomade"
+
+# Wait for results
+- extendedWaitUntil:
+    visible:
+      id: "product-card-0"
+    timeout: 5000
+
+# Verify search results
+- assertVisible: "Pomade"
+
+# Clear search
+- tapOn:
+    id: "clear-search"
+- clearText
+
+---
+# ==============================
+# Test 4: Search No Results
+# ==============================
+- tapOn: "Search products..."
+- inputText: "ZZNONEXISTENTPRODUCTZZ"
+
+# Verify no results message
+- extendedWaitUntil:
+    visible: "No products found"
+    timeout: 5000
+
+# Clear search
+- tapOn:
+    id: "clear-search"
+- clearText
+
+---
+# ==============================
+# Test 5: Sort Products
+# ==============================
+# Tap sort button
+- tapOn: "Sort"
+
+# Sort by price low to high
+- tapOn: "Price: Low to High"
+
+# Verify products reordered
+- assertVisible:
+    id: "product-card-0"
+
+# Sort by price high to low
+- tapOn: "Sort"
+- tapOn: "Price: High to Low"
+
+# Sort by popularity
+- tapOn: "Sort"
+- tapOn: "Most Popular"
+
+# Sort by newest
+- tapOn: "Sort"
+- tapOn: "Newest"
+
+---
+# ==============================
+# Test 6: Filter Products
+# ==============================
+# Tap filter button
+- tapOn: "Filter"
+
+# Set price range
+- tapOn: "$10 - $30"
+
+# Set rating filter
+- tapOn: "4+ Stars"
+
+# Apply filters
+- tapOn: "Apply"
+
+# Verify filtered results
+- assertVisible:
+    id: "product-card-0"
+
+# Clear filters
+- tapOn: "Filter"
+- tapOn: "Clear All"
+- tapOn: "Apply"
+
+---
+# ==============================
+# Test 7: View Product Details
+# ==============================
+# Tap on a product
+- tapOn:
+    id: "product-card-0"
+
+# Wait for detail page
+- extendedWaitUntil:
+    visible: "Add to Cart"
+    timeout: 5000
+
+# Verify product info
+- assertVisible:
+    id: "product-name"
+- assertVisible:
+    id: "product-price"
+- assertVisible:
+    id: "product-rating"
+- assertVisible:
+    id: "product-description"
+
+---
+# ==============================
+# Test 8: View Product Images
+# ==============================
+# Swipe through images
+- swipe:
+    start:
+      id: "product-image-carousel"
+    direction: LEFT
+
+# Tap to zoom
+- tapOn:
+    id: "product-image"
+
+# Verify zoom view
+- assertVisible:
+    id: "image-zoom-view"
+    optional: true
+
+# Close zoom
+- tapOn:
+    id: "close-zoom"
+    optional: true
+
+---
+# ==============================
+# Test 9: View Product Reviews
+# ==============================
+# Scroll to reviews
+- scrollUntilVisible:
+    element: "Customer Reviews"
+    direction: DOWN
+
+# Verify reviews section
+- assertVisible: "Customer Reviews"
+- assertVisible:
+    id: "review-item-0"
+    optional: true
+
+---
+# ==============================
+# Test 10: Select Product Variant
+# ==============================
+# If product has variants (size, scent, etc)
+- tapOn:
+    text: "Size"
+    optional: true
+
+# Select variant
+- tapOn:
+    text: "Large"
+    optional: true
+
+# Verify price updates if applicable
+- assertVisible: "$"
+
+---
+# ==============================
+# Test 11: Add to Cart
+# ==============================
+# Tap Add to Cart
+- tapOn: "Add to Cart"
+
+# Verify added confirmation
+- extendedWaitUntil:
+    visible: "Added to Cart"
+    timeout: 3000
+
+# Verify cart badge updated
+- assertVisible:
+    id: "cart-badge"
+
+---
+# ==============================
+# Test 12: Add Multiple Same Item
+# ==============================
+# Add same item again
+- tapOn: "Add to Cart"
+
+# Verify quantity increased
+- assertVisible:
+    text: "2"
+    optional: true
+
+---
+# ==============================
+# Test 13: View Shopping Cart
+# ==============================
+# Tap cart icon
+- tapOn:
+    id: "cart-icon"
+
+# Verify cart screen
+- extendedWaitUntil:
+    visible: "Shopping Cart"
+    timeout: 5000
+
+# Verify item is in cart
+- assertVisible:
+    id: "cart-item-0"
+
+# Verify quantity
+- assertVisible:
+    id: "quantity-2"
+    optional: true
+
+# Verify subtotal
+- assertVisible: "Subtotal"
+
+---
+# ==============================
+# Test 14: Update Cart Quantity
+# ==============================
+# Increase quantity
+- tapOn:
+    id: "quantity-increase-0"
+
+# Verify quantity increased
+- assertVisible:
+    text: "3"
+    optional: true
+
+# Decrease quantity
+- tapOn:
+    id: "quantity-decrease-0"
+
+# Verify quantity decreased
+- assertVisible:
+    text: "2"
+    optional: true
+
+# Verify total updates
+- assertVisible: "Total"
+
+---
+# ==============================
+# Test 15: Remove Item from Cart
+# ==============================
+# Add another product first
+- tapOn: "Continue Shopping"
+- tapOn:
+    id: "product-card-1"
+- tapOn: "Add to Cart"
+- tapOn:
+    id: "cart-icon"
+
+# Remove first item
+- swipe:
+    start:
+      id: "cart-item-0"
+    direction: LEFT
+
+- tapOn: "Remove"
+
+# Verify item removed
+- assertNotVisible:
+    id: "cart-item-0"
+    optional: true
+
+---
+# ==============================
+# Test 16: Save for Later
+# ==============================
+# Swipe on item
+- swipe:
+    start:
+      id: "cart-item-0"
+    direction: RIGHT
+    optional: true
+
+- tapOn:
+    text: "Save for Later"
+    optional: true
+
+# Verify item in saved section
+- scrollUntilVisible:
+    element: "Saved for Later"
+    direction: DOWN
+    optional: true
+
+- assertVisible:
+    id: "saved-item-0"
+    optional: true
+
+# Move back to cart
+- tapOn:
+    text: "Move to Cart"
+    optional: true
+
+---
+# ==============================
+# Test 17: Empty Cart
+# ==============================
+# Clear all items
+- tapOn:
+    text: "Clear Cart"
+    optional: true
+
+# Confirm
+- tapOn:
+    text: "Clear"
+    optional: true
+
+# Verify empty state
+- assertVisible:
+    text: "Your cart is empty"
+    optional: true
+
+# Verify CTA
+- assertVisible:
+    text: "Start Shopping"
+    optional: true
+
+---
+# ==============================
+# Test 18: Proceed to Checkout
+# ==============================
+# Add items back to cart
+- tapOn:
+    text: "Start Shopping"
+    optional: true
+- tapOn:
+    id: "product-card-0"
+- tapOn: "Add to Cart"
+- tapOn:
+    id: "cart-icon"
+
+# Proceed to checkout
+- tapOn: "Checkout"
+
+# Verify checkout screen
+- extendedWaitUntil:
+    visible: "Checkout"
+    timeout: 5000
+
+---
+# ==============================
+# Test 19: Select Shipping Address
+# ==============================
+# Verify address section
+- assertVisible: "Shipping Address"
+
+# Select saved address (if available)
+- tapOn:
+    id: "address-0"
+    optional: true
+
+# Or add new address
+- tapOn:
+    text: "Add Address"
+    optional: true
+
+# Fill address form
+- tapOn:
+    id: "street-input"
+    optional: true
+- inputText: "123 Main Street"
+
+- tapOn:
+    id: "city-input"
+    optional: true
+- inputText: "New York"
+
+- tapOn:
+    id: "state-input"
+    optional: true
+- inputText: "NY"
+
+- tapOn:
+    id: "zip-input"
+    optional: true
+- inputText: "10001"
+
+# Save address
+- tapOn:
+    text: "Save Address"
+    optional: true
+
+---
+# ==============================
+# Test 20: Select Shipping Method
+# ==============================
+# Verify shipping options
+- assertVisible: "Shipping Method"
+
+# Select standard shipping
+- tapOn:
+    text: "Standard"
+    optional: true
+
+# Verify shipping cost displayed
+- assertVisible: "$"
+
+# Select express shipping
+- tapOn:
+    text: "Express"
+    optional: true
+
+# Verify cost updates
+- assertVisible: "$"
+
+---
+# ==============================
+# Test 21: Apply Product Coupon
+# ==============================
+- tapOn: "Add Coupon"
+
+# Enter coupon
+- inputText: "FREESHIP"
+
+- tapOn: "Apply"
+
+# Verify discount applied
+- assertVisible:
+    text: "Free Shipping"
+    optional: true
+
+---
+# ==============================
+# Test 22: Review Order
+# ==============================
+# Verify order summary
+- assertVisible: "Order Summary"
+
+# Check items listed
+- assertVisible:
+    id: "order-item-0"
+
+# Check subtotal
+- assertVisible: "Subtotal"
+
+# Check shipping
+- assertVisible: "Shipping"
+
+# Check tax
+- assertVisible: "Tax"
+
+# Check total
+- assertVisible: "Total"
+
+---
+# ==============================
+# Test 23: Place Order
+# ==============================
+# Tap place order
+- tapOn: "Place Order"
+
+# Wait for payment processing
+- extendedWaitUntil:
+    visible: "Processing"
+    timeout: 5000
+
+# Complete payment (using saved card or test mode)
+- tapOn:
+    id: "saved-card-0"
+    optional: true
+
+- tapOn:
+    text: "Pay"
+    optional: true
+
+# Verify order confirmation
+- extendedWaitUntil:
+    visible: "Order Confirmed"
+    timeout: 10000
+
+# Verify order number
+- assertVisible: "Order #"
+
+# Verify delivery estimate
+- assertVisible: "Estimated Delivery"
+
+---
+# ==============================
+# Test 24: Order Confirmation Details
+# ==============================
+# Verify items in confirmation
+- assertVisible:
+    id: "confirmation-item-0"
+
+# Verify shipping address
+- assertVisible: "Shipping to"
+
+# Verify email confirmation notice
+- assertVisible: "confirmation email"
+
+---
+# ==============================
+# Test 25: View Order History
+# ==============================
+# Navigate to profile
+- tapOn: "Profile"
+
+# Go to orders
+- tapOn: "Orders"
+
+# Verify orders screen
+- extendedWaitUntil:
+    visible: "My Orders"
+    timeout: 5000
+
+# Verify recent order appears
+- assertVisible:
+    id: "order-item-0"
+
+---
+# ==============================
+# Test 26: Filter Orders
+# ==============================
+# View active orders
+- tapOn: "Active"
+
+# Verify active orders shown
+- assertVisible:
+    text: "Processing"
+    optional: true
+
+# View completed orders
+- tapOn: "Completed"
+
+# Verify completed orders shown
+- assertVisible:
+    text: "Delivered"
+    optional: true
+
+# View all orders
+- tapOn: "All"
+
+---
+# ==============================
+# Test 27: View Order Details
+# ==============================
+# Tap on order
+- tapOn:
+    id: "order-item-0"
+
+# Verify order details
+- assertVisible: "Order Details"
+- assertVisible: "Order #"
+- assertVisible: "Status"
+- assertVisible: "Items"
+- assertVisible: "Total"
+
+---
+# ==============================
+# Test 28: Track Order
+# ==============================
+# Tap track order
+- tapOn: "Track Order"
+
+# Verify tracking screen
+- assertVisible: "Order Tracking"
+
+# Verify status timeline
+- assertVisible:
+    id: "status-timeline"
+
+# Verify current status
+- assertVisible:
+    text: "Processing"
+    optional: true
+
+# Check carrier info (if shipped)
+- assertVisible:
+    text: "Tracking Number"
+    optional: true
+
+# Tap tracking number to open carrier page
+- tapOn:
+    id: "tracking-link"
+    optional: true
+
+# Go back
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 29: Cancel Order
+# ==============================
+# Only if order not shipped
+- tapOn: "Cancel Order"
+
+# Confirm cancellation
+- tapOn:
+    text: "Yes, Cancel"
+    optional: true
+
+# Verify cancellation
+- assertVisible:
+    text: "Order Cancelled"
+    optional: true
+
+# Verify refund notice
+- assertVisible:
+    text: "Refund"
+    optional: true
+
+---
+# ==============================
+# Test 30: Reorder
+# ==============================
+# View a completed order
+- tapOn: "Orders"
+- tapOn: "Completed"
+- tapOn:
+    id: "order-item-0"
+    optional: true
+
+# Tap reorder
+- tapOn:
+    text: "Order Again"
+    optional: true
+
+# Verify items added to cart
+- assertVisible:
+    text: "Added to Cart"
+    optional: true
+
+---
+# ==============================
+# Test 31: Add to Wishlist
+# ==============================
+# Navigate to shop
+- tapOn: "Shop"
+
+# Tap heart on product
+- tapOn:
+    id: "wishlist-button-0"
+
+# Verify added to wishlist
+- assertVisible:
+    text: "Added to Wishlist"
+    optional: true
+
+# Verify heart is filled
+- assertVisible:
+    id: "wishlist-filled-0"
+    optional: true
+
+---
+# ==============================
+# Test 32: View Wishlist
+# ==============================
+- tapOn: "Profile"
+- tapOn: "Wishlist"
+
+# Verify wishlist screen
+- assertVisible: "Wishlist"
+
+# Verify saved product
+- assertVisible:
+    id: "wishlist-item-0"
+
+# Add to cart from wishlist
+- tapOn:
+    text: "Add to Cart"
+
+# Verify added
+- assertVisible:
+    text: "Added to Cart"
+    optional: true
+
+---
+# ==============================
+# Test 33: Remove from Wishlist
+# ==============================
+# Remove item
+- tapOn:
+    id: "remove-wishlist-0"
+
+# Verify removed
+- assertNotVisible:
+    id: "wishlist-item-0"
+    optional: true
+
+# Verify empty state if no items
+- assertVisible:
+    text: "No saved products"
+    optional: true
+
+---
+# ==============================
+# Test 34: Product Out of Stock
+# ==============================
+- tapOn: "Shop"
+
+# Find out of stock product (if any)
+- scrollUntilVisible:
+    element: "Out of Stock"
+    direction: DOWN
+    optional: true
+
+# Tap on out of stock product
+- tapOn:
+    text: "Out of Stock"
+    optional: true
+
+# Verify cannot add to cart
+- assertVisible:
+    text: "Notify Me"
+    optional: true
+
+# Tap notify me
+- tapOn:
+    text: "Notify Me"
+    optional: true
+
+# Verify notification set
+- assertVisible:
+    text: "We'll notify you"
+    optional: true
+
+---
+# ==============================
+# Test 35: Rate Purchased Product
+# ==============================
+- tapOn: "Profile"
+- tapOn: "Orders"
+- tapOn: "Completed"
+- tapOn:
+    id: "order-item-0"
+    optional: true
+
+# Rate product
+- tapOn:
+    text: "Rate"
+    optional: true
+
+# Select rating
+- tapOn:
+    id: "star-5"
+    optional: true
+
+# Write review
+- tapOn:
+    id: "review-input"
+    optional: true
+- inputText: "Great product! Highly recommend."
+
+# Submit review
+- tapOn:
+    text: "Submit"
+    optional: true
+
+# Verify review submitted
+- assertVisible:
+    text: "Review submitted"
+    optional: true

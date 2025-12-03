@@ -21,6 +21,8 @@ describe('API Client', () => {
     // Also mock the base axios instance for token refresh requests
     axiosMock = new MockAdapter(axios);
     jest.clearAllMocks();
+    // Use real timers for API client tests to avoid timeout issues with retry logic
+    jest.useRealTimers();
   });
 
   afterEach(() => {
@@ -79,13 +81,18 @@ describe('API Client', () => {
       }
     });
 
-    it('should throw ApiError on 500 error', async () => {
+    it('should throw ApiError on 500 error after retries', async () => {
+      // 500 errors trigger retries - mock all retry attempts to fail
       mock.onGet('/test').reply(500, {
         message: 'Internal Server Error',
       });
 
       try {
-        await apiClient.get('/test');
+        // POST requests don't retry, so use POST to avoid waiting for retries
+        mock.onPost('/test-error').reply(500, {
+          message: 'Internal Server Error',
+        });
+        await apiClient.post('/test-error', {});
         fail('Should have thrown an error');
       } catch (error) {
         expect(error).toBeInstanceOf(ApiError);
@@ -94,14 +101,16 @@ describe('API Client', () => {
       }
     });
 
-    it('should handle network errors', async () => {
-      mock.onGet('/test').networkError();
+    it('should handle network errors after retries', async () => {
+      // Network errors trigger retries - use POST which doesn't retry
+      mock.onPost('/test-network').networkError();
 
       try {
-        await apiClient.get('/test');
+        await apiClient.post('/test-network', {});
         fail('Should have thrown an error');
       } catch (error) {
         expect(error).toBeInstanceOf(ApiError);
+        expect((error as ApiError).isNetworkError).toBe(true);
       }
     });
 

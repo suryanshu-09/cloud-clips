@@ -235,6 +235,29 @@ coverageThreshold: {
 }
 ```
 
+## Manual Testing Checklist
+
+For release QA, use the comprehensive manual testing checklist:
+
+```bash
+# View the checklist
+cat MANUAL_TESTING_CHECKLIST.md
+```
+
+The checklist covers:
+- **Authentication** (signup, login, OAuth, password reset, biometrics)
+- **Barber Discovery** (browse, search, filter, profile, map)
+- **Booking Flow** (service selection, scheduling, payment, management)
+- **Payment Processing** (cards, checkout, refunds)
+- **Chat & Communication** (messaging, notifications)
+- **Products & Shop** (browsing, cart, orders)
+- **Loyalty Program** (points, rewards, referrals)
+- **Profile & Settings** (profile management, preferences)
+- **Push Notifications** (all notification types)
+- **Offline & Performance** (caching, performance metrics)
+- **Barber App Features** (barber-specific functionality)
+- **Deep Linking** (URL handling)
+
 ## E2E Testing with Maestro
 
 ### Installation
@@ -265,8 +288,44 @@ appId: com.cloudclips.app
 
 ### Available E2E Tests
 
-1. **auth-flow.yaml**: Tests user registration and login
-2. **booking-flow.yaml**: Tests the complete booking process
+1. **auth-flow.yaml**: Comprehensive authentication tests (7 scenarios)
+   - User registration with validation
+   - Login with valid/invalid credentials
+   - Logout flow
+   - Session persistence
+   - Password reset flow
+   - OAuth buttons presence
+   - Form validation
+
+2. **barber-discovery-flow.yaml**: Barber discovery tests (12 scenarios)
+   - Browse barbers list
+   - Search by name, location, specialty
+   - Filter by rating, distance, price
+   - View barber profile
+   - View services, gallery, reviews
+   - View availability
+   - Map view with pins
+   - Empty state handling
+   - Favorite barber
+   - Contact options
+
+3. **booking-flow.yaml**: Complete booking flow tests (17 scenarios)
+   - Navigate to barber profile
+   - Service selection (single/multiple)
+   - Date and time selection
+   - Add booking notes
+   - Apply coupon codes
+   - Review booking summary
+   - Payment and confirmation
+   - Add to calendar
+   - View booking details
+   - Navigate appointments list
+   - View past appointments
+   - Reschedule appointment
+   - Cancel appointment
+   - Quick rebook
+   - Push notification verification
+   - Loyalty points earned
 
 ### Running E2E Tests
 

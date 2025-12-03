@@ -1,0 +1,518 @@
+appId: com.cloudclips.app
+
+---
+# E2E Test: Push Notifications Flow
+# Tests: Booking reminders, Chat notifications, Promotional notifications,
+#        Notification permissions, Deep linking from notifications
+# Phase 32.5 - Push Notifications (18 test scenarios)
+
+# ==============================
+# Test 1: Notification Permission Request
+# ==============================
+- launchApp:
+    clearState: true
+
+# On first launch, notification permission should be requested
+- extendedWaitUntil:
+    visible: "Allow Notifications"
+    timeout: 10000
+    optional: true
+
+# If permission dialog appears, allow it
+- tapOn:
+    text: "Allow"
+    optional: true
+
+# Continue to login
+- tapOn: "Get Started"
+- tapOn: "Login"
+- tapOn: "Email"
+- inputText: "client@test.com"
+- tapOn: "Password"
+- inputText: "Test123!@#"
+- tapOn: "Sign In"
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 10000
+
+---
+# ==============================
+# Test 2: Verify Notification Settings Access
+# ==============================
+- tapOn: "Profile"
+
+- scrollUntilVisible:
+    element: "Notifications"
+    direction: DOWN
+
+- tapOn: "Notifications"
+
+# Verify notification settings screen
+- assertVisible: "Notification Settings"
+- assertVisible: "Push Notifications"
+
+# Verify push is enabled (toggle should be ON)
+- assertVisible: "Push Notifications"
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 3: Booking Reminder Notification Setup
+# ==============================
+- tapOn: "Notifications"
+
+# Verify booking reminder options
+- assertVisible: "Booking Reminders"
+- assertVisible: "24 hours before"
+- assertVisible: "1 hour before"
+- assertVisible: "15 minutes before"
+
+# Enable all reminder times
+- tapOn: "24 hours before"
+- tapOn: "1 hour before"
+- tapOn: "15 minutes before"
+
+# Verify settings saved
+- extendedWaitUntil:
+    visible: "Settings saved"
+    timeout: 3000
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 4: Chat Notification Settings
+# ==============================
+- tapOn: "Notifications"
+
+- scrollUntilVisible:
+    element: "Chat Messages"
+    direction: DOWN
+
+# Verify chat notification options
+- assertVisible: "Chat Messages"
+- assertVisible: "Show Preview"
+- assertVisible: "Sound"
+- assertVisible: "Vibration"
+
+# Toggle chat message notifications
+- tapOn: "Chat Messages"
+
+# Verify disabled
+- extendedWaitUntil:
+    visible: "Settings saved"
+    timeout: 3000
+
+# Re-enable
+- tapOn: "Chat Messages"
+
+# Configure preview
+- tapOn: "Show Preview"
+
+# Verify preview options
+- assertVisible: "Show message content"
+- assertVisible: "Show sender only"
+- assertVisible: "Hide all"
+
+- tapOn: "Show message content"
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 5: Promotional Notification Settings
+# ==============================
+- tapOn: "Notifications"
+
+- scrollUntilVisible:
+    element: "Promotional Offers"
+    direction: DOWN
+
+# Verify promotional notification options
+- assertVisible: "Promotional Offers"
+- assertVisible: "Discounts & Sales"
+- assertVisible: "New Features"
+- assertVisible: "Weekly Newsletter"
+
+# Toggle promotional notifications
+- tapOn: "Promotional Offers"
+
+# Should disable all sub-options
+- extendedWaitUntil:
+    visible: "Settings saved"
+    timeout: 3000
+
+# Re-enable
+- tapOn: "Promotional Offers"
+
+# Customize individual options
+- tapOn: "Weekly Newsletter"  # Disable newsletter
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 6: Order Update Notifications
+# ==============================
+- tapOn: "Notifications"
+
+- scrollUntilVisible:
+    element: "Order Updates"
+    direction: DOWN
+
+# Verify order notification options
+- assertVisible: "Order Updates"
+- assertVisible: "Order Confirmed"
+- assertVisible: "Order Shipped"
+- assertVisible: "Order Delivered"
+
+# All should be enabled by default
+- tapOn: "Order Updates"
+
+# Verify disabled
+- tapOn: "Order Updates"  # Re-enable
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 7: Loyalty Notifications
+# ==============================
+- tapOn: "Notifications"
+
+- scrollUntilVisible:
+    element: "Loyalty Updates"
+    direction: DOWN
+
+# Verify loyalty notification options
+- assertVisible: "Loyalty Updates"
+- assertVisible: "Points Earned"
+- assertVisible: "Points Expiring"
+- assertVisible: "Tier Changes"
+- assertVisible: "New Rewards"
+
+# Toggle specific options
+- tapOn: "Points Expiring"  # Important to keep this ON
+- tapOn: "Points Expiring"  # Re-enable
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 8: Notification Sound Settings
+# ==============================
+- tapOn: "Notifications"
+
+- scrollUntilVisible:
+    element: "Sound"
+    direction: DOWN
+
+- tapOn: "Sound"
+
+# Verify sound options
+- assertVisible: "Notification Sound"
+- assertVisible: "Default"
+- assertVisible: "Chime"
+- assertVisible: "Bell"
+- assertVisible: "None"
+
+# Select different sound
+- tapOn: "Chime"
+
+# Verify selection
+- extendedWaitUntil:
+    visible: "Sound changed"
+    timeout: 3000
+
+- tapOn: "Back"
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 9: Notification Quiet Hours
+# ==============================
+- tapOn: "Notifications"
+
+- scrollUntilVisible:
+    element: "Quiet Hours"
+    direction: DOWN
+
+- tapOn: "Quiet Hours"
+
+# Verify quiet hours options
+- assertVisible: "Enable Quiet Hours"
+- assertVisible: "Start Time"
+- assertVisible: "End Time"
+- assertVisible: "Allow Urgent"
+
+# Enable quiet hours
+- tapOn: "Enable Quiet Hours"
+
+# Set start time
+- tapOn: "Start Time"
+- assertVisible: "Select Time"
+# Note: Time picker interaction depends on platform
+- tapOn:
+    text: "10"
+    optional: true
+- tapOn:
+    text: "PM"
+    optional: true
+- tapOn: 
+    text: "OK"
+    optional: true
+- tapOn:
+    text: "Done"
+    optional: true
+
+# Set end time
+- tapOn: "End Time"
+- tapOn:
+    text: "7"
+    optional: true
+- tapOn:
+    text: "AM"
+    optional: true
+- tapOn:
+    text: "OK"
+    optional: true
+- tapOn:
+    text: "Done"
+    optional: true
+
+# Allow urgent notifications during quiet hours
+- tapOn: "Allow Urgent"
+
+- tapOn: "Back"
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 10: Simulate Booking Reminder
+# ==============================
+# This test simulates receiving a booking reminder notification
+# In real testing, would need a scheduled booking
+
+- tapOn: "Home"
+
+# Navigate to appointments to see notification integration
+- tapOn: "Appointments"
+
+# If there are appointments, reminder settings should apply
+- assertVisible: "Appointments"
+
+# Note: Actual notification testing requires backend trigger
+# This verifies the UI for notification-related features
+
+- tapOn: "Home"
+
+---
+# ==============================
+# Test 11: Notification Badge Count
+# ==============================
+# Verify notification badge appears on relevant tabs
+
+- tapOn: "Messages"
+
+# If there are unread messages, badge should show
+# Note: This depends on having unread messages in the system
+
+- assertVisible: "Messages"
+
+- tapOn: "Home"
+
+---
+# ==============================
+# Test 12: Deep Link - Booking Notification
+# ==============================
+# Simulate tapping a booking reminder notification
+# In Maestro, we can simulate deep links
+
+- openLink: "cloudclips://appointment/123"
+
+# Should open appointment details
+- extendedWaitUntil:
+    visible: "Appointment Details"
+    timeout: 5000
+    optional: true
+
+# If deep link works, verify appointment info shown
+- assertVisible:
+    text: "Appointment"
+    optional: true
+
+# Navigate back
+- tapOn:
+    text: "Back"
+    optional: true
+
+---
+# ==============================
+# Test 13: Deep Link - Chat Notification
+# ==============================
+- openLink: "cloudclips://chat/456"
+
+# Should open chat conversation
+- extendedWaitUntil:
+    visible: "Chat"
+    timeout: 5000
+    optional: true
+
+# Navigate back
+- tapOn:
+    text: "Back"
+    optional: true
+
+---
+# ==============================
+# Test 14: Deep Link - Promotional Notification
+# ==============================
+- openLink: "cloudclips://promo/summer-sale"
+
+# Should open promotional content
+- extendedWaitUntil:
+    visible: "Special Offer"
+    timeout: 5000
+    optional: true
+
+# Navigate back
+- tapOn:
+    text: "Back"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+
+---
+# ==============================
+# Test 15: Disable All Push Notifications
+# ==============================
+- tapOn: "Profile"
+
+- scrollUntilVisible:
+    element: "Notifications"
+    direction: DOWN
+
+- tapOn: "Notifications"
+
+# Disable master push toggle
+- tapOn: "Push Notifications"
+
+# Verify warning about disabled notifications
+- assertVisible: "Push notifications disabled"
+
+# All sub-options should be disabled/grayed out
+- extendedWaitUntil:
+    visible: "All notifications are disabled"
+    timeout: 3000
+
+# Re-enable
+- tapOn: "Push Notifications"
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 16: Email Notification Settings
+# ==============================
+- tapOn: "Notifications"
+
+- scrollUntilVisible:
+    element: "Email Notifications"
+    direction: DOWN
+
+- tapOn: "Email Notifications"
+
+# Verify email notification options
+- assertVisible: "Booking Confirmations"
+- assertVisible: "Receipts"
+- assertVisible: "Weekly Summary"
+- assertVisible: "Marketing Emails"
+
+# Toggle options
+- tapOn: "Marketing Emails"  # Disable
+
+# Verify saved
+- extendedWaitUntil:
+    visible: "Settings saved"
+    timeout: 3000
+
+- tapOn: "Back"
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 17: SMS Notification Settings
+# ==============================
+- tapOn: "Notifications"
+
+- scrollUntilVisible:
+    element: "SMS Notifications"
+    direction: DOWN
+
+# Verify SMS notification options (if available)
+- assertVisible:
+    text: "SMS Notifications"
+    optional: true
+
+- tapOn:
+    text: "SMS Notifications"
+    optional: true
+
+# If SMS is available
+- assertVisible:
+    text: "Booking Reminders"
+    optional: true
+- assertVisible:
+    text: "Order Updates"
+    optional: true
+
+- tapOn:
+    text: "Back"
+    optional: true
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 18: Notification History
+# ==============================
+# Some apps have notification history/center
+
+- tapOn: "Notifications"
+
+- scrollUntilVisible:
+    element: "Notification History"
+    direction: DOWN
+    optional: true
+
+- tapOn:
+    text: "Notification History"
+    optional: true
+
+# If notification history exists
+- assertVisible:
+    text: "Recent Notifications"
+    optional: true
+
+# Mark all as read
+- tapOn:
+    text: "Mark All Read"
+    optional: true
+
+# Clear history
+- tapOn:
+    text: "Clear All"
+    optional: true
+
+- tapOn:
+    text: "Confirm"
+    optional: true
+
+- tapOn:
+    text: "Back"
+    optional: true
+- tapOn: "Back"

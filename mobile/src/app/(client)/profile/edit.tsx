@@ -1,10 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ScrollView, Text, View, Pressable, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { authService } from '@/features/auth/services/authService';
 import { Card, Button, Input, Avatar } from '@/components/ui';
+import {
+  mediaService,
+  pickImageFromCamera,
+  pickImageFromGallery,
+  showImagePickerOptions,
+  IUploadProgress,
+} from '@/services/media';
 import type { IAuthUser } from '@/features/auth/types';
 
 interface IProfileFormData {
@@ -27,6 +34,9 @@ export default function EditProfileScreen() {
     email: '',
   });
   const [hasChanges, setHasChanges] = useState(false);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Initialize form data when user data is available
   useEffect(() => {
@@ -43,10 +53,56 @@ export default function EditProfileScreen() {
   useEffect(() => {
     if (userData) {
       const changed =
-        formData.name !== (userData.name || '') || formData.phone !== (userData.phone || '');
+        formData.name !== (userData.name || '') ||
+        formData.phone !== (userData.phone || '') ||
+        avatarUri !== null;
       setHasChanges(changed);
     }
-  }, [formData, userData]);
+  }, [formData, userData, avatarUri]);
+
+  // Handle avatar upload progress
+  const handleUploadProgress = useCallback((progress: IUploadProgress) => {
+    setUploadProgress(progress.progress);
+  }, []);
+
+  // Handle picking image from camera
+  const handleCameraPress = async () => {
+    try {
+      const image = await pickImageFromCamera({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (image) {
+        setAvatarUri(image.uri);
+      }
+    } catch (error) {
+      console.error('Camera error:', error);
+      Alert.alert('Error', 'Failed to access camera');
+    }
+  };
+
+  // Handle picking image from gallery
+  const handleGalleryPress = async () => {
+    try {
+      const image = await pickImageFromGallery({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (image) {
+        setAvatarUri(image.uri);
+      }
+    } catch (error) {
+      console.error('Gallery error:', error);
+      Alert.alert('Error', 'Failed to access photo library');
+    }
+  };
+
+  // Show image picker options
+  const handleChangePhoto = () => {
+    showImagePickerOptions(handleCameraPress, handleGalleryPress);
+  };
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
@@ -67,7 +123,7 @@ export default function EditProfileScreen() {
     },
   });
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Validation
     if (!formData.name.trim()) {
       Alert.alert('Error', 'Name is required');
@@ -86,10 +142,38 @@ export default function EditProfileScreen() {
       return;
     }
 
-    updateProfileMutation.mutate({
-      name: formData.name.trim(),
-      phone: formData.phone.trim(),
-    });
+    try {
+      let profileImageUrl = userData?.profileImage;
+
+      // Upload avatar if changed
+      if (avatarUri) {
+        setIsUploading(true);
+        setUploadProgress(0);
+
+        try {
+          const uploadResult = await mediaService.uploadAvatar(avatarUri, {
+            onProgress: handleUploadProgress,
+          });
+          profileImageUrl = uploadResult.url;
+        } catch (uploadError) {
+          console.error('Avatar upload error:', uploadError);
+          Alert.alert('Error', 'Failed to upload photo. Please try again.');
+          setIsUploading(false);
+          return;
+        }
+
+        setIsUploading(false);
+      }
+
+      updateProfileMutation.mutate({
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        profileImage: profileImageUrl,
+      });
+    } catch (error) {
+      console.error('Submit error:', error);
+      Alert.alert('Error', 'Failed to update profile. Please try again.');
+    }
   };
 
   if (!userData) {
@@ -114,13 +198,36 @@ export default function EditProfileScreen() {
           <Card className="p-4 items-center">
             <Avatar
               size="xl"
-              source={userData.profileImage}
+              source={avatarUri || userData.profileImage}
               fallback={formData.name.charAt(0) || 'U'}
             />
-            <Button variant="outline" size="sm" className="mt-4">
-              Change Photo
+            {isUploading && (
+              <View className="mt-2 w-full px-4">
+                <View className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <View
+                    className="h-full bg-blue-500 rounded-full"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </View>
+                <Text className="text-xs text-gray-500 text-center mt-1">
+                  Uploading... {Math.round(uploadProgress)}%
+                </Text>
+              </View>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onPress={handleChangePhoto}
+              disabled={isUploading}
+            >
+              {avatarUri ? 'Change Selected Photo' : 'Change Photo'}
             </Button>
-            <Text className="text-xs text-gray-500 mt-2">Photo upload coming soon</Text>
+            {avatarUri && (
+              <Pressable onPress={() => setAvatarUri(null)}>
+                <Text className="text-xs text-red-500 mt-2">Remove selected photo</Text>
+              </Pressable>
+            )}
           </Card>
 
           {/* Basic Information */}
@@ -202,10 +309,14 @@ export default function EditProfileScreen() {
       <View className="p-6 bg-white border-t border-gray-200">
         <Button
           onPress={handleSubmit}
-          disabled={updateProfileMutation.isPending || !hasChanges}
+          disabled={updateProfileMutation.isPending || isUploading || !hasChanges}
           size="lg"
         >
-          {updateProfileMutation.isPending ? 'Saving Changes...' : 'Save Changes'}
+          {isUploading
+            ? 'Uploading Photo...'
+            : updateProfileMutation.isPending
+              ? 'Saving Changes...'
+              : 'Save Changes'}
         </Button>
         {!hasChanges && (
           <Text className="text-center text-gray-500 text-sm mt-2">No changes to save</Text>

@@ -1,0 +1,353 @@
+appId: com.cloudclips.app
+
+---
+# E2E Test: Barber Discovery Flow
+# Tests: Browse, Search, Filter, View Profile, Map View
+
+# ==============================
+# Setup: Login first
+# ==============================
+- launchApp:
+    clearState: true
+
+# Login with test account
+- tapOn: "Login"
+- tapOn: "Email"
+- inputText: "client@test.com"
+- tapOn: "Password"
+- inputText: "Test123!@#"
+- tapOn: "Sign In"
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible: "Find Barbers"
+    timeout: 10000
+
+---
+# ==============================
+# Test 1: Browse Barbers List
+# ==============================
+# Verify barber list is displayed
+- assertVisible: "Nearby Barbers"
+
+# Verify at least one barber card exists
+- assertVisible:
+    id: "barber-card-0"
+
+# Scroll to load more barbers (pagination)
+- scroll:
+    direction: DOWN
+    
+# Pull to refresh
+- scroll:
+    direction: UP
+    
+---
+# ==============================
+# Test 2: Search Barbers
+# ==============================
+# Tap on search bar
+- tapOn: "Search barbers..."
+
+# Search by name
+- inputText: "John"
+- tapOn:
+    id: "search-button"
+    optional: true
+    
+# Wait for results
+- extendedWaitUntil:
+    visible: "barber-card"
+    timeout: 5000
+
+# Clear search
+- tapOn:
+    id: "clear-search"
+    optional: true
+- clearText
+
+# Search by location
+- inputText: "Downtown"
+- tapOn:
+    id: "search-button"
+    optional: true
+
+# Verify results update
+- extendedWaitUntil:
+    visible: "barber-card"
+    timeout: 5000
+
+# Clear search
+- tapOn:
+    id: "clear-search"
+    optional: true
+- clearText
+
+# Search by specialty
+- inputText: "Fade"
+- tapOn:
+    id: "search-button"
+    optional: true
+
+# Clear search for next tests
+- tapOn:
+    id: "clear-search"
+    optional: true
+- clearText
+
+---
+# ==============================
+# Test 3: Filter Barbers
+# ==============================
+# Open filter modal
+- tapOn: "Filter"
+
+# Verify filter modal opened
+- assertVisible: "Filter Barbers"
+
+# Filter by rating (4+ stars)
+- tapOn: "4+ Stars"
+
+# Filter by distance
+- tapOn: "Within 5 miles"
+
+# Filter by price range
+- tapOn: "$$"
+
+# Apply filters
+- tapOn: "Apply Filters"
+
+# Verify results are filtered
+- extendedWaitUntil:
+    visible: "barber-card"
+    timeout: 5000
+
+# Clear filters
+- tapOn: "Filter"
+- tapOn: "Clear All"
+- tapOn: "Apply Filters"
+
+---
+# ==============================
+# Test 4: View Barber Profile
+# ==============================
+# Tap on first barber card
+- tapOn:
+    id: "barber-card-0"
+
+# Wait for profile to load
+- extendedWaitUntil:
+    visible: "Book Appointment"
+    timeout: 5000
+
+# Verify profile sections
+- assertVisible: "About"
+- assertVisible: "Services"
+- assertVisible: "Reviews"
+- assertVisible: "Gallery"
+
+# View barber info
+- assertVisible:
+    id: "barber-name"
+- assertVisible:
+    id: "barber-rating"
+- assertVisible:
+    id: "barber-location"
+
+---
+# ==============================
+# Test 5: View Services
+# ==============================
+# Tap services tab/section
+- tapOn: "Services"
+
+# Verify services are displayed
+- assertVisible:
+    id: "service-item-0"
+
+# Service should show name and price
+- assertVisible: "$"
+
+---
+# ==============================
+# Test 6: View Gallery
+# ==============================
+# Tap gallery tab
+- tapOn: "Gallery"
+
+# Verify gallery images
+- assertVisible:
+    id: "gallery-image-0"
+    optional: true
+
+# Tap on image to view full screen (if available)
+- tapOn:
+    id: "gallery-image-0"
+    optional: true
+    
+# Close full screen view
+- tapOn:
+    id: "close-gallery"
+    optional: true
+
+---
+# ==============================
+# Test 7: View Reviews
+# ==============================
+# Tap reviews tab
+- tapOn: "Reviews"
+
+# Verify reviews section
+- assertVisible: "Customer Reviews"
+
+# Reviews should show rating and text
+- assertVisible:
+    id: "review-item-0"
+    optional: true
+
+---
+# ==============================
+# Test 8: View Availability
+# ==============================
+# Tap view availability
+- tapOn: "View Availability"
+
+# Verify calendar is shown
+- assertVisible: "Select Date"
+
+# Verify time slots are shown
+- assertVisible:
+    id: "time-slot-0"
+    optional: true
+
+# Go back
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 9: Map View
+# ==============================
+# Go back to discovery screen
+- tapOn: "Back"
+
+# Toggle to map view
+- tapOn:
+    id: "map-toggle"
+
+# Verify map is displayed
+- assertVisible:
+    id: "map-view"
+
+# Verify barber pins are on map
+- assertVisible:
+    id: "barber-pin-0"
+    optional: true
+
+# Tap on a pin
+- tapOn:
+    id: "barber-pin-0"
+    optional: true
+
+# Verify barber info card appears
+- assertVisible:
+    id: "barber-info-card"
+    optional: true
+
+# Navigate from pin to profile
+- tapOn:
+    text: "View Profile"
+    optional: true
+
+# Go back to list view
+- tapOn: "Back"
+- tapOn:
+    id: "list-toggle"
+    optional: true
+
+---
+# ==============================
+# Test 10: Empty State
+# ==============================
+# Search for non-existent barber
+- tapOn: "Search barbers..."
+- inputText: "ZZZZNONEXISTENTBARBERZZZ"
+- tapOn:
+    id: "search-button"
+    optional: true
+
+# Verify empty state message
+- extendedWaitUntil:
+    visible: "No barbers found"
+    timeout: 5000
+
+# Clear search
+- tapOn:
+    id: "clear-search"
+    optional: true
+- clearText
+
+---
+# ==============================
+# Test 11: Favorite Barber
+# ==============================
+# Tap on a barber to view profile
+- tapOn:
+    id: "barber-card-0"
+
+# Wait for profile
+- extendedWaitUntil:
+    visible: "Book Appointment"
+    timeout: 5000
+
+# Tap favorite/heart button
+- tapOn:
+    id: "favorite-button"
+
+# Verify favorite status changed
+- assertVisible:
+    id: "favorite-filled"
+    optional: true
+
+# Unfavorite
+- tapOn:
+    id: "favorite-button"
+
+# Go back
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 12: Contact Options
+# ==============================
+# View barber profile
+- tapOn:
+    id: "barber-card-0"
+
+# Wait for profile
+- extendedWaitUntil:
+    visible: "Book Appointment"
+    timeout: 5000
+
+# Verify contact options available
+- assertVisible:
+    text: "Message"
+    optional: true
+
+- assertVisible:
+    text: "Call"
+    optional: true
+
+# Tap message button
+- tapOn:
+    text: "Message"
+    optional: true
+
+# Verify chat screen opens (if available)
+- assertVisible:
+    text: "Send a message"
+    optional: true
+
+# Go back
+- tapOn:
+    text: "Back"
+    optional: true

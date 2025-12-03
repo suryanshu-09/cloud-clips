@@ -1,0 +1,774 @@
+appId: com.cloudclips.app
+
+---
+# E2E Test: Loyalty Program Flow
+# Tests: Enrollment, Points, Rewards, Referrals, Tiers
+
+# ==============================
+# Setup: Login first
+# ==============================
+- launchApp:
+    clearState: true
+
+# Login with test account
+- tapOn: "Login"
+- tapOn: "Email"
+- inputText: "client@test.com"
+- tapOn: "Password"
+- inputText: "Test123!@#"
+- tapOn: "Sign In"
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible: "Find Barbers"
+    timeout: 10000
+
+---
+# ==============================
+# Test 1: Navigate to Loyalty Program
+# ==============================
+- tapOn: "Profile"
+
+# Tap on Loyalty
+- tapOn: "Loyalty"
+
+# Verify loyalty screen loaded
+- extendedWaitUntil:
+    visible: "Loyalty Program"
+    timeout: 5000
+
+---
+# ==============================
+# Test 2: View Loyalty Dashboard
+# ==============================
+# Verify key elements
+- assertVisible: "Points Balance"
+- assertVisible:
+    id: "points-value"
+- assertVisible:
+    id: "tier-badge"
+
+# Verify tier progress
+- assertVisible:
+    id: "tier-progress-bar"
+
+---
+# ==============================
+# Test 3: View Current Tier
+# ==============================
+# Verify tier displayed
+- assertVisible:
+    text: "Bronze"
+    optional: true
+- assertVisible:
+    text: "Silver"
+    optional: true
+- assertVisible:
+    text: "Gold"
+    optional: true
+- assertVisible:
+    text: "Platinum"
+    optional: true
+
+# Tap to view tier details
+- tapOn:
+    id: "tier-badge"
+
+# Verify tier benefits
+- assertVisible: "Tier Benefits"
+- assertVisible:
+    id: "benefit-0"
+
+---
+# ==============================
+# Test 4: View Tier Progress
+# ==============================
+# Check progress to next tier
+- assertVisible:
+    text: "points to"
+    optional: true
+
+# Verify progress bar
+- assertVisible:
+    id: "tier-progress-bar"
+
+# View next tier benefits preview
+- tapOn:
+    text: "View Next Tier"
+    optional: true
+
+- assertVisible:
+    text: "Benefits"
+    optional: true
+
+# Close
+- tapOn:
+    text: "Close"
+    optional: true
+
+---
+# ==============================
+# Test 5: View Points Balance
+# ==============================
+# Verify points prominently displayed
+- assertVisible:
+    id: "points-value"
+
+# Verify points breakdown if available
+- assertVisible:
+    text: "Available"
+    optional: true
+- assertVisible:
+    text: "Pending"
+    optional: true
+
+---
+# ==============================
+# Test 6: View Points History
+# ==============================
+# Tap History tab
+- tapOn: "History"
+
+# Verify history screen
+- assertVisible: "Points History"
+
+# Verify transactions listed
+- assertVisible:
+    id: "transaction-0"
+    optional: true
+
+---
+# ==============================
+# Test 7: Filter Points History
+# ==============================
+# Filter by earned
+- tapOn: "Earned"
+
+# Verify only earning transactions
+- assertVisible:
+    text: "+"
+    optional: true
+
+# Filter by redeemed
+- tapOn: "Redeemed"
+
+# Verify only redemptions
+- assertVisible:
+    text: "-"
+    optional: true
+
+# Filter by expired
+- tapOn:
+    text: "Expired"
+    optional: true
+
+# View all
+- tapOn: "All"
+
+---
+# ==============================
+# Test 8: View Transaction Details
+# ==============================
+# Tap on a transaction
+- tapOn:
+    id: "transaction-0"
+
+# Verify transaction details
+- assertVisible: "Transaction Details"
+- assertVisible:
+    id: "transaction-date"
+- assertVisible:
+    id: "transaction-amount"
+- assertVisible:
+    id: "transaction-source"
+
+# Close details
+- tapOn: "Close"
+
+---
+# ==============================
+# Test 9: View Rewards Catalog
+# ==============================
+# Tap Rewards tab
+- tapOn: "Rewards"
+
+# Verify rewards screen
+- assertVisible: "Available Rewards"
+
+# Verify rewards listed
+- assertVisible:
+    id: "reward-0"
+
+---
+# ==============================
+# Test 10: Filter Rewards by Category
+# ==============================
+# Filter by discounts
+- tapOn:
+    text: "Discounts"
+    optional: true
+
+# Verify filtered results
+- assertVisible:
+    id: "reward-0"
+
+# Filter by free items
+- tapOn:
+    text: "Free Items"
+    optional: true
+
+# View all rewards
+- tapOn:
+    text: "All"
+    optional: true
+
+---
+# ==============================
+# Test 11: View Reward Details
+# ==============================
+# Tap on a reward
+- tapOn:
+    id: "reward-0"
+
+# Verify reward details
+- assertVisible: "Reward Details"
+- assertVisible:
+    id: "reward-name"
+- assertVisible:
+    id: "reward-cost"
+- assertVisible:
+    id: "reward-description"
+
+# Verify terms
+- assertVisible:
+    text: "Terms"
+    optional: true
+
+---
+# ==============================
+# Test 12: Redeem Reward (Sufficient Points)
+# ==============================
+# Note: This test assumes user has enough points
+
+# Tap redeem
+- tapOn:
+    text: "Redeem"
+    optional: true
+
+# Confirm redemption
+- tapOn:
+    text: "Confirm"
+    optional: true
+
+# Verify success
+- assertVisible:
+    text: "Reward Redeemed"
+    optional: true
+
+# Verify points deducted
+- assertVisible:
+    id: "points-value"
+
+---
+# ==============================
+# Test 13: Redeem Reward (Insufficient Points)
+# ==============================
+# Find reward requiring more points
+- scrollUntilVisible:
+    element: "Need more points"
+    direction: DOWN
+    optional: true
+
+# Try to redeem
+- tapOn:
+    text: "Redeem"
+    optional: true
+
+# Verify error
+- assertVisible:
+    text: "Need"
+    optional: true
+- assertVisible:
+    text: "more points"
+    optional: true
+
+---
+# ==============================
+# Test 14: View Redeemed Rewards
+# ==============================
+# Navigate to My Rewards
+- tapOn:
+    text: "My Rewards"
+    optional: true
+
+# Verify redeemed rewards
+- assertVisible: "My Rewards"
+- assertVisible:
+    id: "redeemed-reward-0"
+    optional: true
+
+---
+# ==============================
+# Test 15: View Reward Voucher
+# ==============================
+# Tap on redeemed reward
+- tapOn:
+    id: "redeemed-reward-0"
+    optional: true
+
+# Verify voucher/code
+- assertVisible:
+    id: "reward-code"
+    optional: true
+
+# Copy code
+- tapOn:
+    text: "Copy"
+    optional: true
+
+# Verify copied
+- assertVisible:
+    text: "Copied"
+    optional: true
+
+---
+# ==============================
+# Test 16: View Referral Section
+# ==============================
+# Navigate back to loyalty main
+- tapOn: "Back"
+- tapOn: "Loyalty"
+
+# Tap Refer Friends
+- tapOn: "Refer Friends"
+
+# Verify referral screen
+- assertVisible: "Refer a Friend"
+
+---
+# ==============================
+# Test 17: View Referral Code
+# ==============================
+# Verify personal referral code displayed
+- assertVisible:
+    id: "referral-code"
+
+# Verify code format (e.g., JOHN1234)
+- assertVisible:
+    text: "Your Code"
+
+---
+# ==============================
+# Test 18: Copy Referral Code
+# ==============================
+# Tap copy button
+- tapOn:
+    id: "copy-code-button"
+
+# Verify copied feedback
+- assertVisible:
+    text: "Copied"
+    optional: true
+
+---
+# ==============================
+# Test 19: Share Referral Link
+# ==============================
+# Tap share button
+- tapOn: "Share"
+
+# Verify share sheet opens (platform specific)
+# On iOS: system share sheet
+# On Android: intent chooser
+
+# Note: Can't fully test share sheet in Maestro
+# Just verify the action triggers
+- assertVisible:
+    id: "share-sheet"
+    optional: true
+
+# Cancel share (if possible)
+- tapOn:
+    text: "Cancel"
+    optional: true
+
+---
+# ==============================
+# Test 20: Share via Specific App
+# ==============================
+# Tap specific share option
+- tapOn:
+    text: "WhatsApp"
+    optional: true
+
+# Note: Opens WhatsApp with pre-filled message
+# Can't verify WhatsApp content in test
+
+# Go back
+- tapOn:
+    text: "Back"
+    optional: true
+
+---
+# ==============================
+# Test 21: View Referral Stats
+# ==============================
+# Verify referral stats displayed
+- assertVisible:
+    text: "Friends Invited"
+    optional: true
+- assertVisible:
+    text: "Friends Signed Up"
+    optional: true
+- assertVisible:
+    text: "Points Earned"
+    optional: true
+
+---
+# ==============================
+# Test 22: View Referral List
+# ==============================
+# Tap to view referrals
+- tapOn:
+    text: "View Referrals"
+    optional: true
+
+# Verify referral list
+- assertVisible:
+    id: "referral-item-0"
+    optional: true
+
+# Check status indicators
+- assertVisible:
+    text: "Pending"
+    optional: true
+- assertVisible:
+    text: "Completed"
+    optional: true
+
+---
+# ==============================
+# Test 23: View Referral Leaderboard
+# ==============================
+- tapOn:
+    text: "Leaderboard"
+    optional: true
+
+# Verify leaderboard
+- assertVisible: "Top Referrers"
+- assertVisible:
+    id: "leaderboard-item-0"
+    optional: true
+
+# Go back
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 24: Use Referral Code (New User Flow)
+# ==============================
+# Note: This requires logging out and testing signup flow
+# Simulated here with partial flow
+
+# Logout
+- tapOn: "Profile"
+- scrollUntilVisible:
+    element: "Logout"
+    direction: DOWN
+- tapOn: "Logout"
+- tapOn:
+    text: "Confirm"
+    optional: true
+
+# Start signup
+- tapOn: "Get Started"
+- tapOn: "Sign Up"
+
+# Look for referral code input
+- scrollUntilVisible:
+    element: "Referral Code"
+    direction: DOWN
+    optional: true
+
+# Enter referral code
+- tapOn:
+    text: "Referral Code"
+    optional: true
+- inputText: "JOHN1234"
+
+# Verify code accepted
+- assertVisible:
+    text: "Applied"
+    optional: true
+
+---
+# ==============================
+# Test 25: Invalid Referral Code
+# ==============================
+# Clear and enter invalid code
+- clearText
+- inputText: "INVALIDCODE123"
+
+# Verify error
+- assertVisible:
+    text: "Invalid referral code"
+    optional: true
+
+# Clear for next test
+- clearText
+
+---
+# ==============================
+# Test 26: Own Referral Code
+# ==============================
+# Try to use own code (if user knows their code)
+- inputText: "OWNCODE123"
+
+# Verify error
+- assertVisible:
+    text: "Cannot use your own code"
+    optional: true
+
+# Go back to login
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 27: Login and Verify Points
+# ==============================
+# Login again
+- tapOn: "Login"
+- tapOn: "Email"
+- inputText: "client@test.com"
+- tapOn: "Password"
+- inputText: "Test123!@#"
+- tapOn: "Sign In"
+
+# Wait for home
+- extendedWaitUntil:
+    visible: "Find Barbers"
+    timeout: 10000
+
+# Go to loyalty
+- tapOn: "Profile"
+- tapOn: "Loyalty"
+
+# Verify points balance
+- assertVisible:
+    id: "points-value"
+
+---
+# ==============================
+# Test 28: View Expiring Points
+# ==============================
+# Check for expiring points notice
+- assertVisible:
+    text: "expiring"
+    optional: true
+
+# Tap to view details
+- tapOn:
+    text: "expiring"
+    optional: true
+
+# Verify expiration details
+- assertVisible:
+    text: "Points Expiring"
+    optional: true
+- assertVisible:
+    id: "expiring-points-value"
+    optional: true
+
+---
+# ==============================
+# Test 29: Earn Points from Booking
+# ==============================
+# Navigate to book appointment
+- tapOn: "Home"
+- tapOn:
+    id: "barber-card-0"
+- tapOn: "Book Appointment"
+- tapOn:
+    id: "service-item-0"
+- tapOn: "Continue"
+- tapOn:
+    id: "available-date-0"
+    optional: true
+- tapOn:
+    text: "10:00 AM"
+    optional: true
+- tapOn: "Continue"
+- tapOn: "Confirm & Pay"
+
+# Complete payment (test mode)
+- extendedWaitUntil:
+    visible: "Booking Confirmed"
+    timeout: 10000
+
+# Check points earned notice
+- assertVisible:
+    text: "Points Earned"
+    optional: true
+
+# Go to loyalty to verify
+- tapOn: "Profile"
+- tapOn: "Loyalty"
+
+# Check history for new transaction
+- tapOn: "History"
+- assertVisible:
+    text: "Booking"
+    optional: true
+
+---
+# ==============================
+# Test 30: Use Reward at Checkout
+# ==============================
+# First redeem a discount reward
+- tapOn: "Rewards"
+- tapOn:
+    id: "reward-discount"
+    optional: true
+- tapOn:
+    text: "Redeem"
+    optional: true
+- tapOn:
+    text: "Confirm"
+    optional: true
+
+# Now book with reward
+- tapOn: "Home"
+- tapOn:
+    id: "barber-card-0"
+- tapOn: "Book Appointment"
+- tapOn:
+    id: "service-item-0"
+- tapOn: "Continue"
+- tapOn:
+    id: "available-date-1"
+    optional: true
+- tapOn:
+    text: "11:00 AM"
+    optional: true
+- tapOn: "Continue"
+
+# Apply reward at checkout
+- tapOn:
+    text: "Apply Reward"
+    optional: true
+
+# Select redeemed reward
+- tapOn:
+    id: "available-reward-0"
+    optional: true
+
+# Verify discount applied
+- assertVisible:
+    text: "Discount Applied"
+    optional: true
+
+---
+# ==============================
+# Test 31: Tier Upgrade
+# ==============================
+# Note: This test verifies tier upgrade notification
+# Actual upgrade requires accumulating enough points
+
+# Check for tier upgrade message (if applicable)
+- assertVisible:
+    text: "Congratulations"
+    optional: true
+- assertVisible:
+    text: "upgraded"
+    optional: true
+
+---
+# ==============================
+# Test 32: Loyalty Program Enrollment
+# ==============================
+# Note: For new users not yet enrolled
+
+# Check enrollment prompt
+- assertVisible:
+    text: "Join Loyalty Program"
+    optional: true
+
+# Tap to join
+- tapOn:
+    text: "Join Now"
+    optional: true
+
+# Verify enrollment success
+- assertVisible:
+    text: "Welcome"
+    optional: true
+- assertVisible:
+    text: "bonus points"
+    optional: true
+
+---
+# ==============================
+# Test 33: Skip Enrollment
+# ==============================
+# For users who see enrollment prompt
+- assertVisible:
+    text: "Maybe Later"
+    optional: true
+
+# Tap skip
+- tapOn:
+    text: "Maybe Later"
+    optional: true
+
+# Verify prompt dismissed
+- assertNotVisible:
+    text: "Join Loyalty Program"
+    optional: true
+
+---
+# ==============================
+# Test 34: Empty States
+# ==============================
+# New member with no history
+- tapOn: "History"
+- assertVisible:
+    text: "No transactions yet"
+    optional: true
+
+# No redeemed rewards
+- tapOn:
+    text: "My Rewards"
+    optional: true
+- assertVisible:
+    text: "No rewards yet"
+    optional: true
+
+# No referrals
+- tapOn: "Refer Friends"
+- assertVisible:
+    text: "No referrals yet"
+    optional: true
+
+---
+# ==============================
+# Test 35: Loyalty Program Terms
+# ==============================
+# View terms and conditions
+- scrollUntilVisible:
+    element: "Terms & Conditions"
+    direction: DOWN
+    optional: true
+
+- tapOn:
+    text: "Terms & Conditions"
+    optional: true
+
+# Verify terms displayed
+- assertVisible: "Loyalty Program Terms"
+
+# Scroll through terms
+- scroll:
+    direction: DOWN
+
+# Close terms
+- tapOn: "Close"

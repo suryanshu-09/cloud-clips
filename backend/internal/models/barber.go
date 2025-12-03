@@ -13,6 +13,17 @@ const (
 	ServiceLocationInSalon ServiceLocation = "in_salon"
 )
 
+// StripeConnectStatus represents the status of a barber's Stripe Connect account
+type StripeConnectStatus string
+
+const (
+	ConnectStatusNone       StripeConnectStatus = "none"       // No Connect account
+	ConnectStatusPending    StripeConnectStatus = "pending"    // Onboarding started but incomplete
+	ConnectStatusVerified   StripeConnectStatus = "verified"   // Account verified and can receive payouts
+	ConnectStatusRestricted StripeConnectStatus = "restricted" // Account has restrictions
+	ConnectStatusDisabled   StripeConnectStatus = "disabled"   // Account disabled
+)
+
 type BarberProfile struct {
 	ID               uuid.UUID              `json:"id" bson:"_id"`
 	UserID           uuid.UUID              `json:"userId" bson:"userId"`
@@ -29,8 +40,14 @@ type BarberProfile struct {
 	IsVerified       bool                   `json:"isVerified" bson:"isVerified"`
 	Location         Location               `json:"location" bson:"location"`
 	Address          *string                `json:"address,omitempty" bson:"address,omitempty"`
-	CreatedAt        time.Time              `json:"createdAt" bson:"createdAt"`
-	UpdatedAt        time.Time              `json:"updatedAt" bson:"updatedAt"`
+	// Stripe Connect fields for barber payouts
+	StripeConnectID     *string             `json:"stripeConnectId,omitempty" bson:"stripeConnectId,omitempty"`
+	StripeConnectStatus StripeConnectStatus `json:"stripeConnectStatus" bson:"stripeConnectStatus"`
+	PayoutsEnabled      bool                `json:"payoutsEnabled" bson:"payoutsEnabled"`
+	ChargesEnabled      bool                `json:"chargesEnabled" bson:"chargesEnabled"`
+	ConnectOnboardedAt  *time.Time          `json:"connectOnboardedAt,omitempty" bson:"connectOnboardedAt,omitempty"`
+	CreatedAt           time.Time           `json:"createdAt" bson:"createdAt"`
+	UpdatedAt           time.Time           `json:"updatedAt" bson:"updatedAt"`
 }
 
 type WorkingHour struct {

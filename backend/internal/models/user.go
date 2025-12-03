@@ -42,6 +42,9 @@ type User struct {
 	EmailVerified     bool              `json:"emailVerified" bson:"emailVerified"`
 	ResetToken        *string           `json:"-" bson:"resetToken,omitempty"`
 	ResetTokenExpires *time.Time        `json:"-" bson:"resetTokenExpires,omitempty"`
+	Banned            bool              `json:"banned" bson:"banned"`
+	BannedAt          *time.Time        `json:"bannedAt,omitempty" bson:"bannedAt,omitempty"`
+	BannedReason      *string           `json:"bannedReason,omitempty" bson:"bannedReason,omitempty"`
 }
 
 type Location struct {

@@ -22,7 +22,18 @@ export {
 // Services
 export { paymentService } from './services/paymentService';
 export { mockPaymentService } from './services/mockPaymentService';
-export { stripeService, initializeStripe, useStripe } from './services/stripeService';
+export {
+  initializeStripe,
+  isStripeConfigured,
+  useStripePayment,
+  useSavedCards,
+  usePlatformPay,
+  requestRefund,
+  useStripe,
+  useConfirmPayment,
+  CardField,
+  PlatformPayButton,
+} from './services/stripeService';
 
 // Types
 export * from './types';

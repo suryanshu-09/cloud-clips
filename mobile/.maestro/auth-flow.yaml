@@ -1,20 +1,32 @@
 appId: com.cloudclips.app
 
 ---
-# E2E Test: User Authentication Flow
+# E2E Test: Complete Authentication Flow
+# Tests: Registration, Login, Logout, Password Reset, Session Persistence
 
-- launchApp
+# ==============================
+# Test 1: User Registration
+# ==============================
+- launchApp:
+    clearState: true
 
-# Test: User Registration
+# Navigate to signup
 - tapOn: "Get Started"
 - tapOn: "Sign Up"
 
-# Fill registration form
+# Verify signup screen loaded
+- assertVisible: "Create Account"
+
+# Test validation - empty form submission
+- tapOn: "Create Account"
+- assertVisible: "Full name is required"
+
+# Fill registration form with valid data
 - tapOn: "Full Name"
 - inputText: "John Doe"
 
 - tapOn: "Email"
-- inputText: "john.doe@example.com"
+- inputText: "john.doe.test@example.com"
 
 - tapOn: "Phone Number"
 - inputText: "+1234567890"
@@ -25,35 +37,193 @@ appId: com.cloudclips.app
 - tapOn: "Confirm Password"
 - inputText: "Test123!@#"
 
-# Select role
+# Select client role
 - tapOn: "I'm a Client"
 
 # Submit registration
 - tapOn: "Create Account"
 
+# Wait for registration to complete
+- extendedWaitUntil:
+    visible: "Welcome"
+    timeout: 10000
+
 # Verify successful registration
 - assertVisible: "Welcome"
-- assertVisible: "john.doe@example.com"
+- assertVisible: "Find Barbers"
 
-# Logout
+# Navigate to profile to verify user data
 - tapOn: "Profile"
-- tapOn: "Logout"
+- assertVisible: "John Doe"
+- assertVisible: "john.doe.test@example.com"
 
 ---
-# Test: User Login
+# ==============================
+# Test 2: Logout Flow
+# ==============================
+- assertVisible: "Profile"
 
+# Scroll down to find logout
+- scrollUntilVisible:
+    element: "Logout"
+    direction: DOWN
+
+# Logout
+- tapOn: "Logout"
+
+# Confirm logout dialog if present
+- tapOn:
+    text: "Confirm"
+    optional: true
+
+# Verify redirected to login/welcome screen
+- extendedWaitUntil:
+    visible: "Login"
+    timeout: 5000
+
+---
+# ==============================
+# Test 3: Login Flow
+# ==============================
 - tapOn: "Login"
 
-# Fill login form
+# Verify login screen
+- assertVisible: "Welcome Back"
+
+# Test validation - empty form
+- tapOn: "Sign In"
+- assertVisible: "Email is required"
+
+# Test invalid credentials
 - tapOn: "Email"
-- inputText: "john.doe@example.com"
+- inputText: "wrong@example.com"
+- tapOn: "Password"
+- inputText: "wrongpassword"
+- tapOn: "Sign In"
+
+- extendedWaitUntil:
+    visible: "Invalid credentials"
+    timeout: 5000
+
+# Clear and enter valid credentials
+- tapOn: "Email"
+- clearText
+- inputText: "john.doe.test@example.com"
 
 - tapOn: "Password"
+- clearText
 - inputText: "Test123!@#"
 
 # Submit login
 - tapOn: "Sign In"
 
 # Verify successful login
-- assertVisible: "Home"
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 10000
+
 - assertVisible: "Find Barbers"
+
+---
+# ==============================
+# Test 4: Session Persistence
+# ==============================
+# Stop and restart the app
+- stopApp
+
+- launchApp:
+    clearState: false
+
+# Verify still logged in
+- extendedWaitUntil:
+    visible: "Find Barbers"
+    timeout: 10000
+
+# User should still be logged in
+- tapOn: "Profile"
+- assertVisible: "John Doe"
+
+---
+# ==============================
+# Test 5: Password Reset Flow
+# ==============================
+# Logout first
+- scrollUntilVisible:
+    element: "Logout"
+    direction: DOWN
+- tapOn: "Logout"
+- tapOn:
+    text: "Confirm"
+    optional: true
+
+# Navigate to login
+- tapOn: "Login"
+
+# Tap forgot password
+- tapOn: "Forgot Password?"
+
+# Verify forgot password screen
+- assertVisible: "Reset Password"
+
+# Test validation
+- tapOn: "Send Reset Link"
+- assertVisible: "Email is required"
+
+# Enter email
+- tapOn: "Email"
+- inputText: "john.doe.test@example.com"
+
+# Submit
+- tapOn: "Send Reset Link"
+
+# Verify success message
+- extendedWaitUntil:
+    visible: "Check your email"
+    timeout: 5000
+
+# Go back to login
+- tapOn: "Back to Login"
+- assertVisible: "Welcome Back"
+
+---
+# ==============================
+# Test 6: OAuth Buttons Present
+# ==============================
+# Verify OAuth buttons are present on login screen
+- assertVisible: "Continue with Google"
+- assertVisible:
+    text: "Continue with Apple"
+    optional: true  # Only on iOS
+
+---
+# ==============================
+# Test 7: Registration Validation
+# ==============================
+- tapOn: "Sign Up"
+
+# Test email validation
+- tapOn: "Email"
+- inputText: "invalid-email"
+- tapOn: "Password"  # Move focus away
+- assertVisible: "Invalid email format"
+
+# Test password strength
+- clearText
+- tapOn: "Email"
+- inputText: "valid@example.com"
+- tapOn: "Password"
+- inputText: "weak"
+- tapOn: "Confirm Password"  # Move focus
+- assertVisible: "Password must be at least 8 characters"
+
+# Test password mismatch
+- tapOn: "Password"
+- clearText
+- inputText: "Test123!@#"
+- tapOn: "Confirm Password"
+- inputText: "Different123!@#"
+- tapOn: "Full Name"  # Move focus
+- assertVisible: "Passwords don't match"
+
+# Go back
+- tapOn: "Back"

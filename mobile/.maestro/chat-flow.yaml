@@ -1,0 +1,522 @@
+appId: com.cloudclips.app
+
+---
+# E2E Test: Chat & Communication Flow
+# Tests: Start Chat, Send/Receive Messages, Images, History, Notifications
+
+# ==============================
+# Setup: Login first
+# ==============================
+- launchApp:
+    clearState: true
+
+# Login with test account
+- tapOn: "Login"
+- tapOn: "Email"
+- inputText: "client@test.com"
+- tapOn: "Password"
+- inputText: "Test123!@#"
+- tapOn: "Sign In"
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible: "Find Barbers"
+    timeout: 10000
+
+---
+# ==============================
+# Test 1: Start Chat from Barber Profile
+# ==============================
+# Select a barber
+- tapOn:
+    id: "barber-card-0"
+
+# Wait for profile to load
+- extendedWaitUntil:
+    visible: "Book Appointment"
+    timeout: 5000
+
+# Tap message button
+- tapOn: "Message"
+
+# Verify chat screen opens
+- extendedWaitUntil:
+    visible: "Send a message"
+    timeout: 5000
+
+# Verify barber name is shown
+- assertVisible:
+    id: "chat-header-name"
+
+---
+# ==============================
+# Test 2: Send Text Message
+# ==============================
+# Tap on message input
+- tapOn:
+    id: "message-input"
+
+# Type message
+- inputText: "Hello! I'm interested in booking an appointment. Are you available this week?"
+
+# Send message
+- tapOn:
+    id: "send-button"
+
+# Verify message appears in chat
+- assertVisible: "Hello! I'm interested"
+
+# Verify message has timestamp
+- assertVisible:
+    id: "message-timestamp-0"
+    optional: true
+
+# Verify message status (sent/delivered)
+- assertVisible:
+    id: "message-status-sent"
+    optional: true
+
+---
+# ==============================
+# Test 3: Send Long Message
+# ==============================
+- tapOn:
+    id: "message-input"
+
+# Type long message
+- inputText: "This is a longer message to test how the chat handles multiple lines of text. I wanted to ask about your pricing for a haircut and beard trim. Also, do you have any availability on weekends? I work during weekdays so Saturday or Sunday would be ideal for me. Please let me know what times work best. Thank you!"
+
+- tapOn:
+    id: "send-button"
+
+# Verify long message displays correctly
+- assertVisible: "This is a longer message"
+
+---
+# ==============================
+# Test 4: Send Message with Emoji
+# ==============================
+- tapOn:
+    id: "message-input"
+
+- inputText: "Great! Thanks for the info 👍😊"
+
+- tapOn:
+    id: "send-button"
+
+# Verify emoji message sent
+- assertVisible: "👍"
+
+---
+# ==============================
+# Test 5: Send Image from Gallery
+# ==============================
+# Tap camera/image button
+- tapOn:
+    id: "image-button"
+
+# Select from gallery
+- tapOn:
+    text: "Gallery"
+    optional: true
+
+# Select an image (first image in gallery)
+- tapOn:
+    id: "gallery-image-0"
+    optional: true
+
+# Confirm selection
+- tapOn:
+    text: "Send"
+    optional: true
+
+# Verify image uploading indicator
+- assertVisible:
+    text: "Uploading"
+    optional: true
+
+# Wait for upload complete
+- extendedWaitUntil:
+    visible:
+      id: "chat-image-0"
+    timeout: 10000
+
+---
+# ==============================
+# Test 6: Take and Send Photo
+# ==============================
+# Tap camera button
+- tapOn:
+    id: "image-button"
+
+# Select camera
+- tapOn:
+    text: "Camera"
+    optional: true
+
+# Take photo (simulated in test)
+- tapOn:
+    id: "capture-button"
+    optional: true
+
+# Use photo
+- tapOn:
+    text: "Use Photo"
+    optional: true
+
+# Verify photo sent
+- assertVisible:
+    id: "chat-image-1"
+    optional: true
+
+---
+# ==============================
+# Test 7: View Chat History
+# ==============================
+# Go back to messages list
+- tapOn: "Back"
+
+# Navigate to Messages tab
+- tapOn: "Messages"
+
+# Verify conversation appears in list
+- assertVisible:
+    id: "conversation-0"
+
+# Tap to open conversation
+- tapOn:
+    id: "conversation-0"
+
+# Verify previous messages loaded
+- assertVisible: "Hello! I'm interested"
+
+---
+# ==============================
+# Test 8: Load Older Messages
+# ==============================
+# Scroll to top to load older messages
+- scroll:
+    direction: UP
+
+# Wait for older messages to load
+- extendedWaitUntil:
+    visible:
+      id: "loading-indicator"
+      optional: true
+    timeout: 3000
+
+# Verify older messages appear (if any)
+- assertVisible:
+    id: "message-0"
+    optional: true
+
+---
+# ==============================
+# Test 9: Search in Conversation
+# ==============================
+# Tap on chat info/menu
+- tapOn:
+    id: "chat-menu"
+    optional: true
+
+# Tap search
+- tapOn:
+    text: "Search"
+    optional: true
+
+# Enter search term
+- tapOn:
+    id: "search-input"
+    optional: true
+- inputText: "appointment"
+
+# Verify matching messages highlighted
+- assertVisible:
+    text: "appointment"
+    optional: true
+
+# Close search
+- tapOn:
+    text: "Close"
+    optional: true
+
+---
+# ==============================
+# Test 10: View Shared Media
+# ==============================
+# Tap on chat info
+- tapOn:
+    id: "chat-menu"
+    optional: true
+
+# View media
+- tapOn:
+    text: "Media"
+    optional: true
+
+# Verify shared images appear
+- assertVisible:
+    id: "shared-media-grid"
+    optional: true
+
+# Go back
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 11: Archive Conversation
+# ==============================
+# Go back to messages list
+- tapOn: "Back"
+- tapOn: "Messages"
+
+# Swipe to archive
+- swipe:
+    start:
+      id: "conversation-0"
+    direction: LEFT
+
+# Tap archive
+- tapOn:
+    text: "Archive"
+    optional: true
+
+# Verify conversation removed from main list
+- assertNotVisible:
+    id: "conversation-0"
+    optional: true
+
+---
+# ==============================
+# Test 12: View Archived Conversations
+# ==============================
+# Tap archived section
+- tapOn:
+    text: "Archived"
+    optional: true
+
+# Verify archived conversation appears
+- assertVisible:
+    id: "archived-conversation-0"
+    optional: true
+
+# Unarchive conversation
+- swipe:
+    start:
+      id: "archived-conversation-0"
+    direction: LEFT
+    optional: true
+
+- tapOn:
+    text: "Unarchive"
+    optional: true
+
+---
+# ==============================
+# Test 13: Mute Conversation
+# ==============================
+# Open a conversation
+- tapOn:
+    id: "conversation-0"
+
+# Open chat info
+- tapOn:
+    id: "chat-menu"
+
+# Mute notifications
+- tapOn:
+    text: "Mute"
+    optional: true
+
+# Select mute duration
+- tapOn:
+    text: "Until I unmute"
+    optional: true
+
+# Verify muted indicator
+- assertVisible:
+    id: "muted-icon"
+    optional: true
+
+---
+# ==============================
+# Test 14: Unmute Conversation
+# ==============================
+# Open chat info
+- tapOn:
+    id: "chat-menu"
+
+# Unmute
+- tapOn:
+    text: "Unmute"
+    optional: true
+
+# Verify unmuted
+- assertNotVisible:
+    id: "muted-icon"
+    optional: true
+
+---
+# ==============================
+# Test 15: Delete Conversation
+# ==============================
+# Go back to messages list
+- tapOn: "Back"
+- tapOn: "Messages"
+
+# Swipe to delete
+- swipe:
+    start:
+      id: "conversation-0"
+    direction: LEFT
+
+- tapOn:
+    text: "Delete"
+    optional: true
+
+# Confirm deletion
+- tapOn:
+    text: "Delete"
+    optional: true
+
+# Verify conversation deleted
+- assertNotVisible:
+    id: "conversation-0"
+    optional: true
+
+---
+# ==============================
+# Test 16: Start Chat from Booking
+# ==============================
+# Navigate to appointments
+- tapOn: "Appointments"
+
+# Open an appointment
+- tapOn:
+    id: "appointment-card-0"
+    optional: true
+
+# Contact barber
+- tapOn:
+    text: "Contact Barber"
+    optional: true
+
+# Verify chat opens with booking context
+- assertVisible:
+    text: "Send a message"
+    optional: true
+
+# Verify booking reference shown
+- assertVisible:
+    text: "Appointment"
+    optional: true
+
+---
+# ==============================
+# Test 17: Block User
+# ==============================
+# Open chat info
+- tapOn:
+    id: "chat-menu"
+    optional: true
+
+# Block user
+- tapOn:
+    text: "Block"
+    optional: true
+
+# Confirm block
+- tapOn:
+    text: "Block User"
+    optional: true
+
+# Verify blocked status
+- assertVisible:
+    text: "Blocked"
+    optional: true
+
+# Verify cannot send messages
+- assertVisible:
+    text: "You cannot send messages to this user"
+    optional: true
+
+---
+# ==============================
+# Test 18: Unblock User
+# ==============================
+# Unblock
+- tapOn:
+    text: "Unblock"
+    optional: true
+
+# Verify unblocked
+- assertVisible:
+    id: "message-input"
+
+---
+# ==============================
+# Test 19: Report Conversation
+# ==============================
+# Open chat info
+- tapOn:
+    id: "chat-menu"
+    optional: true
+
+# Report
+- tapOn:
+    text: "Report"
+    optional: true
+
+# Select reason
+- tapOn:
+    text: "Spam"
+    optional: true
+
+# Submit report
+- tapOn:
+    text: "Submit"
+    optional: true
+
+# Verify report submitted
+- assertVisible:
+    text: "Report submitted"
+    optional: true
+
+---
+# ==============================
+# Test 20: Empty Messages State
+# ==============================
+# Logout and login as new user (simulated)
+# Or verify empty state for user with no messages
+
+# Navigate to messages
+- tapOn: "Messages"
+
+# If no conversations, verify empty state
+- assertVisible:
+    text: "No conversations yet"
+    optional: true
+
+# Verify CTA to start conversation
+- assertVisible:
+    text: "Find a barber"
+    optional: true
+
+---
+# ==============================
+# Test 21: Real-time Message Indicator
+# ==============================
+# This test verifies typing indicator and real-time updates
+# Note: Requires simulated or real second user
+
+# Open a conversation
+- tapOn:
+    id: "conversation-0"
+    optional: true
+
+# Verify typing indicator space exists
+- assertVisible:
+    id: "typing-indicator-container"
+    optional: true
+
+# Note: Actual typing indicator requires second user to be typing

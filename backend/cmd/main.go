@@ -8,7 +8,9 @@ import (
 	"cloud-clips/internal/graphql"
 	"cloud-clips/internal/handlers"
 	"cloud-clips/internal/middleware"
+	"cloud-clips/internal/services"
 	"cloud-clips/internal/storage"
+	"cloud-clips/internal/websocket"
 
 	"github.com/gin-gonic/gin"
 	gqlHandler "github.com/graphql-go/handler"
@@ -33,6 +35,24 @@ func main() {
 	store := storage.NewMemoryStorage()
 	store.SeedMockData()
 
+	// Initialize Firebase service (for token verification and FCM)
+	firebaseConfig := services.FirebaseConfig{
+		ProjectID:       os.Getenv("FIREBASE_PROJECT_ID"),
+		CredentialsFile: os.Getenv("FIREBASE_CREDENTIALS_FILE"),
+		FCMServerKey:    os.Getenv("FCM_SERVER_KEY"),
+	}
+	firebaseService := services.NewFirebaseService(firebaseConfig)
+	if firebaseService.IsConfigured() {
+		log.Println("[Firebase] Service initialized")
+	} else {
+		log.Println("[Firebase] Service not configured - push notifications disabled")
+	}
+
+	// Initialize WebSocket hub
+	wsHub := websocket.NewHub()
+	go wsHub.Run()
+	log.Println("[WebSocket] Hub started")
+
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(store)
 	userHandler := handlers.NewUserHandler(store)
@@ -44,6 +64,47 @@ func main() {
 	chatHandler := handlers.NewChatHandler(store)
 	notificationHandler := handlers.NewNotificationHandler(store)
 	paymentHandler := handlers.NewPaymentHandler(store)
+	adminHandler := handlers.NewAdminHandler(store)
+	loyaltyHandler := handlers.NewLoyaltyHandler(store)
+
+	// Initialize media service for file uploads
+	mediaConfig := services.MediaConfig{
+		StorageType:       services.MediaStorageType(os.Getenv("MEDIA_STORAGE_TYPE")),
+		BaseURL:           os.Getenv("MEDIA_BASE_URL"),
+		LocalPath:         os.Getenv("MEDIA_LOCAL_PATH"),
+		S3Bucket:          os.Getenv("AWS_S3_BUCKET"),
+		S3Region:          os.Getenv("AWS_REGION"),
+		S3AccessKeyID:     os.Getenv("AWS_ACCESS_KEY_ID"),
+		S3SecretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
+		S3Endpoint:        os.Getenv("AWS_S3_ENDPOINT"),
+		FirebaseBucket:    os.Getenv("FIREBASE_STORAGE_BUCKET"),
+		MaxFileSize:       5 * 1024 * 1024, // 5MB
+	}
+
+	// Default to local storage if not configured
+	if mediaConfig.StorageType == "" {
+		mediaConfig.StorageType = services.StorageTypeLocal
+		if mediaConfig.LocalPath == "" {
+			mediaConfig.LocalPath = "./uploads"
+		}
+		if mediaConfig.BaseURL == "" {
+			port := os.Getenv("PORT")
+			if port == "" {
+				port = "8080"
+			}
+			mediaConfig.BaseURL = "http://localhost:" + port
+		}
+	}
+
+	mediaService, err := services.NewMediaService(mediaConfig)
+	if err != nil {
+		log.Printf("[Media] Warning: Failed to initialize media service: %v", err)
+		log.Println("[Media] File uploads will be disabled")
+	} else {
+		log.Printf("[Media] Service initialized with storage type: %s", mediaConfig.StorageType)
+	}
+
+	uploadHandler := handlers.NewUploadHandler(store, mediaService)
 
 	// Initialize Gin router
 	router := gin.New()
@@ -91,9 +152,14 @@ func main() {
 			auth.POST("/logout", authHandler.Logout)
 			auth.POST("/refresh", authHandler.RefreshToken)
 			auth.POST("/forgot", authHandler.ForgotPassword)
-			auth.POST("/reset", authHandler.ResetPassword)
-			auth.GET("/verify", authHandler.VerifyEmail)
+			auth.POST("/reset-password", authHandler.ResetPassword)
+			auth.POST("/verify-email", authHandler.VerifyEmail)
+			auth.GET("/verify-email", authHandler.VerifyEmail) // Support GET for email links
+			auth.POST("/resend-verification", authHandler.ResendVerification)
 			auth.POST("/firebase-sync", authHandler.FirebaseSync)
+			// OAuth routes
+			auth.POST("/google", authHandler.GoogleAuth)
+			auth.POST("/apple", authHandler.AppleAuth)
 		}
 
 		// Auth-protected auth routes
@@ -141,6 +207,15 @@ func main() {
 			barbersProtected.POST("/:id/gallery", barberHandler.AddGalleryImage)
 			barbersProtected.DELETE("/:id/gallery/:imageIndex", barberHandler.DeleteGalleryImage)
 			barbersProtected.DELETE("/:id", barberHandler.DeleteBarberProfile)
+
+			// Stripe Connect endpoints for barber payouts
+			barbersProtected.POST("/:id/connect", barberHandler.CreateConnectAccount)
+			barbersProtected.POST("/:id/connect/onboarding", barberHandler.CreateOnboardingLink)
+			barbersProtected.GET("/:id/connect/status", barberHandler.GetConnectStatus)
+			barbersProtected.POST("/:id/connect/dashboard", barberHandler.GetDashboardLink)
+			barbersProtected.GET("/:id/earnings", barberHandler.GetEarnings)
+			barbersProtected.GET("/:id/earnings/history", barberHandler.GetEarningsHistory)
+			barbersProtected.GET("/:id/payouts", barberHandler.GetPayouts)
 		}
 
 		// ================== APPOINTMENT ROUTES ==================
@@ -254,7 +329,106 @@ func main() {
 
 		// Stripe webhook (no auth required - uses signature verification)
 		api.POST("/webhooks/stripe", paymentHandler.HandleStripeWebhook)
+
+		// ================== LOYALTY ROUTES ==================
+		loyalty := api.Group("/loyalty")
+		loyalty.Use(middleware.AuthMiddleware())
+		{
+			// Account
+			loyalty.GET("/account", loyaltyHandler.GetLoyaltyAccount)
+			loyalty.POST("/enroll", loyaltyHandler.EnrollInLoyalty)
+			loyalty.GET("/transactions", loyaltyHandler.GetLoyaltyTransactions)
+
+			// Rewards
+			loyalty.GET("/rewards", loyaltyHandler.GetRewards)
+			loyalty.GET("/rewards/:id", loyaltyHandler.GetReward)
+			loyalty.POST("/rewards/:id/redeem", loyaltyHandler.RedeemReward)
+			loyalty.GET("/my-rewards", loyaltyHandler.GetMyRewards)
+			loyalty.POST("/my-rewards/:id/use", loyaltyHandler.UseReward)
+
+			// Referrals
+			loyalty.GET("/referral/code", loyaltyHandler.GetReferralCode)
+			loyalty.POST("/referral/apply", loyaltyHandler.ApplyReferralCode)
+			loyalty.GET("/referrals", loyaltyHandler.GetReferrals)
+		}
+
+		// ================== ADMIN ROUTES ==================
+		admin := api.Group("/admin")
+		admin.Use(middleware.AuthMiddleware())
+		admin.Use(middleware.RoleMiddleware("admin"))
+		{
+			// Dashboard
+			admin.GET("/dashboard/stats", adminHandler.GetDashboardStats)
+
+			// User management
+			admin.GET("/users", adminHandler.GetUsers)
+			admin.PUT("/users/:id/role", adminHandler.UpdateUserRole)
+			admin.PUT("/users/:id/ban", adminHandler.BanUser)
+
+			// Barber verification
+			admin.GET("/barbers/pending", adminHandler.GetPendingBarbers)
+			admin.PUT("/barbers/:id/verify", adminHandler.VerifyBarber)
+
+			// Appointments overview
+			admin.GET("/appointments", adminHandler.GetAppointments)
+
+			// Orders overview
+			admin.GET("/orders", adminHandler.GetOrders)
+
+			// Revenue reports
+			admin.GET("/revenue", adminHandler.GetRevenueReport)
+
+			// Notifications
+			admin.POST("/notifications/broadcast", adminHandler.BroadcastNotification)
+
+			// Analytics
+			admin.GET("/analytics/users", adminHandler.GetUserAnalytics)
+
+			// Loyalty program management
+			admin.GET("/loyalty/stats", loyaltyHandler.GetLoyaltyStats)
+			admin.POST("/loyalty/rewards", loyaltyHandler.CreateReward)
+			admin.PUT("/loyalty/rewards/:id", loyaltyHandler.UpdateReward)
+			admin.DELETE("/loyalty/rewards/:id", loyaltyHandler.DeleteReward)
+			admin.POST("/loyalty/earn", loyaltyHandler.EarnPoints)
+			admin.POST("/loyalty/adjust", loyaltyHandler.AdjustPoints)
+		}
+
+		// ================== UPLOAD ROUTES ==================
+		uploads := api.Group("/uploads")
+		uploads.Use(middleware.AuthMiddleware())
+		{
+			uploads.POST("", uploadHandler.UploadGeneric)
+			uploads.POST("/avatar", uploadHandler.UploadAvatar)
+			uploads.POST("/gallery", uploadHandler.UploadGalleryImage)
+			uploads.POST("/gallery/batch", uploadHandler.UploadGalleryImages)
+			uploads.POST("/product", uploadHandler.UploadProductImage)
+			uploads.POST("/review", uploadHandler.UploadReviewPhotos)
+			uploads.DELETE("", uploadHandler.DeleteImage)
+			uploads.GET("/policy", uploadHandler.GetUploadPolicy)
+		}
 	}
+
+	// Serve uploaded files (for local storage)
+	router.Static("/uploads", mediaConfig.LocalPath)
+
+	// WebSocket endpoint for real-time features
+	router.GET("/ws", func(c *gin.Context) {
+		// Extract user ID from auth token or query parameter
+		userID := c.Query("userId")
+		if userID == "" {
+			// Try to get from auth header
+			token := c.GetHeader("Authorization")
+			if token != "" {
+				// In production, validate the token and extract user ID
+				// For now, we'll require the userId query parameter
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "userId is required"})
+				return
+			}
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "userId is required"})
+			return
+		}
+		wsHub.ServeWs(c.Writer, c.Request, userID)
+	})
 
 	// Start server
 	port := os.Getenv("PORT")
@@ -265,6 +439,7 @@ func main() {
 	log.Printf("Server starting on port %s", port)
 	log.Printf("REST API: http://localhost:%s/api", port)
 	log.Printf("GraphQL Playground: http://localhost:%s/graphql", port)
+	log.Printf("WebSocket: ws://localhost:%s/ws", port)
 	log.Printf("Health Check: http://localhost:%s/health", port)
 
 	if err := router.Run(":" + port); err != nil {

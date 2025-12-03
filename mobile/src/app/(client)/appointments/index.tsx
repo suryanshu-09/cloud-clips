@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/Input';
 import { AppointmentCard } from '@/components/booking/AppointmentCard';
 import { useAppointments } from '@/features/bookings/hooks/useAppointments';
 import { useBooking } from '@/features/bookings/hooks/useBooking';
+import { useTranslation } from '@/services/i18n/useTranslation';
 import type { AppointmentWithDetails, AppointmentStatus } from '@/features/bookings/types';
 
 type TabType = 'upcoming' | 'past' | 'cancelled';
@@ -24,9 +25,18 @@ interface ITabButtonProps {
   isActive: boolean;
   count: number;
   onPress: () => void;
+  appointmentText: string;
+  appointmentsText: string;
 }
 
-function TabButton({ label, isActive, count, onPress }: ITabButtonProps) {
+function TabButton({
+  label,
+  isActive,
+  count,
+  onPress,
+  appointmentText,
+  appointmentsText,
+}: ITabButtonProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -38,7 +48,7 @@ function TabButton({ label, isActive, count, onPress }: ITabButtonProps) {
         {label}
       </Text>
       <Text className={`text-xs ${isActive ? 'text-blue-100' : 'text-gray-400'}`}>
-        {count} {count === 1 ? 'appointment' : 'appointments'}
+        {count} {count === 1 ? appointmentText : appointmentsText}
       </Text>
     </Pressable>
   );
@@ -58,6 +68,7 @@ function AppointmentSkeleton() {
 
 export default function AppointmentsListScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabType>('upcoming');
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
@@ -73,9 +84,10 @@ export default function AppointmentsListScreen() {
       setSelectedAppointmentId(null);
       setCancelReason('');
       refetch();
+      Alert.alert(t('common.success'), t('appointments.cancel.success'));
     },
     onError: (error) => {
-      Alert.alert('Error', error.message || 'Failed to cancel appointment');
+      Alert.alert(t('common.error'), error.message || t('errors.generic'));
     },
   });
 
@@ -184,20 +196,20 @@ export default function AppointmentsListScreen() {
   const emptyStateConfig = {
     upcoming: {
       icon: '📅',
-      title: 'No Upcoming Appointments',
-      description: 'Book your next haircut or grooming session with a professional barber.',
-      actionLabel: 'Book Now',
+      title: t('appointments.empty.upcoming'),
+      description: t('appointments.empty.upcomingTip'),
+      actionLabel: t('home.bookNow'),
     },
     past: {
       icon: '📋',
-      title: 'No Past Appointments',
-      description: "You haven't completed any appointments yet.",
-      actionLabel: 'Book Your First',
+      title: t('appointments.empty.past'),
+      description: t('appointments.empty.pastTip'),
+      actionLabel: t('home.bookNow'),
     },
     cancelled: {
       icon: '🚫',
-      title: 'No Cancelled Appointments',
-      description: "You haven't cancelled any appointments.",
+      title: t('appointments.empty.cancelled'),
+      description: t('appointments.empty.cancelledTip'),
       actionLabel: undefined,
     },
   };
@@ -208,29 +220,37 @@ export default function AppointmentsListScreen() {
     <SafeView className="flex-1 bg-gray-50">
       {/* Header */}
       <View className="px-4 pt-4 pb-2 bg-white border-b border-gray-100">
-        <Text className="text-2xl font-bold text-gray-900 mb-1">My Appointments</Text>
-        <Text className="text-gray-600 text-sm">Manage your upcoming and past appointments</Text>
+        <Text className="text-2xl font-bold text-gray-900 mb-1">{t('appointments.title')}</Text>
+        <Text className="text-gray-600 text-sm">
+          {t('appointments.empty.upcomingTip').split('.')[0]}
+        </Text>
       </View>
 
       {/* Tabs */}
       <View className="flex-row gap-2 px-4 py-3 bg-white border-b border-gray-100">
         <TabButton
-          label="Upcoming"
+          label={t('appointments.tabs.upcoming')}
           isActive={activeTab === 'upcoming'}
           count={appointmentCounts.upcoming}
           onPress={() => setActiveTab('upcoming')}
+          appointmentText="appointment"
+          appointmentsText="appointments"
         />
         <TabButton
-          label="Past"
+          label={t('appointments.tabs.past')}
           isActive={activeTab === 'past'}
           count={appointmentCounts.past}
           onPress={() => setActiveTab('past')}
+          appointmentText="appointment"
+          appointmentsText="appointments"
         />
         <TabButton
-          label="Cancelled"
+          label={t('appointments.tabs.cancelled')}
           isActive={activeTab === 'cancelled'}
           count={appointmentCounts.cancelled}
           onPress={() => setActiveTab('cancelled')}
+          appointmentText="appointment"
+          appointmentsText="appointments"
         />
       </View>
 
@@ -239,10 +259,10 @@ export default function AppointmentsListScreen() {
         <AppointmentSkeleton />
       ) : isError ? (
         <View className="flex-1 items-center justify-center p-8">
-          <Text className="text-xl mb-2">Something went wrong</Text>
-          <Text className="text-gray-600 text-center mb-4">Unable to load your appointments</Text>
+          <Text className="text-xl mb-2">{t('errors.generic')}</Text>
+          <Text className="text-gray-600 text-center mb-4">{t('errors.network')}</Text>
           <Button onPress={() => refetch()} variant="primary">
-            Try Again
+            {t('common.tryAgain')}
           </Button>
         </View>
       ) : filteredAppointments.length === 0 ? (
@@ -282,15 +302,13 @@ export default function AppointmentsListScreen() {
           setSelectedAppointmentId(null);
           setCancelReason('');
         }}
-        title="Cancel Appointment"
+        title={t('appointments.cancel.title')}
       >
         <View>
-          <Text className="text-gray-600 mb-4">
-            Are you sure you want to cancel this appointment? This action cannot be undone.
-          </Text>
+          <Text className="text-gray-600 mb-4">{t('appointments.cancel.message')}</Text>
           <Input
-            label="Reason for cancellation (optional)"
-            placeholder="Enter your reason..."
+            label={t('appointments.cancel.reason')}
+            placeholder={t('appointments.cancel.reasonPlaceholder')}
             value={cancelReason}
             onChangeText={setCancelReason}
             multiline
@@ -307,7 +325,7 @@ export default function AppointmentsListScreen() {
                 }}
                 fullWidth
               >
-                Keep Appointment
+                {t('common.cancel')}
               </Button>
             </View>
             <View className="flex-1">
@@ -317,7 +335,7 @@ export default function AppointmentsListScreen() {
                 loading={isCanceling}
                 fullWidth
               >
-                Cancel Appointment
+                {t('appointments.cancel.confirm')}
               </Button>
             </View>
           </View>

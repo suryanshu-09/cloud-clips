@@ -1,5 +1,5 @@
 import { View, Text, Pressable, ScrollView } from 'react-native';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface IDevAccount {
   email: string;
@@ -39,16 +39,32 @@ interface IDevLoginHelperProps {
   onSelectAccount?: (email: string, password: string) => void;
 }
 
+// Check if dev mode is enabled
+const isDevMode = (): boolean => {
+  // Only show in development builds AND when DEV_MODE env var is true
+  const envDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+  return typeof __DEV__ !== 'undefined' && __DEV__ && envDevMode;
+};
+
 /**
  * Development helper component to show available test accounts
- * Only visible when EXPO_PUBLIC_DEV_MODE is true
+ * Only visible when:
+ * 1. Running in development mode (__DEV__ is true)
+ * 2. EXPO_PUBLIC_DEV_MODE environment variable is set to 'true'
+ *
+ * This component should be completely tree-shaken in production builds.
  */
 export function DevLoginHelper({ onSelectAccount }: IDevLoginHelperProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const DEV_MODE = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+  const [showHelper, setShowHelper] = useState(false);
 
-  // Don't render in production
-  if (!DEV_MODE) {
+  useEffect(() => {
+    // Check dev mode on mount to handle SSR correctly
+    setShowHelper(isDevMode());
+  }, []);
+
+  // Don't render in production or when dev mode is disabled
+  if (!showHelper) {
     return null;
   }
 
@@ -72,7 +88,7 @@ export function DevLoginHelper({ onSelectAccount }: IDevLoginHelperProps) {
           </Text>
 
           <ScrollView style={{ maxHeight: 400 }} nestedScrollEnabled={true}>
-            {DEV_ACCOUNTS.map((account, index) => (
+            {DEV_ACCOUNTS.map((account) => (
               <Pressable
                 key={account.email}
                 onPress={() => onSelectAccount?.(account.email, account.password)}
@@ -102,7 +118,8 @@ export function DevLoginHelper({ onSelectAccount }: IDevLoginHelperProps) {
 
           <View className="mt-3 pt-3 border-t border-yellow-200">
             <Text className="text-xs text-yellow-700">
-              💡 To disable dev mode, set EXPO_PUBLIC_DEV_MODE=false in your .env file
+              To disable dev mode, set EXPO_PUBLIC_DEV_MODE=false in your .env file and restart the
+              app.
             </Text>
           </View>
         </View>
@@ -110,3 +127,6 @@ export function DevLoginHelper({ onSelectAccount }: IDevLoginHelperProps) {
     </View>
   );
 }
+
+// Export a null component for production builds to help with tree-shaking
+export const DevLoginHelperProd = () => null;

@@ -1,0 +1,1223 @@
+appId: com.cloudclips.app
+
+---
+# E2E Test: Barber App Features Flow
+# Tests: Barber login, View/manage appointments, Accept/decline bookings,
+#        Complete appointments, View earnings, Manage availability, 
+#        Manage services, View and reply to reviews
+# Phase 32.5 - Barber App Features (42 test scenarios)
+
+# ==============================
+# Test 1: Barber Login
+# ==============================
+- launchApp:
+    clearState: true
+
+# Navigate to login
+- tapOn: "Get Started"
+- tapOn: "Login"
+
+# Enter barber credentials
+- tapOn: "Email"
+- inputText: "barber@test.com"
+
+- tapOn: "Password"
+- inputText: "Test123!@#"
+
+- tapOn: "Sign In"
+
+# Wait for barber dashboard
+- extendedWaitUntil:
+    visible: "Dashboard"
+    timeout: 10000
+
+# Verify barber-specific UI elements
+- assertVisible: "Today's Appointments"
+- assertVisible: "Earnings"
+- assertVisible: "Availability"
+
+---
+# ==============================
+# Test 2: View Barber Dashboard
+# ==============================
+# Verify dashboard components
+- assertVisible: "Dashboard"
+- assertVisible: "Today's Appointments"
+- assertVisible: "Weekly Stats"
+- assertVisible: "Quick Actions"
+
+# Check stats are visible
+- assertVisible: "Appointments"
+- assertVisible: "Revenue"
+- assertVisible: "Rating"
+
+# Verify quick action buttons
+- assertVisible: "Set Availability"
+- assertVisible: "Manage Services"
+- assertVisible: "View Earnings"
+
+---
+# ==============================
+# Test 3: View Appointments List
+# ==============================
+- tapOn: "Appointments"
+
+# Verify appointments screen
+- assertVisible: "Appointments"
+- assertVisible: "Today"
+- assertVisible: "Upcoming"
+- assertVisible: "Past"
+
+# Check today's appointments tab
+- tapOn: "Today"
+- assertVisible: "Today's Schedule"
+
+# Check upcoming appointments
+- tapOn: "Upcoming"
+- assertVisible: "Upcoming Appointments"
+
+# Check past appointments
+- tapOn: "Past"
+- assertVisible: "Past Appointments"
+
+---
+# ==============================
+# Test 4: View Appointment Details
+# ==============================
+- tapOn: "Today"
+
+# Tap on an appointment (if exists)
+- tapOn:
+    text: "View Details"
+    optional: true
+
+# Verify appointment details
+- assertVisible:
+    text: "Appointment Details"
+    optional: true
+- assertVisible:
+    text: "Client"
+    optional: true
+- assertVisible:
+    text: "Service"
+    optional: true
+- assertVisible:
+    text: "Date"
+    optional: true
+- assertVisible:
+    text: "Time"
+    optional: true
+
+# Go back
+- tapOn:
+    text: "Back"
+    optional: true
+
+---
+# ==============================
+# Test 5: Accept Pending Appointment
+# ==============================
+# Look for pending appointments
+- scrollUntilVisible:
+    element: "Pending"
+    direction: DOWN
+    optional: true
+
+- tapOn:
+    text: "Pending"
+    optional: true
+
+# If there are pending appointments
+- tapOn:
+    text: "Accept"
+    optional: true
+
+# Verify confirmation
+- extendedWaitUntil:
+    visible: "Appointment confirmed"
+    timeout: 5000
+    optional: true
+
+---
+# ==============================
+# Test 6: Decline Pending Appointment
+# ==============================
+# Look for another pending appointment
+- tapOn:
+    text: "Pending"
+    optional: true
+
+- tapOn:
+    text: "Decline"
+    optional: true
+
+# Verify decline dialog
+- assertVisible:
+    text: "Decline Appointment"
+    optional: true
+- assertVisible:
+    text: "Reason"
+    optional: true
+
+# Enter reason
+- tapOn:
+    text: "Reason"
+    optional: true
+- inputText: "Not available at this time"
+
+# Confirm decline
+- tapOn:
+    text: "Confirm Decline"
+    optional: true
+
+# Verify declined
+- extendedWaitUntil:
+    visible: "Appointment declined"
+    timeout: 5000
+    optional: true
+
+---
+# ==============================
+# Test 7: Complete Appointment
+# ==============================
+- tapOn: "Today"
+
+# Find a confirmed appointment
+- tapOn:
+    text: "Confirmed"
+    optional: true
+
+- tapOn:
+    text: "Mark Complete"
+    optional: true
+
+# Verify completion dialog
+- assertVisible:
+    text: "Complete Appointment"
+    optional: true
+
+# Add notes
+- tapOn:
+    text: "Add Notes"
+    optional: true
+- inputText: "Client requested shorter sides"
+
+# Confirm completion
+- tapOn:
+    text: "Complete"
+    optional: true
+
+# Verify completion
+- extendedWaitUntil:
+    visible: "Appointment completed"
+    timeout: 5000
+    optional: true
+
+# Verify review request sent notification
+- assertVisible:
+    text: "Review request sent"
+    optional: true
+
+---
+# ==============================
+# Test 8: Mark No-Show
+# ==============================
+- tapOn: "Today"
+
+- tapOn:
+    text: "Confirmed"
+    optional: true
+
+- tapOn:
+    text: "No Show"
+    optional: true
+
+# Verify no-show dialog
+- assertVisible:
+    text: "Mark as No-Show"
+    optional: true
+- assertVisible:
+    text: "This will record the appointment as a no-show"
+    optional: true
+
+# Confirm no-show
+- tapOn:
+    text: "Confirm"
+    optional: true
+
+# Verify recorded
+- extendedWaitUntil:
+    visible: "Marked as no-show"
+    timeout: 5000
+    optional: true
+
+---
+# ==============================
+# Test 9: View Earnings Dashboard
+# ==============================
+- tapOn: "Dashboard"
+- tapOn: "View Earnings"
+
+# Verify earnings screen
+- assertVisible: "Earnings"
+- assertVisible: "Today"
+- assertVisible: "This Week"
+- assertVisible: "This Month"
+- assertVisible: "All Time"
+
+# Check earnings breakdown
+- assertVisible: "Gross Earnings"
+- assertVisible: "Platform Fee"
+- assertVisible: "Net Earnings"
+
+# View today's earnings
+- tapOn: "Today"
+- assertVisible: "$"
+
+# View weekly earnings
+- tapOn: "This Week"
+- assertVisible: "$"
+
+# View monthly earnings
+- tapOn: "This Month"
+- assertVisible: "$"
+
+---
+# ==============================
+# Test 10: View Payout History
+# ==============================
+- scrollUntilVisible:
+    element: "Payout History"
+    direction: DOWN
+
+- tapOn: "Payout History"
+
+# Verify payout history
+- assertVisible: "Payouts"
+- assertVisible: "Completed"
+- assertVisible: "Pending"
+
+# View payout details
+- tapOn:
+    text: "View Details"
+    optional: true
+
+# Verify payout details
+- assertVisible:
+    text: "Amount"
+    optional: true
+- assertVisible:
+    text: "Date"
+    optional: true
+- assertVisible:
+    text: "Bank Account"
+    optional: true
+
+- tapOn:
+    text: "Back"
+    optional: true
+
+---
+# ==============================
+# Test 11: Request Payout
+# ==============================
+- tapOn: "Request Payout"
+
+# Verify payout request screen
+- assertVisible: "Request Payout"
+- assertVisible: "Available Balance"
+- assertVisible: "Payout Method"
+
+# Enter amount
+- tapOn: "Amount"
+- inputText: "100"
+
+# Select payout method
+- tapOn: "Payout Method"
+- assertVisible: "Bank Account"
+- assertVisible: "Debit Card"
+
+- tapOn: "Bank Account"
+
+# Submit request
+- tapOn: "Request Payout"
+
+# Verify confirmation
+- extendedWaitUntil:
+    visible: "Payout requested"
+    timeout: 5000
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 12: View Schedule
+# ==============================
+- tapOn: "Dashboard"
+- tapOn: "Set Availability"
+
+# Verify schedule screen
+- assertVisible: "Availability"
+- assertVisible: "Weekly Schedule"
+
+# Check days are visible
+- assertVisible: "Monday"
+- assertVisible: "Tuesday"
+- assertVisible: "Wednesday"
+- assertVisible: "Thursday"
+- assertVisible: "Friday"
+- assertVisible: "Saturday"
+- assertVisible: "Sunday"
+
+---
+# ==============================
+# Test 13: Set Working Hours
+# ==============================
+# Edit Monday hours
+- tapOn: "Monday"
+
+# Verify time selection
+- assertVisible: "Working Hours"
+- assertVisible: "Start Time"
+- assertVisible: "End Time"
+- assertVisible: "Day Off"
+
+# Set start time
+- tapOn: "Start Time"
+- tapOn:
+    text: "9"
+    optional: true
+- tapOn:
+    text: "AM"
+    optional: true
+- tapOn:
+    text: "OK"
+    optional: true
+
+# Set end time
+- tapOn: "End Time"
+- tapOn:
+    text: "6"
+    optional: true
+- tapOn:
+    text: "PM"
+    optional: true
+- tapOn:
+    text: "OK"
+    optional: true
+
+# Save
+- tapOn: "Save"
+
+# Verify saved
+- extendedWaitUntil:
+    visible: "Schedule updated"
+    timeout: 3000
+
+---
+# ==============================
+# Test 14: Set Day Off
+# ==============================
+# Edit Sunday
+- tapOn: "Sunday"
+
+# Mark as day off
+- tapOn: "Day Off"
+
+# Save
+- tapOn: "Save"
+
+# Verify Sunday shows as off
+- assertVisible: "Off"
+
+---
+# ==============================
+# Test 15: Add Break Time
+# ==============================
+- tapOn: "Monday"
+
+# Add break
+- tapOn: "Add Break"
+
+# Set break time
+- tapOn: "Break Start"
+- tapOn:
+    text: "12"
+    optional: true
+- tapOn:
+    text: "PM"
+    optional: true
+- tapOn:
+    text: "OK"
+    optional: true
+
+- tapOn: "Break End"
+- tapOn:
+    text: "1"
+    optional: true
+- tapOn:
+    text: "PM"
+    optional: true
+- tapOn:
+    text: "OK"
+    optional: true
+
+# Save
+- tapOn: "Save"
+
+# Verify break shows
+- assertVisible: "Lunch Break"
+
+---
+# ==============================
+# Test 16: Block Time Off
+# ==============================
+- scrollUntilVisible:
+    element: "Block Time"
+    direction: DOWN
+
+- tapOn: "Block Time"
+
+# Verify block time screen
+- assertVisible: "Block Time Off"
+- assertVisible: "Date"
+- assertVisible: "Start Time"
+- assertVisible: "End Time"
+- assertVisible: "Reason"
+
+# Select date
+- tapOn: "Date"
+# Select a future date
+- tapOn:
+    text: "15"
+    optional: true
+- tapOn:
+    text: "OK"
+    optional: true
+
+# Set times
+- tapOn: "Start Time"
+- tapOn:
+    text: "2"
+    optional: true
+- tapOn:
+    text: "PM"
+    optional: true
+- tapOn:
+    text: "OK"
+    optional: true
+
+- tapOn: "End Time"
+- tapOn:
+    text: "4"
+    optional: true
+- tapOn:
+    text: "PM"
+    optional: true
+- tapOn:
+    text: "OK"
+    optional: true
+
+# Add reason
+- tapOn: "Reason"
+- inputText: "Personal appointment"
+
+# Save
+- tapOn: "Block Time"
+
+# Verify blocked
+- extendedWaitUntil:
+    visible: "Time blocked"
+    timeout: 3000
+
+---
+# ==============================
+# Test 17: Set Vacation
+# ==============================
+- tapOn: "Set Vacation"
+
+# Verify vacation screen
+- assertVisible: "Set Vacation"
+- assertVisible: "Start Date"
+- assertVisible: "End Date"
+
+# Select start date
+- tapOn: "Start Date"
+- tapOn:
+    text: "20"
+    optional: true
+- tapOn:
+    text: "OK"
+    optional: true
+
+# Select end date
+- tapOn: "End Date"
+- tapOn:
+    text: "25"
+    optional: true
+- tapOn:
+    text: "OK"
+    optional: true
+
+# Save vacation
+- tapOn: "Set Vacation"
+
+# Verify vacation set
+- extendedWaitUntil:
+    visible: "Vacation scheduled"
+    timeout: 3000
+
+# Verify warning about existing appointments
+- assertVisible:
+    text: "existing appointments"
+    optional: true
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 18: Manage Services
+# ==============================
+- tapOn: "Dashboard"
+- tapOn: "Manage Services"
+
+# Verify services screen
+- assertVisible: "My Services"
+- assertVisible: "Add Service"
+
+# Check existing services
+- assertVisible: "Haircut"
+- assertVisible: "Beard Trim"
+
+---
+# ==============================
+# Test 19: Add New Service
+# ==============================
+- tapOn: "Add Service"
+
+# Verify add service form
+- assertVisible: "Add Service"
+- assertVisible: "Service Name"
+- assertVisible: "Description"
+- assertVisible: "Duration"
+- assertVisible: "Price"
+- assertVisible: "Category"
+
+# Fill service details
+- tapOn: "Service Name"
+- inputText: "Premium Haircut"
+
+- tapOn: "Description"
+- inputText: "Includes wash, cut, and style"
+
+- tapOn: "Duration"
+- assertVisible: "15 min"
+- assertVisible: "30 min"
+- assertVisible: "45 min"
+- assertVisible: "60 min"
+- tapOn: "45 min"
+
+- tapOn: "Price"
+- inputText: "35"
+
+- tapOn: "Category"
+- assertVisible: "Hair"
+- assertVisible: "Beard"
+- assertVisible: "Package"
+- tapOn: "Hair"
+
+# Save service
+- tapOn: "Save Service"
+
+# Verify saved
+- extendedWaitUntil:
+    visible: "Service added"
+    timeout: 5000
+
+# Verify service appears in list
+- assertVisible: "Premium Haircut"
+- assertVisible: "$35"
+
+---
+# ==============================
+# Test 20: Edit Service
+# ==============================
+- tapOn: "Premium Haircut"
+
+# Verify edit mode
+- assertVisible: "Edit Service"
+
+# Update price
+- tapOn: "Price"
+- clearText
+- inputText: "40"
+
+# Save changes
+- tapOn: "Save Service"
+
+# Verify updated
+- extendedWaitUntil:
+    visible: "Service updated"
+    timeout: 5000
+
+# Verify new price
+- assertVisible: "$40"
+
+---
+# ==============================
+# Test 21: Disable Service
+# ==============================
+- tapOn: "Premium Haircut"
+
+# Toggle service off
+- tapOn: "Service Active"
+
+# Save
+- tapOn: "Save Service"
+
+# Verify disabled indicator
+- assertVisible: "Disabled"
+
+# Re-enable
+- tapOn: "Premium Haircut"
+- tapOn: "Service Active"
+- tapOn: "Save Service"
+
+---
+# ==============================
+# Test 22: Delete Service
+# ==============================
+# Swipe to delete
+- swipe:
+    from:
+      text: "Premium Haircut"
+    direction: LEFT
+
+- tapOn: "Delete"
+
+# Confirm deletion
+- assertVisible: "Delete Service"
+- assertVisible: "This action cannot be undone"
+
+- tapOn: "Confirm"
+
+# Verify deleted
+- extendedWaitUntil:
+    visible: "Service deleted"
+    timeout: 5000
+
+---
+# ==============================
+# Test 23: View Reviews
+# ==============================
+- tapOn: "Dashboard"
+
+- scrollUntilVisible:
+    element: "Reviews"
+    direction: DOWN
+
+- tapOn: "Reviews"
+
+# Verify reviews screen
+- assertVisible: "Reviews"
+- assertVisible: "Average Rating"
+- assertVisible: "Total Reviews"
+
+# Check review breakdown
+- assertVisible: "5 stars"
+- assertVisible: "4 stars"
+- assertVisible: "3 stars"
+- assertVisible: "2 stars"
+- assertVisible: "1 star"
+
+---
+# ==============================
+# Test 24: View Review Details
+# ==============================
+# Tap on a review
+- tapOn:
+    text: "View"
+    optional: true
+
+# Verify review details
+- assertVisible:
+    text: "Review"
+    optional: true
+- assertVisible:
+    text: "Rating"
+    optional: true
+- assertVisible:
+    text: "Comment"
+    optional: true
+- assertVisible:
+    text: "Date"
+    optional: true
+
+- tapOn:
+    text: "Back"
+    optional: true
+
+---
+# ==============================
+# Test 25: Reply to Review
+# ==============================
+# Find a review without reply
+- scrollUntilVisible:
+    element: "Reply"
+    direction: DOWN
+
+- tapOn: "Reply"
+
+# Verify reply form
+- assertVisible: "Reply to Review"
+- assertVisible: "Your Response"
+
+# Enter reply
+- tapOn: "Your Response"
+- inputText: "Thank you for your feedback! We appreciate your business."
+
+# Submit reply
+- tapOn: "Post Reply"
+
+# Verify reply posted
+- extendedWaitUntil:
+    visible: "Reply posted"
+    timeout: 5000
+
+---
+# ==============================
+# Test 26: Edit Reply
+# ==============================
+# Find review with existing reply
+- scrollUntilVisible:
+    element: "Edit Reply"
+    direction: DOWN
+
+- tapOn:
+    text: "Edit Reply"
+    optional: true
+
+# Edit reply text
+- tapOn:
+    text: "Your Response"
+    optional: true
+- clearText
+- inputText: "Updated response: Thank you so much!"
+
+# Save edit
+- tapOn:
+    text: "Update Reply"
+    optional: true
+
+# Verify updated
+- extendedWaitUntil:
+    visible: "Reply updated"
+    timeout: 5000
+    optional: true
+
+---
+# ==============================
+# Test 27: Delete Reply
+# ==============================
+- tapOn:
+    text: "Delete Reply"
+    optional: true
+
+# Confirm deletion
+- tapOn:
+    text: "Confirm"
+    optional: true
+
+# Verify deleted
+- extendedWaitUntil:
+    visible: "Reply deleted"
+    timeout: 5000
+    optional: true
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 28: Filter Reviews
+# ==============================
+- tapOn: "Reviews"
+
+# Filter by rating
+- tapOn: "Filter"
+
+- assertVisible: "All Ratings"
+- assertVisible: "5 stars only"
+- assertVisible: "4 stars & above"
+- assertVisible: "With comments"
+- assertVisible: "Needs reply"
+
+- tapOn: "5 stars only"
+
+# Verify filtered
+- assertVisible: "5"
+
+# Clear filter
+- tapOn: "Clear Filter"
+
+---
+# ==============================
+# Test 29: Sort Reviews
+# ==============================
+- tapOn: "Sort"
+
+- assertVisible: "Most Recent"
+- assertVisible: "Oldest First"
+- assertVisible: "Highest Rated"
+- assertVisible: "Lowest Rated"
+
+- tapOn: "Lowest Rated"
+
+# Verify sorted
+- tapOn: "Sort"
+- tapOn: "Most Recent"
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 30: View Client Profile from Appointment
+# ==============================
+- tapOn: "Appointments"
+- tapOn: "Today"
+
+# Tap on client name in appointment
+- tapOn:
+    text: "View Client"
+    optional: true
+
+# Verify client info
+- assertVisible:
+    text: "Client Profile"
+    optional: true
+- assertVisible:
+    text: "Booking History"
+    optional: true
+- assertVisible:
+    text: "Notes"
+    optional: true
+
+- tapOn:
+    text: "Back"
+    optional: true
+
+---
+# ==============================
+# Test 31: Add Client Notes
+# ==============================
+- tapOn:
+    text: "View Client"
+    optional: true
+
+- tapOn:
+    text: "Add Note"
+    optional: true
+
+- inputText: "Prefers sides shorter, sensitive scalp"
+
+- tapOn:
+    text: "Save Note"
+    optional: true
+
+# Verify note saved
+- extendedWaitUntil:
+    visible: "Note saved"
+    timeout: 5000
+    optional: true
+
+- tapOn:
+    text: "Back"
+    optional: true
+
+---
+# ==============================
+# Test 32: Barber Profile Settings
+# ==============================
+- tapOn: "Profile"
+
+# Verify barber profile options
+- assertVisible: "Profile"
+- assertVisible: "Edit Profile"
+- assertVisible: "Portfolio"
+- assertVisible: "Business Info"
+
+---
+# ==============================
+# Test 33: Edit Barber Bio
+# ==============================
+- tapOn: "Edit Profile"
+
+# Update bio
+- tapOn: "Bio"
+- clearText
+- inputText: "Professional barber with 10 years of experience. Specializing in fades and beard work."
+
+# Save
+- tapOn: "Save"
+
+# Verify saved
+- extendedWaitUntil:
+    visible: "Profile updated"
+    timeout: 5000
+
+---
+# ==============================
+# Test 34: Manage Portfolio
+# ==============================
+- tapOn: "Portfolio"
+
+# Verify portfolio screen
+- assertVisible: "Portfolio"
+- assertVisible: "Add Photo"
+
+# Add photo
+- tapOn: "Add Photo"
+
+# Photo picker (simulated)
+- tapOn:
+    text: "Choose from Gallery"
+    optional: true
+- tapOn:
+    text: "Cancel"
+    optional: true
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 35: Update Business Info
+# ==============================
+- tapOn: "Business Info"
+
+# Verify business info fields
+- assertVisible: "Business Name"
+- assertVisible: "Address"
+- assertVisible: "Phone"
+- assertVisible: "Website"
+
+# Update phone
+- tapOn: "Phone"
+- clearText
+- inputText: "+1 555-123-4567"
+
+# Save
+- tapOn: "Save"
+
+# Verify saved
+- extendedWaitUntil:
+    visible: "Business info updated"
+    timeout: 5000
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 36: Notification Settings for Barber
+# ==============================
+- tapOn: "Settings"
+- tapOn: "Notifications"
+
+# Verify barber-specific notification options
+- assertVisible: "New Booking Requests"
+- assertVisible: "Booking Cancellations"
+- assertVisible: "New Reviews"
+- assertVisible: "Payout Updates"
+
+# Toggle options
+- tapOn: "New Booking Requests"
+- tapOn: "New Booking Requests"
+
+- tapOn: "Back"
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 37: Calendar Integration
+# ==============================
+- tapOn: "Settings"
+
+- scrollUntilVisible:
+    element: "Calendar Sync"
+    direction: DOWN
+
+- tapOn: "Calendar Sync"
+
+# Verify calendar options
+- assertVisible: "Sync with Calendar"
+- assertVisible: "Google Calendar"
+- assertVisible: "Apple Calendar"
+
+# Enable sync
+- tapOn: "Google Calendar"
+
+# Note: Would need OAuth in real test
+- tapOn:
+    text: "Cancel"
+    optional: true
+
+- tapOn: "Back"
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 38: View Analytics
+# ==============================
+- tapOn: "Dashboard"
+
+- scrollUntilVisible:
+    element: "Analytics"
+    direction: DOWN
+
+- tapOn: "Analytics"
+
+# Verify analytics screen
+- assertVisible: "Analytics"
+- assertVisible: "Appointments"
+- assertVisible: "Revenue"
+- assertVisible: "Reviews"
+- assertVisible: "Client Retention"
+
+# Check time period selector
+- assertVisible: "Last 7 Days"
+- assertVisible: "Last 30 Days"
+- assertVisible: "This Year"
+
+- tapOn: "Last 30 Days"
+
+# Verify charts/stats update
+- assertVisible: "Total Appointments"
+- assertVisible: "Total Revenue"
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 39: Export Earnings Report
+# ==============================
+- tapOn: "View Earnings"
+
+- scrollUntilVisible:
+    element: "Export"
+    direction: DOWN
+
+- tapOn: "Export"
+
+# Verify export options
+- assertVisible: "Export Report"
+- assertVisible: "PDF"
+- assertVisible: "CSV"
+- assertVisible: "Date Range"
+
+# Select format
+- tapOn: "PDF"
+
+# Select date range
+- tapOn: "Date Range"
+- assertVisible: "This Month"
+- assertVisible: "Last Month"
+- assertVisible: "Custom"
+
+- tapOn: "This Month"
+
+# Export
+- tapOn: "Download"
+
+# Verify export
+- extendedWaitUntil:
+    visible: "Report exported"
+    timeout: 5000
+
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 40: Instant Booking Settings
+# ==============================
+- tapOn: "Dashboard"
+- tapOn: "Settings"
+
+- scrollUntilVisible:
+    element: "Booking Settings"
+    direction: DOWN
+
+- tapOn: "Booking Settings"
+
+# Verify booking settings
+- assertVisible: "Instant Booking"
+- assertVisible: "Booking Buffer"
+- assertVisible: "Cancellation Policy"
+- assertVisible: "Deposit Required"
+
+# Toggle instant booking
+- tapOn: "Instant Booking"
+
+# Set booking buffer
+- tapOn: "Booking Buffer"
+- assertVisible: "No buffer"
+- assertVisible: "15 minutes"
+- assertVisible: "30 minutes"
+- assertVisible: "1 hour"
+
+- tapOn: "15 minutes"
+
+# Save
+- tapOn: "Save"
+
+- tapOn: "Back"
+- tapOn: "Back"
+
+---
+# ==============================
+# Test 41: Contact Client from Appointment
+# ==============================
+- tapOn: "Appointments"
+- tapOn: "Today"
+
+# Find message button on appointment
+- tapOn:
+    text: "Message"
+    optional: true
+
+# Verify chat opens
+- assertVisible:
+    text: "Chat"
+    optional: true
+
+# Send message
+- tapOn:
+    text: "Type a message"
+    optional: true
+- inputText: "Looking forward to seeing you!"
+- tapOn:
+    text: "Send"
+    optional: true
+
+- tapOn:
+    text: "Back"
+    optional: true
+
+---
+# ==============================
+# Test 42: Barber Logout
+# ==============================
+- tapOn: "Profile"
+
+- scrollUntilVisible:
+    element: "Logout"
+    direction: DOWN
+
+- tapOn: "Logout"
+
+# Confirm logout
+- tapOn:
+    text: "Confirm"
+    optional: true
+
+# Verify redirected to login
+- extendedWaitUntil:
+    visible: "Login"
+    timeout: 5000

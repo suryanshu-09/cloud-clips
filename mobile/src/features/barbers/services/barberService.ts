@@ -7,18 +7,28 @@ import type {
   IBarberAvailability,
   IBarberUpdateData,
 } from '../types';
-import { mockBarberService } from './mockBarberService';
 
-// Check if we should use mock data
-const USE_MOCK = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+// Check if we should use mock data as fallback
+const DEV_MODE = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+
+// Lazy load mock service only when needed
+let mockBarberService: typeof import('./mockBarberService').mockBarberService | null = null;
+
+const getMockService = async () => {
+  if (!mockBarberService && DEV_MODE) {
+    const module = await import('./mockBarberService');
+    mockBarberService = module.mockBarberService;
+  }
+  return mockBarberService;
+};
 
 /**
  * Barber service for API calls
- * Automatically uses mock data in DEV_MODE
+ * Falls back to mock data in DEV_MODE when API is unavailable
  */
-const realBarberService = {
+export const barberService = {
   /**
-   * Get list of all barbers
+   * Get list of all barbers with optional filters
    */
   getBarbers: async (params?: IBarberSearchParams): Promise<IBarberListResponse> => {
     try {
@@ -27,6 +37,14 @@ const realBarberService = {
       });
       return response.data;
     } catch (error: any) {
+      // Fall back to mock in dev mode
+      if (DEV_MODE) {
+        const mock = await getMockService();
+        if (mock) {
+          console.log('[BARBERS] Using mock data fallback');
+          return mock.getBarbers(params);
+        }
+      }
       throw new Error(error.message || 'Failed to fetch barbers');
     }
   },
@@ -38,13 +56,26 @@ const realBarberService = {
     latitude: number;
     longitude: number;
     radius?: number;
+    limit?: number;
   }): Promise<IBarberListResponse> => {
     try {
       const response = await apiClient.get<IBarberListResponse>(endpoints.barbers.nearby, {
-        params,
+        params: {
+          lat: params.latitude,
+          lng: params.longitude,
+          radius: params.radius || 10, // Default 10km radius
+          limit: params.limit || 20,
+        },
       });
       return response.data;
     } catch (error: any) {
+      if (DEV_MODE) {
+        const mock = await getMockService();
+        if (mock) {
+          console.log('[BARBERS] Using mock nearby data fallback');
+          return mock.getNearbyBarbers(params);
+        }
+      }
       throw new Error(error.message || 'Failed to fetch nearby barbers');
     }
   },
@@ -59,6 +90,13 @@ const realBarberService = {
       });
       return response.data;
     } catch (error: any) {
+      if (DEV_MODE) {
+        const mock = await getMockService();
+        if (mock) {
+          console.log('[BARBERS] Using mock search fallback');
+          return mock.searchBarbers(params);
+        }
+      }
       throw new Error(error.message || 'Failed to search barbers');
     }
   },
@@ -71,7 +109,33 @@ const realBarberService = {
       const response = await apiClient.get<IBarberProfile>(endpoints.barbers.detail(id));
       return response.data;
     } catch (error: any) {
+      if (DEV_MODE) {
+        const mock = await getMockService();
+        if (mock) {
+          console.log('[BARBERS] Using mock barber detail fallback');
+          return mock.getBarberById(id);
+        }
+      }
       throw new Error(error.message || 'Failed to fetch barber profile');
+    }
+  },
+
+  /**
+   * Get barber services
+   */
+  getBarberServices: async (barberId: string) => {
+    try {
+      const response = await apiClient.get(endpoints.barbers.services(barberId));
+      return response.data;
+    } catch (error: any) {
+      if (DEV_MODE) {
+        const mock = await getMockService();
+        if (mock) {
+          const barber = await mock.getBarberById(barberId);
+          return barber.services || [];
+        }
+      }
+      throw new Error(error.message || 'Failed to fetch barber services');
     }
   },
 
@@ -88,6 +152,13 @@ const realBarberService = {
       );
       return response.data;
     } catch (error: any) {
+      if (DEV_MODE) {
+        const mock = await getMockService();
+        if (mock) {
+          console.log('[BARBERS] Using mock availability fallback');
+          return mock.getBarberAvailability(barberId, date);
+        }
+      }
       throw new Error(error.message || 'Failed to fetch barber availability');
     }
   },
@@ -95,11 +166,18 @@ const realBarberService = {
   /**
    * Get barber reviews
    */
-  getBarberReviews: async (barberId: string) => {
+  getBarberReviews: async (barberId: string, params?: { page?: number; limit?: number }) => {
     try {
-      const response = await apiClient.get(endpoints.barbers.reviews(barberId));
+      const response = await apiClient.get(endpoints.barbers.reviews(barberId), { params });
       return response.data;
     } catch (error: any) {
+      if (DEV_MODE) {
+        const mock = await getMockService();
+        if (mock) {
+          console.log('[BARBERS] Using mock reviews fallback');
+          return mock.getBarberReviews(barberId);
+        }
+      }
       throw new Error(error.message || 'Failed to fetch barber reviews');
     }
   },
@@ -112,6 +190,13 @@ const realBarberService = {
       const response = await apiClient.get(endpoints.barbers.portfolio(barberId));
       return response.data;
     } catch (error: any) {
+      if (DEV_MODE) {
+        const mock = await getMockService();
+        if (mock) {
+          console.log('[BARBERS] Using mock portfolio fallback');
+          return mock.getBarberPortfolio(barberId);
+        }
+      }
       throw new Error(error.message || 'Failed to fetch barber portfolio');
     }
   },
@@ -121,10 +206,21 @@ const realBarberService = {
    */
   updateBarberProfile: async (data: IBarberUpdateData): Promise<IBarberProfile> => {
     try {
-      const response = await apiClient.patch<IBarberProfile>(endpoints.barbers.updateProfile, data);
+      const response = await apiClient.put<IBarberProfile>(endpoints.barbers.updateProfile, data);
       return response.data;
     } catch (error: any) {
       throw new Error(error.message || 'Failed to update barber profile');
+    }
+  },
+
+  /**
+   * Update barber schedule/working hours
+   */
+  updateBarberSchedule: async (barberId: string, schedule: any): Promise<void> => {
+    try {
+      await apiClient.put(endpoints.barbers.schedule(barberId), schedule);
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to update barber schedule');
     }
   },
 
@@ -154,9 +250,17 @@ const realBarberService = {
       throw new Error(error.message || 'Failed to upload portfolio image');
     }
   },
-};
 
-// Export either mock or real service based on DEV_MODE
-export const barberService = USE_MOCK ? mockBarberService : realBarberService;
+  /**
+   * Delete portfolio image
+   */
+  deletePortfolioImage: async (barberId: string, imageId: string): Promise<void> => {
+    try {
+      await apiClient.delete(`${endpoints.barbers.portfolio(barberId)}/${imageId}`);
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to delete portfolio image');
+    }
+  },
+};
 
 export default barberService;

@@ -37,7 +37,7 @@ function DefaultLoadingFallback(): React.ReactElement {
  * <LazyMapView />
  * ```
  */
-export function createLazyComponent<T extends ComponentType<any>>(
+export function createLazyComponent<T extends ComponentType<Record<string, unknown>>>(
   importFn: () => Promise<{ default: T }>,
   options: ILazyLoadOptions = {}
 ): (props: React.ComponentProps<T>) => React.ReactElement {
@@ -48,7 +48,7 @@ export function createLazyComponent<T extends ComponentType<any>>(
     return React.createElement(
       Suspense,
       { fallback: fallbackElement },
-      React.createElement(LazyComponent, props as any)
+      React.createElement(LazyComponent, props as React.ComponentProps<T>)
     );
   };
 }

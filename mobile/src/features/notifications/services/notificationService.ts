@@ -136,7 +136,7 @@ export const notificationService = {
   async scheduleLocalNotification(
     payload: INotificationPayload,
     trigger?: Notifications.NotificationTriggerInput
-  ): Promise<string> {
+  ): Promise<string | null> {
     return await messagingService.scheduleNotification(
       payload.title,
       payload.body,
@@ -163,24 +163,34 @@ export const notificationService = {
    * Get all scheduled notifications
    */
   async getAllScheduledNotifications(): Promise<IScheduledNotification[]> {
-    const notifications = await Notifications.getAllScheduledNotificationsAsync();
-    return notifications.map((notification) => ({
-      id: notification.identifier,
-      title: notification.content.title || '',
-      body: notification.content.body || '',
-      data: notification.content.data as Record<string, any>,
-      scheduledTime: notification.trigger
-        ? 'date' in notification.trigger
-          ? new Date(notification.trigger.date)
-          : new Date()
-        : new Date(),
-    }));
+    // Check if notifications are available (not in Expo Go)
+    if (!messagingService.isAvailable()) {
+      return [];
+    }
+
+    try {
+      const notifications = await Notifications.getAllScheduledNotificationsAsync();
+      return notifications.map((notification) => ({
+        id: notification.identifier,
+        title: notification.content.title || '',
+        body: notification.content.body || '',
+        data: notification.content.data as Record<string, any>,
+        scheduledTime: notification.trigger
+          ? 'date' in notification.trigger
+            ? new Date(notification.trigger.date)
+            : new Date()
+          : new Date(),
+      }));
+    } catch (error) {
+      console.error('[NotificationService] Error getting scheduled notifications:', error);
+      return [];
+    }
   },
 
   /**
    * Present a notification immediately (local notification)
    */
-  async presentNotification(payload: INotificationPayload): Promise<string> {
+  async presentNotification(payload: INotificationPayload): Promise<string | null> {
     return await messagingService.presentNotification(payload.title, payload.body, payload.data);
   },
 
@@ -207,28 +217,28 @@ export const notificationService = {
 
   /**
    * Add notification received listener
-   * Returns a subscription that should be cleaned up
+   * Returns a subscription that should be cleaned up, or null if not available
    */
   addNotificationReceivedListener(
     listener: (notification: Notifications.Notification) => void
-  ): Notifications.Subscription {
+  ): Notifications.Subscription | null {
     return messagingService.addNotificationReceivedListener(listener);
   },
 
   /**
    * Add notification response listener (when user taps notification)
-   * Returns a subscription that should be cleaned up
+   * Returns a subscription that should be cleaned up, or null if not available
    */
   addNotificationResponseListener(
     listener: (response: Notifications.NotificationResponse) => void
-  ): Notifications.Subscription {
+  ): Notifications.Subscription | null {
     return messagingService.addNotificationResponseListener(listener);
   },
 
   /**
    * Remove notification subscription
    */
-  removeNotificationSubscription(subscription: Notifications.Subscription): void {
+  removeNotificationSubscription(subscription: Notifications.Subscription | null): void {
     messagingService.removeNotificationSubscription(subscription);
   },
 };

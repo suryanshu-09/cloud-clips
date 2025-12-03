@@ -25,7 +25,13 @@ type MemoryStorage struct {
 	Coupons        map[uuid.UUID]*models.Coupon
 	ChatMessages   map[uuid.UUID]*models.ChatMessage
 	Notifications  map[uuid.UUID]*models.Notification
-	mu             sync.RWMutex
+	// Loyalty program
+	LoyaltyAccounts     map[uuid.UUID]*models.LoyaltyAccount
+	LoyaltyTransactions map[uuid.UUID]*models.LoyaltyTransaction
+	LoyaltyRewards      map[uuid.UUID]*models.LoyaltyReward
+	UserRewards         map[uuid.UUID]*models.UserReward
+	Referrals           map[uuid.UUID]*models.Referral
+	mu                  sync.RWMutex
 }
 
 func NewMemoryStorage() *MemoryStorage {
@@ -39,6 +45,12 @@ func NewMemoryStorage() *MemoryStorage {
 		Coupons:        make(map[uuid.UUID]*models.Coupon),
 		ChatMessages:   make(map[uuid.UUID]*models.ChatMessage),
 		Notifications:  make(map[uuid.UUID]*models.Notification),
+		// Loyalty program
+		LoyaltyAccounts:     make(map[uuid.UUID]*models.LoyaltyAccount),
+		LoyaltyTransactions: make(map[uuid.UUID]*models.LoyaltyTransaction),
+		LoyaltyRewards:      make(map[uuid.UUID]*models.LoyaltyReward),
+		UserRewards:         make(map[uuid.UUID]*models.UserReward),
+		Referrals:           make(map[uuid.UUID]*models.Referral),
 	}
 }
 

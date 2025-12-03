@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,13 +8,14 @@ import {
   Pressable,
   Alert,
 } from 'react-native';
-import { useState } from 'react';
 import { Link } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SafeView } from '@/components/ui/SafeView';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
+import { AppleSignInButton } from '@/components/auth/AppleSignInButton';
 import { useRegister } from '@/features/auth/hooks/useRegister';
 import { registerSchema, type IRegisterFormData } from '@/utils/validation/authSchemas';
 
@@ -45,9 +47,11 @@ export default function RegisterScreen() {
   };
 
   // Show error alert if registration fails
-  if (registerError) {
-    Alert.alert('Registration Failed', registerError.message);
-  }
+  useEffect(() => {
+    if (registerError) {
+      Alert.alert('Registration Failed', registerError.message);
+    }
+  }, [registerError]);
 
   const handleRoleSelect = (role: 'client' | 'barber') => {
     setSelectedRole(role);
@@ -71,6 +75,31 @@ export default function RegisterScreen() {
             <View className="mb-4">
               <Text className="text-3xl font-bold text-gray-900 mb-1">Create Account</Text>
               <Text className="text-base text-gray-600">Join Cloud Clips today</Text>
+            </View>
+
+            {/* Social Sign Up */}
+            <View className="mb-4">
+              <View className="flex-row gap-4 mb-4">
+                <GoogleSignInButton />
+                <AppleSignInButton />
+                {/* Fallback for web */}
+                {Platform.OS === 'web' && (
+                  <>
+                    <Button variant="outline" size="lg" fullWidth disabled>
+                      Google
+                    </Button>
+                    <Button variant="outline" size="lg" fullWidth disabled>
+                      Apple
+                    </Button>
+                  </>
+                )}
+              </View>
+
+              <View className="flex-row items-center my-2">
+                <View className="flex-1 h-px bg-gray-300" />
+                <Text className="mx-4 text-gray-500 text-sm">Or register with email</Text>
+                <View className="flex-1 h-px bg-gray-300" />
+              </View>
             </View>
 
             {/* Role Selection */}
