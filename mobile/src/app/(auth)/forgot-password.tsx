@@ -68,7 +68,7 @@ export default function ForgotPasswordScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className="flex-1 bg-white px-6 pt-12">
+          <View className="flex-1 bg-white px-6 pt-4">
             {/* Back Button */}
             <Pressable onPress={() => router.back()} className="mb-6">
               <Text className="text-blue-600 text-base font-medium">← Back to Login</Text>

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -1005,6 +1006,258 @@ func (h *AuthHandler) findOrCreateOAuthUser(email, name, avatar string, provider
 
 	if avatar != "" {
 		user.Avatar = &avatar
+	}
+
+	h.storage.Users[user.ID] = user
+	return user, true // Is a new user
+}
+
+// ============================================================================
+// Phone Authentication
+// ============================================================================
+
+// Phone auth request types
+type PhoneSendCodeRequest struct {
+	PhoneNumber string `json:"phoneNumber" binding:"required"`
+}
+
+type PhoneVerifyRequest struct {
+	VerificationID string `json:"verificationId" binding:"required"`
+	Code           string `json:"code" binding:"required"`
+}
+
+type PhoneSendCodeResponse struct {
+	VerificationID string `json:"verificationId"`
+	ExpiresAt      int64  `json:"expiresAt"`
+	Message        string `json:"message"`
+}
+
+// Phone verification storage
+var (
+	phoneVerifications     = make(map[string]phoneVerificationData) // verificationId -> data
+	phoneVerificationMutex sync.RWMutex
+	phoneRateLimit         = make(map[string]time.Time) // phoneNumber -> last request time
+	phoneRateLimitMutex    sync.RWMutex
+)
+
+type phoneVerificationData struct {
+	PhoneNumber string
+	Code        string
+	ExpiresAt   time.Time
+	Attempts    int
+}
+
+// generateVerificationCode generates a 6-digit verification code
+func generateVerificationCode() string {
+	code := ""
+	for i := 0; i < 6; i++ {
+		b := make([]byte, 1)
+		rand.Read(b)
+		code += fmt.Sprintf("%d", b[0]%10)
+	}
+	return code
+}
+
+// POST /api/auth/phone/send-code - Send phone verification code
+func (h *AuthHandler) PhoneSendCode(c *gin.Context) {
+	var req PhoneSendCodeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate phone number format (E.164)
+	phoneRegex := `^\+[1-9]\d{6,14}$`
+	matched, _ := regexp.MatchString(phoneRegex, req.PhoneNumber)
+	if !matched {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid phone number format. Use E.164 format (e.g., +14155551234)",
+		})
+		return
+	}
+
+	// Rate limiting: only allow one request per phone number per 60 seconds
+	phoneRateLimitMutex.RLock()
+	lastRequest, exists := phoneRateLimit[req.PhoneNumber]
+	phoneRateLimitMutex.RUnlock()
+
+	if exists && time.Since(lastRequest) < 60*time.Second {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error":      "Please wait before requesting another code",
+			"retryAfter": 60 - int(time.Since(lastRequest).Seconds()),
+		})
+		return
+	}
+
+	// Update rate limit
+	phoneRateLimitMutex.Lock()
+	phoneRateLimit[req.PhoneNumber] = time.Now()
+	phoneRateLimitMutex.Unlock()
+
+	// Generate verification ID and code
+	verificationID, err := generateSecureToken(16)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate verification ID"})
+		return
+	}
+
+	code := generateVerificationCode()
+	expiresAt := time.Now().Add(10 * time.Minute) // Code expires in 10 minutes
+
+	// Store verification data
+	phoneVerificationMutex.Lock()
+	// Clean up any existing verifications for this phone number
+	for id, data := range phoneVerifications {
+		if data.PhoneNumber == req.PhoneNumber {
+			delete(phoneVerifications, id)
+		}
+	}
+	phoneVerifications[verificationID] = phoneVerificationData{
+		PhoneNumber: req.PhoneNumber,
+		Code:        code,
+		ExpiresAt:   expiresAt,
+		Attempts:    0,
+	}
+	phoneVerificationMutex.Unlock()
+
+	// In production, send SMS via Twilio/Firebase/etc.
+	// For development, we'll log the code (and in dev mode, return it)
+	devMode := os.Getenv("DEV_MODE") == "true"
+
+	// TODO: Implement SMS sending via Twilio or similar service
+	// twilioClient.SendSMS(req.PhoneNumber, fmt.Sprintf("Your Cloud Clips verification code is: %s", code))
+
+	// Log for development
+	fmt.Printf("[Phone Auth] Verification code for %s: %s (expires: %s)\n",
+		req.PhoneNumber, code, expiresAt.Format(time.RFC3339))
+
+	response := PhoneSendCodeResponse{
+		VerificationID: verificationID,
+		ExpiresAt:      expiresAt.Unix(),
+		Message:        "Verification code sent",
+	}
+
+	// In dev mode, include the code in the response for testing
+	if devMode {
+		c.JSON(http.StatusOK, gin.H{
+			"verificationId": response.VerificationID,
+			"expiresAt":      response.ExpiresAt,
+			"message":        response.Message,
+			"devCode":        code, // Only in dev mode!
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// POST /api/auth/phone/verify - Verify phone code and authenticate
+func (h *AuthHandler) PhoneVerify(c *gin.Context) {
+	var req PhoneVerifyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate code format
+	if len(req.Code) != 6 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid verification code format"})
+		return
+	}
+
+	// Get verification data
+	phoneVerificationMutex.Lock()
+	data, exists := phoneVerifications[req.VerificationID]
+	if !exists {
+		phoneVerificationMutex.Unlock()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired verification ID"})
+		return
+	}
+
+	// Check expiry
+	if time.Now().After(data.ExpiresAt) {
+		delete(phoneVerifications, req.VerificationID)
+		phoneVerificationMutex.Unlock()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Verification code has expired"})
+		return
+	}
+
+	// Check attempts (max 5 attempts)
+	if data.Attempts >= 5 {
+		delete(phoneVerifications, req.VerificationID)
+		phoneVerificationMutex.Unlock()
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many attempts. Please request a new code"})
+		return
+	}
+
+	// Increment attempts
+	data.Attempts++
+	phoneVerifications[req.VerificationID] = data
+
+	// Verify code
+	if data.Code != req.Code {
+		phoneVerificationMutex.Unlock()
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error":             "Invalid verification code",
+			"attemptsRemaining": 5 - data.Attempts,
+		})
+		return
+	}
+
+	// Code verified - remove from storage
+	phoneNumber := data.PhoneNumber
+	delete(phoneVerifications, req.VerificationID)
+	phoneVerificationMutex.Unlock()
+
+	// Find or create user by phone number
+	user, isNewUser := h.findOrCreatePhoneUser(phoneNumber)
+
+	// Generate tokens
+	accessToken, refreshToken, expiresAt, err := h.generateTokens(user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"user":         user,
+		"accessToken":  accessToken,
+		"refreshToken": refreshToken,
+		"expiresAt":    expiresAt,
+		"isNewUser":    isNewUser,
+	})
+}
+
+// Helper function to find or create user by phone number
+func (h *AuthHandler) findOrCreatePhoneUser(phoneNumber string) (*models.User, bool) {
+	// Check if user already exists by phone number
+	for _, user := range h.storage.Users {
+		if user.Phone == phoneNumber {
+			// Update last active
+			user.LastActive = time.Now()
+			return user, false // Not a new user
+		}
+	}
+
+	// Create new user with phone number
+	// Generate a placeholder name from phone number
+	lastFour := phoneNumber[len(phoneNumber)-4:]
+	user := &models.User{
+		ID:            uuid.New(),
+		Email:         "", // Email can be added later
+		Phone:         phoneNumber,
+		Name:          fmt.Sprintf("User %s", lastFour),
+		Role:          models.RoleClient,
+		Location:      models.Location{Type: "Point", Coordinates: []float64{0, 0}},
+		CreatedAt:     time.Now(),
+		LastActive:    time.Now(),
+		AuthProvider:  models.AuthProviderPhone,
+		EmailVerified: false, // Phone users need to verify email separately if they want to add one
+		NotificationPrefs: models.NotificationPrefs{
+			Push:  true,
+			SMS:   true,
+			Email: false, // No email yet
+		},
 	}
 
 	h.storage.Users[user.ID] = user

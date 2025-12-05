@@ -160,6 +160,9 @@ func main() {
 			// OAuth routes
 			auth.POST("/google", authHandler.GoogleAuth)
 			auth.POST("/apple", authHandler.AppleAuth)
+			// Phone auth routes
+			auth.POST("/phone/send-code", authHandler.PhoneSendCode)
+			auth.POST("/phone/verify", authHandler.PhoneVerify)
 		}
 
 		// Auth-protected auth routes

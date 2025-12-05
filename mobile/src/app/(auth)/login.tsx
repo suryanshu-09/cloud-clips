@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/Button';
 import { DevLoginHelper } from '@/components/auth/DevLoginHelper';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { AppleSignInButton } from '@/components/auth/AppleSignInButton';
+import { PhoneSignInButton } from '@/components/auth/PhoneSignInButton';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useBiometrics } from '@/features/auth/hooks/useBiometrics';
 import { setAuthToken } from '@/services/api/client';
@@ -104,7 +105,7 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View className="flex-1 bg-white px-6 pt-12">
+          <View className="flex-1 bg-white px-6 pt-4">
             {/* Header */}
             <View className="mb-8">
               <Text className="text-4xl font-bold text-gray-900 mb-2">{t('auth.login.title')}</Text>
@@ -228,7 +229,7 @@ export default function LoginScreen() {
                 <View className="flex-1 h-px bg-gray-300" />
               </View>
 
-              <View className="flex-row gap-4">
+              <View className="flex-row gap-4 mb-3">
                 <GoogleSignInButton />
                 <AppleSignInButton />
                 {/* Fallback for platforms where neither is available */}
@@ -243,6 +244,9 @@ export default function LoginScreen() {
                   </>
                 )}
               </View>
+
+              {/* Phone Sign-In */}
+              <PhoneSignInButton />
             </View>
           </View>
         </ScrollView>

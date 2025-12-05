@@ -1,7 +1,20 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Alert, Platform } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import * as Crypto from 'expo-crypto';
+
+// Apple Logo SVG Component
+function AppleLogo({ size = 20, color = '#FFFFFF' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"
+        fill={color}
+      />
+    </Svg>
+  );
+}
 
 // Conditionally import Apple Authentication
 let AppleAuthentication: any = null;
@@ -122,28 +135,27 @@ export function AppleSignInButton({ onSuccess, onError, disabled }: IAppleSignIn
     }
   }, [appleSignInError, onError]);
 
-  // Don't render on non-iOS platforms
-  if (Platform.OS !== 'ios') {
-    return null;
-  }
-
   const isLoading = isInitializing || isLoggingInWithApple;
-  const isDisabled = disabled || isLoading || !isAvailable;
+  // On non-iOS platforms, Apple Sign-In is not available
+  const isDisabled = disabled || isLoading || !isAvailable || Platform.OS !== 'ios';
 
   return (
     <Pressable
       onPress={handleAppleSignIn}
       disabled={isDisabled}
-      className={`flex-1 flex-row items-center justify-center px-4 py-3 rounded-lg bg-black ${
-        isDisabled ? 'opacity-50' : 'active:opacity-80'
-      }`}
+      style={{
+        backgroundColor: '#000000',
+        opacity: isDisabled ? 0.5 : 1,
+      }}
+      className="flex-1 flex-row items-center justify-center px-4 py-3 rounded-lg"
     >
       {isLoading ? (
         <ActivityIndicator size="small" color="#FFFFFF" />
       ) : (
         <>
-          {/* Apple Logo */}
-          <Text className="text-white text-lg mr-2"></Text>
+          <View className="mr-3">
+            <AppleLogo size={20} color="#FFFFFF" />
+          </View>
           <Text className="text-white font-semibold text-base">Apple</Text>
         </>
       )}

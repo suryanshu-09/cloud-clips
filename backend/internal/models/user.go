@@ -21,6 +21,7 @@ const (
 	AuthProviderGoogle   AuthProvider = "google"
 	AuthProviderApple    AuthProvider = "apple"
 	AuthProviderFirebase AuthProvider = "firebase"
+	AuthProviderPhone    AuthProvider = "phone"
 )
 
 type User struct {

@@ -15,6 +15,7 @@ import {
   authService as firebaseAuthService,
   IGoogleSignInResult,
   IAppleSignInResult,
+  IPhoneSignInResult,
 } from '@/services/firebase/auth';
 import { initializeNotifications, cleanupNotifications } from '@/services/notifications';
 import { messagingService } from '@/services/firebase/messaging';
@@ -199,6 +200,65 @@ export const useAuth = () => {
     },
   });
 
+  // Phone Auth - Send verification code mutation
+  const sendPhoneCodeMutation = useMutation({
+    mutationFn: async (phoneNumber: string) => {
+      // Send phone verification request to backend
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/auth/phone/send-code`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ phoneNumber }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to send verification code');
+      }
+
+      const data = await response.json();
+      return { verificationId: data.verificationId, phoneNumber };
+    },
+    onError: (error: Error) => {
+      console.error('Phone code send error:', error.message);
+    },
+  });
+
+  // Phone Auth - Verify code and sign in mutation
+  const verifyPhoneCodeMutation = useMutation({
+    mutationFn: async ({ verificationId, verificationCode }: IPhoneSignInResult) => {
+      // Verify code with backend
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/auth/phone/verify`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            verificationId,
+            code: verificationCode,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Invalid verification code');
+      }
+
+      return response.json() as Promise<IAuthResponse>;
+    },
+    onSuccess: handleLoginSuccess,
+    onError: (error: Error) => {
+      console.error('Phone verification error:', error.message);
+    },
+  });
+
   // Logout mutation
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -294,6 +354,8 @@ export const useAuth = () => {
     loginWithGoogleAsync: googleSignInMutation.mutateAsync,
     loginWithApple: appleSignInMutation.mutate,
     loginWithAppleAsync: appleSignInMutation.mutateAsync,
+    sendPhoneCode: sendPhoneCodeMutation.mutateAsync,
+    verifyPhoneCode: verifyPhoneCodeMutation.mutateAsync,
     logout: logoutMutation.mutate,
     refreshToken: refreshTokenMutation.mutate,
     updateProfile: updateProfileMutation.mutate,
@@ -304,6 +366,8 @@ export const useAuth = () => {
     isLoggingIn: loginMutation.isPending,
     isLoggingInWithGoogle: googleSignInMutation.isPending,
     isLoggingInWithApple: appleSignInMutation.isPending,
+    isSendingPhoneCode: sendPhoneCodeMutation.isPending,
+    isVerifyingPhoneCode: verifyPhoneCodeMutation.isPending,
     isLoggingOut: logoutMutation.isPending,
     isUpdatingProfile: updateProfileMutation.isPending,
     isDeletingAccount: deleteAccountMutation.isPending,
@@ -312,6 +376,7 @@ export const useAuth = () => {
     loginError: loginMutation.error,
     googleSignInError: googleSignInMutation.error,
     appleSignInError: appleSignInMutation.error,
+    phoneAuthError: sendPhoneCodeMutation.error || verifyPhoneCodeMutation.error,
     logoutError: logoutMutation.error,
     updateProfileError: updateProfileMutation.error,
     deleteAccountError: deleteAccountMutation.error,

@@ -4,6 +4,13 @@ export default function EarningsLayout() {
   return (
     <Stack>
       <Stack.Screen
+        name="index"
+        options={{
+          title: 'Earnings',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
         name="history"
         options={{
           title: 'Earnings History',
