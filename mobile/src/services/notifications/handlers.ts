@@ -6,8 +6,12 @@
  */
 
 import { router } from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import { messagingService } from '../firebase/messaging';
+
+// Use types from expo-notifications without importing the module directly
+type Notification = import('expo-notifications').Notification;
+type NotificationResponse = import('expo-notifications').NotificationResponse;
+type Subscription = import('expo-notifications').Subscription;
 
 /**
  * Notification types that the app can receive
@@ -137,7 +141,7 @@ const handleNotificationPress = (data: INotificationData): void => {
 /**
  * Handle foreground notification (when app is open)
  */
-const handleForegroundNotification = (notification: Notifications.Notification): void => {
+const handleForegroundNotification = (notification: Notification): void => {
   const { title, body, data } = notification.request.content;
 
   console.log('[Notifications] Foreground notification received:', { title, body, data });
@@ -154,7 +158,7 @@ const handleForegroundNotification = (notification: Notifications.Notification):
 /**
  * Handle notification response (user tapped notification)
  */
-const handleNotificationResponse = (response: Notifications.NotificationResponse): void => {
+const handleNotificationResponse = (response: NotificationResponse): void => {
   const { data } = response.notification.request.content;
 
   console.log('[Notifications] Notification response:', data);
@@ -166,8 +170,8 @@ const handleNotificationResponse = (response: Notifications.NotificationResponse
 
 // Track subscription state
 let isSetup = false;
-let foregroundSubscription: Notifications.Subscription | null = null;
-let responseSubscription: Notifications.Subscription | null = null;
+let foregroundSubscription: Subscription | null = null;
+let responseSubscription: Subscription | null = null;
 
 /**
  * Setup notification handlers

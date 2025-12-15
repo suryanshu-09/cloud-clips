@@ -1,8 +1,25 @@
 /**
  * Loyalty Program Screen
  * Displays loyalty account, points, tiers, rewards, and referral program
+ *
+ * NOTE: This feature is temporarily disabled. To re-enable:
+ * 1. Uncomment all the code below
+ * 2. Remove the placeholder export
+ * 3. Remove `href: null` from the loyalty tab in _layout.tsx (if added)
  */
 
+// TEMPORARILY DISABLED - Placeholder export to prevent build errors
+export default function LoyaltyScreenDisabled() {
+  return null;
+}
+
+/*
+ * =============================================================================
+ * LOYALTY SCREEN - COMMENTED OUT FOR FUTURE USE
+ * =============================================================================
+ */
+
+/*
 import { useState, useCallback } from 'react';
 import {
   View,
@@ -229,7 +246,6 @@ function OverviewSection({
 
   return (
     <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-      {/* Points Card */}
       <View className="mx-4 mt-4 bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-6 shadow-lg">
         <View className="flex-row justify-between items-start">
           <View>
@@ -270,7 +286,6 @@ function OverviewSection({
         </View>
       </View>
 
-      {/* Available Rewards */}
       {availableRewards.length > 0 && (
         <View className="mx-4 mt-6">
           <Text className="text-lg font-bold text-gray-900 mb-3">Your Rewards</Text>
@@ -288,7 +303,6 @@ function OverviewSection({
         </View>
       )}
 
-      {/* Tier Benefits */}
       <View className="mx-4 mt-6 mb-8">
         <Text className="text-lg font-bold text-gray-900 mb-3">
           {account?.tier || 'Bronze'} Member Benefits
@@ -320,7 +334,6 @@ function ReferralsSection() {
 
   return (
     <ScrollView className="flex-1 px-4" showsVerticalScrollIndicator={false}>
-      {/* Share Card */}
       <View className="mt-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 shadow-lg">
         <Text className="text-white text-xl font-bold mb-2">Invite Friends & Earn</Text>
         <Text className="text-purple-100 mb-4">
@@ -345,7 +358,6 @@ function ReferralsSection() {
         </Button>
       </View>
 
-      {/* Stats */}
       <View className="mt-6">
         <Text className="text-lg font-bold text-gray-900 mb-3">Your Referral Stats</Text>
         <View className="flex-row gap-3">
@@ -368,7 +380,6 @@ function ReferralsSection() {
         </View>
       </View>
 
-      {/* How it works */}
       <View className="mt-6 mb-8">
         <Text className="text-lg font-bold text-gray-900 mb-3">How It Works</Text>
         <View className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
@@ -493,13 +504,11 @@ export default function LoyaltyScreen() {
 
   return (
     <SafeView className="flex-1 bg-gray-50">
-      {/* Header */}
       <View className="px-4 pt-4 pb-2 bg-white border-b border-gray-100">
         <Text className="text-2xl font-bold text-gray-900 mb-1">Rewards</Text>
         <Text className="text-gray-600 text-sm">Earn points, unlock rewards</Text>
       </View>
 
-      {/* Tabs */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -528,7 +537,6 @@ export default function LoyaltyScreen() {
         />
       </ScrollView>
 
-      {/* Content */}
       {activeTab === 'overview' && (
         <OverviewSection
           account={account}
@@ -642,3 +650,4 @@ export default function LoyaltyScreen() {
     </SafeView>
   );
 }
+*/

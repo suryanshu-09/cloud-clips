@@ -1,36 +1,64 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { storageHelpers } from '../storage/mmkv';
 import apiClient from '../api/client';
 
-// Storage keys
-const PUSH_TOKEN_KEY = 'pushToken';
-const PUSH_TOKEN_REGISTERED_KEY = 'pushTokenRegistered';
-
 // Check if we're running in Expo Go (where push notifications are not supported in SDK 53+)
 const isExpoGo = Constants.appOwnership === 'expo';
 
-// Configure notification handler only if not in Expo Go
-if (!isExpoGo) {
-  try {
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
-    });
-  } catch (error) {
-    console.warn('[Messaging] Failed to set notification handler:', error);
+// Lazy-loaded Notifications module (only loaded when not in Expo Go)
+let Notifications: typeof import('expo-notifications') | null = null;
+
+// Initialize notifications module if not in Expo Go
+const getNotifications = async (): Promise<typeof import('expo-notifications') | null> => {
+  if (isExpoGo) {
+    return null;
   }
-} else {
-  console.log(
-    '[Messaging] Running in Expo Go - push notifications are disabled. Use a development build for full functionality.'
-  );
-}
+
+  if (!Notifications) {
+    try {
+      Notifications = await import('expo-notifications');
+    } catch (error) {
+      console.warn('[Messaging] Failed to load expo-notifications:', error);
+      return null;
+    }
+  }
+  return Notifications;
+};
+
+// Initialize and configure notification handler (only if not in Expo Go)
+const initNotificationHandler = async (): Promise<void> => {
+  if (isExpoGo) {
+    console.log(
+      '[Messaging] Running in Expo Go - push notifications are disabled. Use a development build for full functionality.'
+    );
+    return;
+  }
+
+  const notifs = await getNotifications();
+  if (notifs) {
+    try {
+      notifs.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        }),
+      });
+    } catch (error) {
+      console.warn('[Messaging] Failed to set notification handler:', error);
+    }
+  }
+};
+
+// Initialize on module load (async, non-blocking)
+initNotificationHandler();
+
+// Storage keys
+const PUSH_TOKEN_KEY = 'pushToken';
+const PUSH_TOKEN_REGISTERED_KEY = 'pushTokenRegistered';
 
 export interface INotificationPermissions {
   granted: boolean;
@@ -41,6 +69,13 @@ export interface INotificationPermissions {
     allowsSound: boolean | null;
   };
 }
+
+// Type for notification trigger input
+type NotificationTriggerInput = import('expo-notifications').NotificationTriggerInput;
+type NotificationRequest = import('expo-notifications').NotificationRequest;
+type Notification = import('expo-notifications').Notification;
+type NotificationResponse = import('expo-notifications').NotificationResponse;
+type Subscription = import('expo-notifications').Subscription;
 
 // FCM/Push notification service
 export const messagingService = {
@@ -58,8 +93,13 @@ export const messagingService = {
       return { granted: false, canAskAgain: false };
     }
 
+    const notifs = await getNotifications();
+    if (!notifs) {
+      return { granted: false, canAskAgain: false };
+    }
+
     try {
-      const { status, canAskAgain, ios } = await Notifications.requestPermissionsAsync();
+      const { status, canAskAgain, ios } = await notifs.requestPermissionsAsync();
 
       return {
         granted: status === 'granted',
@@ -84,8 +124,13 @@ export const messagingService = {
       return { granted: false, canAskAgain: false };
     }
 
+    const notifs = await getNotifications();
+    if (!notifs) {
+      return { granted: false, canAskAgain: false };
+    }
+
     try {
-      const { status, canAskAgain, ios } = await Notifications.getPermissionsAsync();
+      const { status, canAskAgain, ios } = await notifs.getPermissionsAsync();
 
       return {
         granted: status === 'granted',
@@ -111,6 +156,11 @@ export const messagingService = {
       return null;
     }
 
+    const notifs = await getNotifications();
+    if (!notifs) {
+      return null;
+    }
+
     try {
       const projectId = Constants.expoConfig?.extra?.eas?.projectId;
 
@@ -119,7 +169,7 @@ export const messagingService = {
         return null;
       }
 
-      const token = await Notifications.getExpoPushTokenAsync({ projectId });
+      const token = await notifs.getExpoPushTokenAsync({ projectId });
 
       // Store token locally
       storageHelpers.setString('expoPushToken', token.data);
@@ -137,8 +187,13 @@ export const messagingService = {
       return null;
     }
 
+    const notifs = await getNotifications();
+    if (!notifs) {
+      return null;
+    }
+
     try {
-      const token = await Notifications.getDevicePushTokenAsync();
+      const token = await notifs.getDevicePushTokenAsync();
       return token.data;
     } catch (error) {
       console.error('[Messaging] Error getting device push token:', error);
@@ -222,15 +277,20 @@ export const messagingService = {
     title: string,
     body: string,
     data?: Record<string, unknown>,
-    trigger?: Notifications.NotificationTriggerInput
+    trigger?: NotificationTriggerInput
   ): Promise<string | null> => {
     if (isExpoGo) {
       console.warn('[Messaging] Notifications not available in Expo Go.');
       return null;
     }
 
+    const notifs = await getNotifications();
+    if (!notifs) {
+      return null;
+    }
+
     try {
-      return await Notifications.scheduleNotificationAsync({
+      return await notifs.scheduleNotificationAsync({
         content: {
           title,
           body,
@@ -278,8 +338,11 @@ export const messagingService = {
   cancelNotification: async (notificationId: string): Promise<void> => {
     if (isExpoGo) return;
 
+    const notifs = await getNotifications();
+    if (!notifs) return;
+
     try {
-      await Notifications.cancelScheduledNotificationAsync(notificationId);
+      await notifs.cancelScheduledNotificationAsync(notificationId);
     } catch (error) {
       console.error('[Messaging] Error canceling notification:', error);
     }
@@ -289,19 +352,25 @@ export const messagingService = {
   cancelAllNotifications: async (): Promise<void> => {
     if (isExpoGo) return;
 
+    const notifs = await getNotifications();
+    if (!notifs) return;
+
     try {
-      await Notifications.cancelAllScheduledNotificationsAsync();
+      await notifs.cancelAllScheduledNotificationsAsync();
     } catch (error) {
       console.error('[Messaging] Error canceling all notifications:', error);
     }
   },
 
   // Get all scheduled notifications
-  getScheduledNotifications: async (): Promise<Notifications.NotificationRequest[]> => {
+  getScheduledNotifications: async (): Promise<NotificationRequest[]> => {
     if (isExpoGo) return [];
 
+    const notifs = await getNotifications();
+    if (!notifs) return [];
+
     try {
-      return await Notifications.getAllScheduledNotificationsAsync();
+      return await notifs.getAllScheduledNotificationsAsync();
     } catch (error) {
       console.error('[Messaging] Error getting scheduled notifications:', error);
       return [];
@@ -312,8 +381,11 @@ export const messagingService = {
   getBadgeCount: async (): Promise<number> => {
     if (isExpoGo || Platform.OS !== 'ios') return 0;
 
+    const notifs = await getNotifications();
+    if (!notifs) return 0;
+
     try {
-      return await Notifications.getBadgeCountAsync();
+      return await notifs.getBadgeCountAsync();
     } catch (error) {
       console.error('[Messaging] Error getting badge count:', error);
       return 0;
@@ -324,8 +396,11 @@ export const messagingService = {
   setBadgeCount: async (count: number): Promise<void> => {
     if (isExpoGo || Platform.OS !== 'ios') return;
 
+    const notifs = await getNotifications();
+    if (!notifs) return;
+
     try {
-      await Notifications.setBadgeCountAsync(count);
+      await notifs.setBadgeCountAsync(count);
     } catch (error) {
       console.error('[Messaging] Error setting badge count:', error);
     }
@@ -335,8 +410,11 @@ export const messagingService = {
   clearBadge: async (): Promise<void> => {
     if (isExpoGo || Platform.OS !== 'ios') return;
 
+    const notifs = await getNotifications();
+    if (!notifs) return;
+
     try {
-      await Notifications.setBadgeCountAsync(0);
+      await notifs.setBadgeCountAsync(0);
     } catch (error) {
       console.error('[Messaging] Error clearing badge:', error);
     }
@@ -344,10 +422,17 @@ export const messagingService = {
 
   // Add notification received listener
   addNotificationReceivedListener: (
-    listener: (notification: Notifications.Notification) => void
-  ): Notifications.Subscription | null => {
+    listener: (notification: Notification) => void
+  ): Subscription | null => {
     if (isExpoGo) {
       console.warn('[Messaging] Notification listeners not available in Expo Go.');
+      return null;
+    }
+
+    // For listeners, we need to load synchronously since we can't return a Promise
+    // This is safe because initNotificationHandler() would have already loaded the module
+    if (!Notifications) {
+      console.warn('[Messaging] Notifications module not loaded yet.');
       return null;
     }
 
@@ -361,9 +446,14 @@ export const messagingService = {
 
   // Add notification response listener (when user taps notification)
   addNotificationResponseListener: (
-    listener: (response: Notifications.NotificationResponse) => void
-  ): Notifications.Subscription | null => {
+    listener: (response: NotificationResponse) => void
+  ): Subscription | null => {
     if (isExpoGo) {
+      return null;
+    }
+
+    if (!Notifications) {
+      console.warn('[Messaging] Notifications module not loaded yet.');
       return null;
     }
 
@@ -376,7 +466,7 @@ export const messagingService = {
   },
 
   // Remove notification listeners
-  removeNotificationSubscription: (subscription: Notifications.Subscription | null): void => {
+  removeNotificationSubscription: (subscription: Subscription | null): void => {
     if (subscription) {
       subscription.remove();
     }
@@ -393,8 +483,13 @@ export const messagingService = {
       return null;
     }
 
+    const notifs = await getNotifications();
+    if (!notifs) {
+      return null;
+    }
+
     try {
-      return await Notifications.scheduleNotificationAsync({
+      return await notifs.scheduleNotificationAsync({
         content: {
           title,
           body,
@@ -411,11 +506,14 @@ export const messagingService = {
   /**
    * Get the last notification response (for handling deep links from killed state)
    */
-  getLastNotificationResponse: async (): Promise<Notifications.NotificationResponse | null> => {
+  getLastNotificationResponse: async (): Promise<NotificationResponse | null> => {
     if (isExpoGo) return null;
 
+    const notifs = await getNotifications();
+    if (!notifs) return null;
+
     try {
-      return await Notifications.getLastNotificationResponseAsync();
+      return await notifs.getLastNotificationResponseAsync();
     } catch (error) {
       console.error('[Messaging] Error getting last notification response:', error);
       return null;
@@ -428,8 +526,11 @@ export const messagingService = {
   dismissAllNotifications: async (): Promise<void> => {
     if (isExpoGo) return;
 
+    const notifs = await getNotifications();
+    if (!notifs) return;
+
     try {
-      await Notifications.dismissAllNotificationsAsync();
+      await notifs.dismissAllNotificationsAsync();
     } catch (error) {
       console.error('[Messaging] Error dismissing notifications:', error);
     }

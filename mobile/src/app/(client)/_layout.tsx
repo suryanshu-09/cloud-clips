@@ -65,6 +65,13 @@ export default function ClientLayout() {
           href: null, // Hide from tab bar
         }}
       />
+      {/* Loyalty screen - temporarily disabled */}
+      <Tabs.Screen
+        name="loyalty"
+        options={{
+          href: null, // Hidden - feature temporarily disabled
+        }}
+      />
     </Tabs>
   );
 }
