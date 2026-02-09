@@ -3,14 +3,34 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "cd mobile && bun dev",
-    "prepare": "husky"
+    "dev": "cd mobile && bun dev",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev\"",
+    "build": "cd mobile && bun build",
+    "lint": "cd mobile && bun lint",
+    "format": "cd mobile && bun format",
+    "typecheck": "cd mobile && bun type-check",
+    "test": "cd mobile && bun test",
+    "setup": "npm run setup:env && npm run install:all",
+    "setup:env": "npm run setup:env:mobile && npm run setup:env:backend",
+    "setup:env:mobile": "cd mobile && [ -f .env ] || cp .env.example .env",
+    "setup:env:backend": "cd backend && [ -f .env ] || cp .env.example .env",
+    "install:all": "npm install && cd mobile && bun install && cd ../backend && npm install",
+    "clean": "npm run clean:mobile && npm run clean:backend && rm -rf node_modules",
+    "clean:mobile": "cd mobile && rm -rf node_modules && rm -rf .expo && rm -rf dist",
+    "clean:backend": "cd backend && rm -rf node_modules && rm -rf .convex",
+    "prepare": "husky",
+    "convex:deploy": "cd backend && npx convex deploy",
+    "convex:dev": "cd backend && npx convex dev",
+    "android": "cd mobile && bun android",
+    "ios": "cd mobile && bun ios"
   },
   "devDependencies": {
-    "husky": "^9.1.7"
+    "husky": "^9.1.7",
+    "concurrently": "^9.0.0"
   },
   "dependencies": {
-    "@react-native-google-signin/google-signin": "^16.0.0",
-    "react-native-mmkv": "^4.0.1"
+    "@react-native-google-signin/google-signin": "^16.1.1",
+    "react-native-mmkv": "^4.1.2"
   }
 }

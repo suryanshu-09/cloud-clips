@@ -1,0 +1,33 @@
+{
+  "name": "cloud-clips-backend",
+  "version": "1.0.0",
+  "description": "Cloud Clips Convex Backend",
+  "main": "index.js",
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy",
+    "typecheck": "tsc --noEmit",
+    "setup:env": "[ -f .env ] || cp .env.example .env",
+    "env:check": "node -e \"require('fs').existsSync('.env') || (console.error('ERROR: .env file not found. Run: cp .env.example .env') || process.exit(1))\"",
+    "predev": "npm run env:check",
+    "clean": "rm -rf node_modules .convex",
+    "convex:logs": "convex logs",
+    "convex:import": "convex import",
+    "convex:export": "convex export",
+    "stripe:webhook": "stripe listen --forward-to localhost:3000/api/webhooks/stripe"
+  },
+  "keywords": ["convex", "backend", "cloud-clips"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "convex": "^1.17.0",
+    "@convex-dev/auth": "^0.0.71",
+    "stripe": "^14.0.0",
+    "resend": "^2.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  }
+}

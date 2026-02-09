@@ -1,39 +1,53 @@
-# Agent Guidelines for cloud-clips
+# Agent Guidelines for Cloud Clips
+
+## Tech Stack Overview
+
+**Frontend**: React Native + Expo + NativeWind + TypeScript  
+**Backend**: Convex (real-time BaaS)  
+**Maps**: OpenStreetMap + Nominatim  
+**Payments**: Stripe Connect  
+**Auth**: Convex Auth  
+**Storage**: Convex File Storage  
+
+---
 
 ## Development Commands
 
 ```bash
-# Installation
-bun install     # Install dependencies
+# Mobile (from /mobile directory)
+cd mobile
+bun install           # Install dependencies
+bun dev               # Start Expo dev server
+bun android           # Run on Android
+bun ios               # Run on iOS
+bun lint              # Run ESLint
+bun format            # Run Prettier
+bun test              # Run tests
 
-# Development
-bun dev         # Start dev server
-bun android     # Run on Android device/emulator
-bun ios         # Run on iOS device/simulator
-bun build       # Build for production
-bun lint        # Run ESLint
-bun format      # Run Prettier
-
-# Testing
-bun test                    # Run all tests
-bun test <test-name>        # Run specific test
-bun test:watch             # Run tests in watch mode
-bun test:e2e               # Run end-to-end tests
+# Backend (Convex from /backend directory)
+cd backend
+npm install           # Install Convex dependencies
+npx convex dev        # Start Convex dev server
+npx convex deploy     # Deploy to production
 ```
+
+---
 
 ## Project Structure
 
 ```
 src/
-├── app/                # App navigation and entry
-├── components/         # Reusable components
-├── features/          # Feature-specific code
+├── app/                # Expo Router navigation
+├── components/         # Reusable UI components
+├── features/          # Feature-based modules
 ├── hooks/             # Custom hooks
-├── services/          # API and external services
-├── store/             # Jotai atoms and utils
+├── services/          # API/external services
+├── store/             # Jotai atoms
 ├── types/             # TypeScript types
-└── utils/             # Helper functions
+└── utils/             # Helpers & constants
 ```
+
+---
 
 ## Code Style & Conventions
 
@@ -45,121 +59,266 @@ src/
 - Async functions prefixed with 'async'
 - Use optional chaining and nullish coalescing
 
+### Convex Integration
+
+```typescript
+// Import from generated files
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+
+// Use queries
+const barbers = useQuery(api.barbers.getNearbyBarbers, {
+  lat: location.lat,
+  lng: location.lng,
+  radius: 10
+});
+
+// Use mutations
+const book = useMutation(api.appointments.bookAppointment);
+```
+
 ### State Management
 
-- Jotai for local state
-- TanStack Query for server state
-- Persist important state with MMKV
+- **Jotai** - Local UI state
+- **TanStack Query** - Server state (for non-Convex APIs like Stripe)
+- **MMKV** - Persistent storage
+- **Convex** - Real-time database state
 
 ### Component Rules
 
 - One component per file
 - PascalCase for component files and function names
 - Props interface in same file unless shared
-- Styles at bottom of file using NativeWind
+- Styles at bottom using NativeWind classes
 
 ### Import Order
 
 ```typescript
-// 1. React/React Native imports
+// 1. React/React Native
 import { useState } from "react";
 import { View, Text } from "react-native";
 
-// 2. Third-party libraries
-import { useQuery } from "@tanstack/react-query";
+// 2. Expo
+import { useRouter } from "expo-router";
 
-// 3. Local imports
-import { useAuth } from "@/hooks";
+// 3. Third-party
+import { useQuery } from "convex/react";
+import MapView from "react-native-maps";
+
+// 4. Local
 import { Button } from "@/components";
+import { api } from "@/convex/_generated/api";
 ```
 
 ### Error Handling
 
-- Use try/catch with Error objects
-- Custom error classes for specific cases
-- Error boundaries for component errors
-- Log errors to monitoring service
-
-### Example Component
-
 ```typescript
-interface IUserCardProps {
-  userId: string;
-  onPress?: () => void;
+// Convex errors are typed
+try {
+  await bookAppointment({ ...args });
+} catch (error) {
+  if (error instanceof ConvexError) {
+    // Handle specific Convex errors
+  }
 }
 
-export function UserCard({ userId, onPress }: IUserCardProps) {
-  const { data: user } = useQuery(['user', userId], () =>
-    fetchUser(userId)
-  )
-
-  if (!user) return null
-
-  return (
-    <Pressable
-      onPress={onPress}
-      className="p-4 bg-white rounded-lg shadow-sm"
-    >
-      <Text className="text-lg font-bold">{user.name}</Text>
-    </Pressable>
-  )
-}
+// React Error Boundaries for components
+<ErrorBoundary fallback={<ErrorScreen />}>
+  <App />
+</ErrorBoundary>
 ```
 
-## API Integration
+---
 
-- Use TanStack Query for data fetching
-- Define query keys in constants
-- Implement retry logic for failed requests
-- Cache successful responses
-- Type all API responses
+## OpenStreetMap Guidelines
+
+### Map Component
+
+```typescript
+import MapView, { UrlTile, Marker } from 'react-native-maps';
+
+// Use OSM tiles
+<MapView>
+  <UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
+  <Marker coordinate={{ lat, lng }} />
+</MapView>
+```
+
+### Geocoding (Nominatim)
+
+```typescript
+// Always include User-Agent for Nominatim
+const response = await fetch(
+  `https://nominatim.openstreetmap.org/search?format=json&q=${address}`,
+  { headers: { 'User-Agent': 'CloudClips/1.0' } }
+);
+```
+
+### Rate Limits
+
+- Nominatim: 1 request/second
+- Cache results in MMKV
+- Use debouncing for search inputs (300ms)
+
+---
+
+## Convex Patterns
+
+### Queries
+
+```typescript
+// convex/barbers.ts
+import { query } from "./_generated/server";
+
+export const getNearbyBarbers = query({
+  args: {
+    lat: v.number(),
+    lng: v.number(),
+    radius: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const barbers = await ctx.db.query("barberProfiles").collect();
+    
+    // Filter by distance
+    return barbers.filter(barber => {
+      const distance = calculateDistance(
+        args.lat, args.lng,
+        barber.location.lat, barber.location.lng
+      );
+      return distance <= args.radius;
+    });
+  },
+});
+```
+
+### Mutations
+
+```typescript
+// convex/appointments.ts
+import { mutation } from "./_generated/server";
+
+export const bookAppointment = mutation({
+  args: {
+    barberId: v.id("users"),
+    scheduledFor: v.number(),
+    // ...
+  },
+  handler: async (ctx, args) => {
+    const userId = ctx.userId;
+    if (!userId) throw new Error("Not authenticated");
+    
+    const appointment = await ctx.db.insert("appointments", {
+      clientId: userId,
+      barberId: args.barberId,
+      scheduledFor: args.scheduledFor,
+      status: "pending",
+      createdAt: Date.now(),
+    });
+    
+    return appointment;
+  },
+});
+```
+
+### Actions (External APIs)
+
+```typescript
+// convex/payments.ts
+import { action } from "./_generated/server";
+import Stripe from "stripe";
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2023-10-16",
+});
+
+export const createPaymentIntent = action({
+  args: { amount: v.number(), barberAccountId: v.string() },
+  handler: async (ctx, args) => {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: args.amount,
+      currency: "usd",
+      transfer_data: { destination: args.barberAccountId },
+    });
+    
+    return { clientSecret: paymentIntent.client_secret };
+  },
+});
+```
+
+---
 
 ## Performance Guidelines
 
-- Memoize callbacks with useCallback
-- Memoize expensive computations with useMemo
-- Use FlatList for long lists
-- Lazy load images and components
-- Minimize re-renders
+- Use Convex's automatic caching (queries revalidate automatically)
+- FlatList for long lists (barbers, messages, products)
+- Image optimization with Convex CDN
+- Memoize expensive components with React.memo
+- Debounce search inputs (300ms)
+- Paginate with cursors, not offset
+
+---
 
 ## Testing Guidelines
 
-- Jest + React Native Testing Library
-- Test files co-located with components
-- Follow Arrange-Act-Assert pattern
-- Mock external services and API calls
-- Test edge cases and error states
+### Unit Tests
+
+```typescript
+// Component tests
+import { render, screen } from '@testing-library/react-native';
+
+test('renders barber card', () => {
+  render(<BarberCard barber={mockBarber} />);
+  expect(screen.getByText(mockBarber.businessName)).toBeTruthy();
+});
+```
+
+### Convex Tests
+
+```typescript
+// convex/_tests/appointments.test.ts
+import { test, expect } from "@jest/globals";
+
+test("book appointment", async () => {
+  const t = convexTest();
+  const userId = await t.run(async (ctx) => {
+    return await ctx.db.insert("users", { email: "test@test.com", ... });
+  });
+  
+  const appointment = await t.mutation(api.appointments.bookAppointment, {
+    barberId: "...",
+    scheduledFor: Date.now(),
+  });
+  
+  expect(appointment.status).toBe("pending");
+});
+```
+
+---
 
 ## Git Workflow
 
 - Feature branches from main
-- Branch naming: feature/_, bugfix/_, hotfix/\*
-- Rebase before PR
-- Squash commits when merging
-- Conventional commits
+- Branch naming: `feature/description`, `bugfix/description`, `hotfix/description`
+- Conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`
+- PRs require at least 1 review
+- Squash and merge
 
-## Backend Decision Status
+---
 
-Two paths are being evaluated:
+## Security
 
-1. Go + PostgreSQL
-2. Supabase
+- Never commit `.env` files
+- Use Convex Auth for authentication
+- RLS through Convex functions (check ctx.userId)
+- Validate all inputs with Zod
+- Sanitize user-generated content
 
-Refer to PROJECT_PLAN.md for detailed comparison
-
-## Current Project Status
-
-- Initial setup completed
-- Evaluating backend options
-- Basic mobile app structure in place
-- Using Expo, NativeWind, TypeScript
-
-## Next Steps
-
-Refer to PROJECT_PLAN.md for detailed timeline and next steps based on backend choice
+---
 
 ## Resources
 
-- Project Plan: PROJECT_PLAN.md
-- Database Schema: SCHEMA.md
-- API Documentation: [Pending backend decision]
+- **README.md** - Full project documentation
+- **TODO.md** - Development roadmap and tasks
+- **Convex Docs**: https://docs.convex.dev
+- **OpenStreetMap Docs**: https://wiki.openstreetmap.org
+- **Expo Docs**: https://docs.expo.dev
