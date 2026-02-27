@@ -9,6 +9,7 @@ import {
   type ViewProps,
 } from 'react-native';
 import { ReactNode, useRef, useEffect } from 'react';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -30,25 +31,35 @@ export function BottomSheet({
   showHandle = true,
   ...props
 }: IBottomSheetProps) {
+  const prefersReducedMotion = useReducedMotion();
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const lastGestureDy = useRef(0);
 
   useEffect(() => {
     if (visible) {
-      Animated.spring(translateY, {
-        toValue: SCREEN_HEIGHT * (1 - snapPoints[0]),
-        useNativeDriver: true,
-        tension: 50,
-        friction: 8,
-      }).start();
+      if (prefersReducedMotion) {
+        // Skip spring animation — jump directly to open position
+        translateY.setValue(SCREEN_HEIGHT * (1 - snapPoints[0]));
+      } else {
+        Animated.spring(translateY, {
+          toValue: SCREEN_HEIGHT * (1 - snapPoints[0]),
+          useNativeDriver: true,
+          tension: 50,
+          friction: 8,
+        }).start();
+      }
     } else {
-      Animated.timing(translateY, {
-        toValue: SCREEN_HEIGHT,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      if (prefersReducedMotion) {
+        translateY.setValue(SCREEN_HEIGHT);
+      } else {
+        Animated.timing(translateY, {
+          toValue: SCREEN_HEIGHT,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }
     }
-  }, [visible, translateY, snapPoints]);
+  }, [visible, translateY, snapPoints, prefersReducedMotion]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -77,18 +88,37 @@ export function BottomSheet({
   ).current;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable onPress={onClose} className="flex-1 bg-black/50">
-        <Pressable onPress={(e) => e.stopPropagation()}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      accessibilityViewIsModal={true}
+    >
+      <Pressable
+        onPress={onClose}
+        className="flex-1 bg-black/50"
+        accessibilityLabel="Close sheet"
+        accessibilityRole="button"
+        accessibilityHint="Tap outside to close this panel"
+      >
+        <Pressable onPress={(e) => e.stopPropagation()} accessible={false}>
           <Animated.View
             {...props}
             style={{
               transform: [{ translateY }],
             }}
             className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl overflow-hidden"
+            accessibilityViewIsModal={true}
           >
             {showHandle && (
-              <View {...panResponder.panHandlers} className="items-center py-3">
+              <View
+                {...panResponder.panHandlers}
+                className="items-center py-3"
+                accessibilityLabel="Drag handle"
+                accessibilityHint="Drag down to close this panel"
+                accessibilityRole="none"
+              >
                 <View className="w-12 h-1.5 bg-gray-300 rounded-full" />
               </View>
             )}

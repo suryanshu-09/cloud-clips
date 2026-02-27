@@ -9,11 +9,22 @@ interface IInputProps extends TextInputProps {
   rightIcon?: React.ReactNode;
   disabled?: boolean;
   fullWidth?: boolean;
+  accessibilityHint?: string;
 }
 
 export const Input = forwardRef<TextInput, IInputProps>(
   (
-    { label, error, helperText, leftIcon, rightIcon, disabled = false, fullWidth = true, ...props },
+    {
+      label,
+      error,
+      helperText,
+      leftIcon,
+      rightIcon,
+      disabled = false,
+      fullWidth = true,
+      accessibilityHint,
+      ...props
+    },
     ref
   ) => {
     const [isFocused, setIsFocused] = useState(false);
@@ -23,15 +34,34 @@ export const Input = forwardRef<TextInput, IInputProps>(
       error ? 'border-red-500' : isFocused ? 'border-blue-600' : 'border-gray-300'
     } ${disabled ? 'bg-gray-100' : 'bg-white'}`;
 
+    // Build a descriptive accessibility label combining label + error state
+    const computedAccessibilityLabel = props.accessibilityLabel ?? label;
+    const computedAccessibilityHint =
+      accessibilityHint ?? (error ? `Error: ${error}` : helperText ?? undefined);
+
     return (
       <View className={containerStyles} testID="input-container">
-        {label && <Text className="text-sm font-medium text-gray-700 mb-2">{label}</Text>}
+        {label && (
+          <Text
+            className="text-sm font-medium text-gray-700 mb-2"
+            importantForAccessibility="no-hide-descendants"
+          >
+            {label}
+          </Text>
+        )}
         <View className={inputWrapperStyles}>
-          {leftIcon && <View className="mr-2">{leftIcon}</View>}
+          {leftIcon && (
+            <View className="mr-2" importantForAccessibility="no">
+              {leftIcon}
+            </View>
+          )}
           <TextInput
             ref={ref}
             {...props}
             editable={!disabled}
+            accessibilityLabel={computedAccessibilityLabel}
+            accessibilityHint={computedAccessibilityHint}
+            accessibilityState={{ disabled }}
             onFocus={(e) => {
               setIsFocused(true);
               props.onFocus?.(e);
@@ -43,10 +73,24 @@ export const Input = forwardRef<TextInput, IInputProps>(
             className="flex-1 py-3 text-base text-gray-900"
             placeholderTextColor="#9ca3af"
           />
-          {rightIcon && <View className="ml-2">{rightIcon}</View>}
+          {rightIcon && (
+            <View className="ml-2" importantForAccessibility="no">
+              {rightIcon}
+            </View>
+          )}
         </View>
-        {error && <Text className="text-sm text-red-500 mt-1">{error}</Text>}
-        {helperText && !error && <Text className="text-sm text-gray-500 mt-1">{helperText}</Text>}
+        {error && (
+          <Text
+            className="text-sm text-red-500 mt-1"
+            accessibilityLiveRegion="polite"
+            accessibilityRole="alert"
+          >
+            {error}
+          </Text>
+        )}
+        {helperText && !error && (
+          <Text className="text-sm text-gray-500 mt-1">{helperText}</Text>
+        )}
       </View>
     );
   }

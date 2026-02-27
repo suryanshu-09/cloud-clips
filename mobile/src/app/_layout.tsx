@@ -10,6 +10,7 @@ import { queryClient } from '@/services/api/queryClient';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { OfflineBanner } from '@/components/ui/OfflineBanner';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { useFontScaleSync } from '@/hooks/useFontScale';
 import { initSentry, errorTrackingService } from '@/services/errorTracking/sentry';
 import { offlineSyncService } from '@/services/offline/offlineSync';
 import { StripeProviderWrapper } from '@/services/stripe/provider';
@@ -26,6 +27,9 @@ import { useNotificationSetup } from '@/features/notifications';
  */
 function AppContent() {
   const { isOffline, wasOffline, acknowledgeOnline } = useNetworkStatus();
+
+  // Sync OS-level font scale (Dynamic Type / Accessibility font size) into app state
+  useFontScaleSync();
 
   // Initialize push notification handlers and token registration
   const { isAvailable: notificationsAvailable } = useNotificationSetup();

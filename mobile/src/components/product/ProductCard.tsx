@@ -59,8 +59,25 @@ function ProductCardComponent({
 
   const { isOutOfStock, isLowStock } = stockStatus;
 
+  const cardLabel = [
+    product.name,
+    categoryDisplay,
+    formattedPrice,
+    formattedRating ? `${formattedRating} stars` : null,
+    isOutOfStock ? 'Out of stock' : isLowStock ? `Only ${product.stock} left` : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
   return (
-    <Pressable {...props} disabled={isOutOfStock}>
+    <Pressable
+      {...props}
+      disabled={isOutOfStock}
+      accessibilityRole="button"
+      accessibilityLabel={cardLabel}
+      accessibilityHint={isOutOfStock ? undefined : 'Tap to view product details'}
+      accessibilityState={{ disabled: isOutOfStock }}
+    >
       <Card variant="elevated" padding="none" className="overflow-hidden">
         {/* Product Image */}
         <View className="relative w-full aspect-square bg-gray-100">
@@ -142,6 +159,9 @@ function ProductCardComponent({
             <Pressable
               onPress={handleAddToCart}
               className="mt-3 bg-blue-500 active:bg-blue-600 rounded-lg py-2 items-center"
+              accessibilityRole="button"
+              accessibilityLabel={`Add ${product.name} to cart`}
+              accessibilityHint="Adds this product to your shopping cart"
             >
               <Text className="text-white font-semibold text-sm">Add to Cart</Text>
             </Pressable>

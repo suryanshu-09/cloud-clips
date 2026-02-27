@@ -70,18 +70,35 @@ function StarRatingComponent({
     );
   };
 
+  const reviewCountLabel =
+    reviewCount !== undefined && reviewCount > 0 ? `, ${reviewCount} reviews` : '';
+  const accessLabel = `Rating: ${rating.toFixed(1)} out of ${maxRating} stars${reviewCountLabel}`;
+
   return (
-    <View className="flex-row items-center">
-      <View className="flex-row" style={{ gap: 2 }}>
+    <View
+      className="flex-row items-center"
+      accessible={true}
+      accessibilityLabel={accessLabel}
+      accessibilityRole="none"
+      importantForAccessibility="yes"
+    >
+      <View className="flex-row" style={{ gap: 2 }} importantForAccessibility="no-hide-descendants">
         {Array.from({ length: maxRating }, (_, i) => renderStar(i + 1))}
       </View>
 
       {showValue && (
-        <Text className={`${textSize} text-gray-700 ml-2 font-medium`}>{rating.toFixed(1)}</Text>
+        <Text
+          className={`${textSize} text-gray-700 ml-2 font-medium`}
+          importantForAccessibility="no"
+        >
+          {rating.toFixed(1)}
+        </Text>
       )}
 
       {reviewCount !== undefined && reviewCount > 0 && (
-        <Text className={`${textSize} text-gray-500 ml-1`}>({reviewCount})</Text>
+        <Text className={`${textSize} text-gray-500 ml-1`} importantForAccessibility="no">
+          ({reviewCount})
+        </Text>
       )}
     </View>
   );

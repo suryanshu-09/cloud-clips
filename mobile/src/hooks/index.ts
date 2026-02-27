@@ -14,3 +14,5 @@ export { useLocation } from './useLocation';
 export { useCurrentLocation } from './useCurrentLocation';
 export { useReverseGeocoding } from './useReverseGeocoding';
 export { useAddressAutocomplete } from './useAddressAutocomplete';
+export { useReducedMotion } from './useReducedMotion';
+export { useFontScale, useFontScaleSync } from './useFontScale';

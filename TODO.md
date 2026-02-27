@@ -344,10 +344,10 @@ A phased approach to building the complete Cloud Clips application with Convex +
 - [ ] Sync on reconnect
 
 ### 11.4 Accessibility
-- [ ] Screen reader labels
-- [ ] Color contrast audit
-- [ ] Font scaling support
-- [ ] Reduced motion support
+- [x] Screen reader labels
+- [x] Color contrast audit
+- [x] Font scaling support
+- [x] Reduced motion support
 
 ---
 

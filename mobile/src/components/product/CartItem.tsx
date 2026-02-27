@@ -51,17 +51,27 @@ export function CartItem({
           {/* Quantity Controls and Total */}
           <View className="flex-row items-center justify-between">
             {!readOnly ? (
-              <View className="flex-row items-center bg-gray-100 rounded-lg">
+              <View
+                className="flex-row items-center bg-gray-100 rounded-lg"
+                accessibilityRole="none"
+              >
                 {/* Decrement Button */}
                 <Pressable
                   onPress={onDecrement}
                   className="px-3 py-1 active:bg-gray-200 rounded-l-lg"
+                  accessibilityRole="button"
+                  accessibilityLabel={`Decrease quantity of ${item.name}`}
+                  accessibilityHint={`Currently ${item.quantity}. Tap to decrease`}
                 >
                   <Text className="text-gray-700 font-bold text-lg">−</Text>
                 </Pressable>
 
                 {/* Quantity */}
-                <View className="px-4 py-1 border-x border-gray-200">
+                <View
+                  className="px-4 py-1 border-x border-gray-200"
+                  accessible={true}
+                  accessibilityLabel={`Quantity: ${item.quantity}`}
+                >
                   <Text className="text-gray-900 font-semibold">{item.quantity}</Text>
                 </View>
 
@@ -69,6 +79,9 @@ export function CartItem({
                 <Pressable
                   onPress={onIncrement}
                   className="px-3 py-1 active:bg-gray-200 rounded-r-lg"
+                  accessibilityRole="button"
+                  accessibilityLabel={`Increase quantity of ${item.name}`}
+                  accessibilityHint={`Currently ${item.quantity}. Tap to increase`}
                 >
                   <Text className="text-gray-700 font-bold text-lg">+</Text>
                 </Pressable>
@@ -87,6 +100,9 @@ export function CartItem({
           <Pressable
             onPress={onRemove}
             className="w-8 h-8 items-center justify-center active:bg-gray-100 rounded-full"
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${item.name} from cart`}
+            accessibilityHint="Removes this item from your shopping cart"
           >
             <Text className="text-red-500 text-xl">×</Text>
           </Pressable>

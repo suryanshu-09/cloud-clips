@@ -128,8 +128,23 @@ function ConversationListItemComponent({
   const unreadCount = conversation.unreadCount ?? 0;
   const hasUnread = unreadCount > 0;
 
+  const itemLabel = [
+    otherParticipant.name,
+    isLastMessageFromMe ? `You: ${truncatedMessage}` : truncatedMessage,
+    formattedTime,
+    hasUnread ? `${unreadCount} unread message${unreadCount !== 1 ? 's' : ''}` : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
   return (
-    <Pressable onPress={onPress} {...props}>
+    <Pressable
+      onPress={onPress}
+      {...props}
+      accessibilityRole="button"
+      accessibilityLabel={itemLabel}
+      accessibilityHint="Tap to open this conversation"
+    >
       <Card
         variant="default"
         padding="md"

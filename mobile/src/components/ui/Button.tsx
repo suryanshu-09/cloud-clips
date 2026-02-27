@@ -64,6 +64,8 @@ export const Button = forwardRef<typeof Pressable, IButtonProps>(
         // @ts-ignore
         ref={ref}
         disabled={isDisabled}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isDisabled, busy: loading }}
         className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${
           isDisabled ? disabledStyles : ''
         } ${widthStyles}`}
@@ -73,6 +75,7 @@ export const Button = forwardRef<typeof Pressable, IButtonProps>(
             size="small"
             color={variant === 'outline' ? '#2563eb' : '#ffffff'}
             className="mr-2"
+            accessibilityLabel="Loading"
           />
         )}
         <Text className={`${textVariantStyles[variant]} ${textSizeStyles[size]}`}>{children}</Text>

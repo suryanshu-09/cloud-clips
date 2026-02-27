@@ -168,8 +168,24 @@ function AppointmentCardComponent({
   // For no_show, use custom styling since Badge doesn't have a maroon variant
   const isNoShow = appointment.status === 'no_show';
 
+  const cardLabel = [
+    appointment.serviceName,
+    `with ${appointment.barberName}`,
+    `on ${formattedDate} at ${formattedTime}`,
+    `status: ${statusConfig.label}`,
+    formatPrice(appointment.price),
+  ].join(', ');
+
   return (
-    <Pressable onPress={handleViewDetails} disabled={isLoading} {...props}>
+    <Pressable
+      onPress={handleViewDetails}
+      disabled={isLoading}
+      {...props}
+      accessibilityRole="button"
+      accessibilityLabel={cardLabel}
+      accessibilityHint="Tap to view appointment details"
+      accessibilityState={{ disabled: isLoading }}
+    >
       <Card variant="elevated" padding="none" className="overflow-hidden">
         {/* Header with status */}
         <View className="flex-row items-center justify-between px-4 pt-4 pb-2">

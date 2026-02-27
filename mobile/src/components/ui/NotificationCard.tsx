@@ -54,12 +54,20 @@ export function NotificationCard({
 
   const formattedDate = format(new Date(notification.createdAt), 'MMM dd, yyyy • hh:mm a');
 
+  const cardLabel = `${notification.title}. ${notification.body}. ${
+    notification.isRead ? 'Read' : 'Unread'
+  }. ${formattedDate}`;
+
   return (
     <Pressable
       onPress={handlePress}
       className={`p-4 mb-3 rounded-lg border ${getNotificationColor(notification.type)} ${
         !notification.isRead ? 'border-l-4' : 'border-l-0'
       }`}
+      accessibilityRole="button"
+      accessibilityLabel={cardLabel}
+      accessibilityHint="Tap to open this notification"
+      accessibilityState={{ checked: notification.isRead }}
     >
       <View className="flex-row items-start">
         <View className="mr-3">
@@ -89,6 +97,9 @@ export function NotificationCard({
               onMarkAsRead(notification.id);
             }}
             className="px-3 py-1 bg-blue-100 rounded-md"
+            accessibilityRole="button"
+            accessibilityLabel="Mark as read"
+            accessibilityHint="Marks this notification as read"
           >
             <Text className="text-xs text-blue-700 font-medium">Mark as Read</Text>
           </Pressable>
@@ -101,6 +112,9 @@ export function NotificationCard({
               onDelete(notification.id);
             }}
             className="px-3 py-1 bg-red-100 rounded-md ml-2"
+            accessibilityRole="button"
+            accessibilityLabel="Delete notification"
+            accessibilityHint="Permanently removes this notification"
           >
             <Text className="text-xs text-red-700 font-medium">Delete</Text>
           </Pressable>

@@ -32,18 +32,29 @@ export function ImageZoomModal({
       animationType="fade"
       onRequestClose={onClose}
       statusBarTranslucent
+      accessibilityViewIsModal={true}
     >
       <View className="flex-1 bg-black">
         {/* Close Button */}
         <View className="absolute top-12 right-4 z-10">
-          <Pressable onPress={onClose} className="bg-black/50 rounded-full p-2">
+          <Pressable
+            onPress={onClose}
+            className="bg-black/50 rounded-full p-2"
+            accessibilityLabel="Close image viewer"
+            accessibilityRole="button"
+            accessibilityHint="Closes the full-screen image viewer"
+          >
             <Ionicons name="close" size={28} color="white" />
           </Pressable>
         </View>
 
         {/* Image Counter */}
         {imageUrls.length > 1 && (
-          <View className="absolute top-12 left-4 z-10">
+          <View
+            className="absolute top-12 left-4 z-10"
+            accessibilityLabel={`Image ${currentIndex + 1} of ${imageUrls.length}`}
+            accessible={true}
+          >
             <View className="bg-black/50 rounded-full px-4 py-2">
               <Ionicons name="images-outline" size={20} color="white" />
             </View>
@@ -64,8 +75,15 @@ export function ImageZoomModal({
               key={index}
               style={{ width: SCREEN_WIDTH, height: SCREEN_HEIGHT }}
               className="items-center justify-center"
+              accessible={true}
+              accessibilityLabel={`Image ${index + 1} of ${imageUrls.length}`}
             >
-              <Image source={{ uri: url }} style={styles.image} resizeMode="contain" />
+              <Image
+                source={{ uri: url }}
+                style={styles.image}
+                resizeMode="contain"
+                accessibilityIgnoresInvertColors
+              />
             </View>
           ))}
         </ScrollView>

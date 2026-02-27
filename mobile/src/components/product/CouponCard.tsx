@@ -133,7 +133,13 @@ function CouponCardComponent({
         <View className="flex-1 p-4">
           {/* Code and Copy button */}
           <View className="flex-row items-center justify-between mb-2">
-            <Pressable onPress={handleCopyCode} className="flex-row items-center gap-2">
+            <Pressable
+              onPress={handleCopyCode}
+              className="flex-row items-center gap-2"
+              accessibilityRole="button"
+              accessibilityLabel={`Coupon code ${coupon.code}. Tap to copy`}
+              accessibilityHint="Copies the coupon code"
+            >
               <Text className="text-lg font-bold text-gray-900 tracking-wide">{coupon.code}</Text>
               <Text className="text-gray-400">📋</Text>
             </Pressable>

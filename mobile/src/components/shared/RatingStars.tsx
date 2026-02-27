@@ -45,6 +45,9 @@ export function RatingStars({
   const renderStar = (position: number) => {
     const filled = position <= displayRating;
     const partialFill = position - 0.5 <= displayRating && position > displayRating;
+    const starLabel = interactive
+      ? `${position} star${position !== 1 ? 's' : ''}`
+      : undefined;
 
     return (
       <Pressable
@@ -52,6 +55,10 @@ export function RatingStars({
         onPress={() => handlePress(position)}
         disabled={!interactive}
         className={`${interactive ? 'active:scale-110' : ''}`}
+        accessibilityRole={interactive ? 'radio' : 'none'}
+        accessibilityLabel={starLabel}
+        accessibilityState={interactive ? { selected: position <= displayRating } : undefined}
+        accessibilityHint={interactive ? `Set rating to ${position}` : undefined}
       >
         <View className="relative">
           {partialFill ? (
@@ -75,18 +82,36 @@ export function RatingStars({
     );
   };
 
+  const reviewCountLabel = showCount && reviewCount !== undefined ? `, ${reviewCount} reviews` : '';
+  const displayRatingValue = !showCount && rating > 0 ? `, ${rating.toFixed(1)}` : '';
+  const groupLabel = interactive
+    ? `Star rating selector, currently ${displayRating} out of ${maxRating}`
+    : `Rating: ${rating.toFixed(1)} out of ${maxRating} stars${reviewCountLabel}`;
+
   return (
-    <View className="flex-row items-center gap-1">
-      <View className="flex-row gap-0.5">
+    <View
+      className="flex-row items-center gap-1"
+      accessibilityRole={interactive ? 'radiogroup' : 'none'}
+      accessibilityLabel={groupLabel}
+    >
+      <View className="flex-row gap-0.5" importantForAccessibility="no-hide-descendants">
         {Array.from({ length: maxRating }, (_, i) => renderStar(i + 1))}
       </View>
 
       {showCount && reviewCount !== undefined && (
-        <Text className={`${sizeStyles[size]} text-gray-600 ml-1`}>({reviewCount})</Text>
+        <Text
+          className={`${sizeStyles[size]} text-gray-600 ml-1`}
+          importantForAccessibility="no"
+        >
+          ({reviewCount})
+        </Text>
       )}
 
       {!showCount && rating > 0 && (
-        <Text className={`${sizeStyles[size]} text-gray-700 ml-1 font-medium`}>
+        <Text
+          className={`${sizeStyles[size]} text-gray-700 ml-1 font-medium`}
+          importantForAccessibility="no"
+        >
           {rating.toFixed(1)}
         </Text>
       )}

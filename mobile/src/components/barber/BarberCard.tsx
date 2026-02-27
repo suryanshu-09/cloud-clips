@@ -42,8 +42,25 @@ function BarberCardComponent({
     return Math.min(...prices);
   }, [barber.services]);
 
+  const cardLabel = [
+    barber.businessName || barber.name,
+    barber.isVerified ? 'Verified' : null,
+    barber.rating > 0
+      ? `${barber.rating.toFixed(1)} stars, ${barber.totalReviews} reviews`
+      : null,
+    formattedDistance,
+    lowestPrice ? `From $${lowestPrice}` : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
   return (
-    <Pressable {...props}>
+    <Pressable
+      {...props}
+      accessibilityRole="button"
+      accessibilityLabel={cardLabel}
+      accessibilityHint="Tap to view this barber's profile"
+    >
       <Card variant="elevated" padding="none" className="overflow-hidden">
         <View className="flex-row">
           {/* Avatar Section */}

@@ -84,7 +84,13 @@ function ReviewCardComponent({
           <View className="flex-row items-center gap-2">
             <RatingStars rating={review.rating} size="sm" />
             {onMorePress && (
-              <Pressable onPress={onMorePress} className="p-1">
+              <Pressable
+                onPress={onMorePress}
+                className="p-1"
+                accessibilityRole="button"
+                accessibilityLabel="More options"
+                accessibilityHint="Opens more options for this review"
+              >
                 <Text className="text-gray-500 text-lg">⋮</Text>
               </Pressable>
             )}
@@ -97,29 +103,33 @@ function ReviewCardComponent({
         )}
 
         {/* Photos */}
-        {review.photos && review.photos.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8 }}
-          >
-            {review.photos.map((photo, index) => (
-              <Pressable
-                key={`${review.id}-photo-${index}`}
-                onPress={() => handleImagePress(index)}
-                className="active:opacity-80"
-              >
-                <OptimizedImage
-                  source={photo}
-                  width={96}
-                  height={96}
-                  className="rounded-lg"
-                  contentFit="cover"
-                />
-              </Pressable>
-            ))}
-          </ScrollView>
-        )}
+          {review.photos && review.photos.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8 }}
+              accessibilityLabel={`${review.photos.length} review photo${review.photos.length !== 1 ? 's' : ''}`}
+            >
+              {review.photos.map((photo, index) => (
+                <Pressable
+                  key={`${review.id}-photo-${index}`}
+                  onPress={() => handleImagePress(index)}
+                  className="active:opacity-80"
+                  accessibilityRole="button"
+                  accessibilityLabel={`Review photo ${index + 1} of ${review.photos!.length}`}
+                  accessibilityHint="Tap to view full-size image"
+                >
+                  <OptimizedImage
+                    source={photo}
+                    width={96}
+                    height={96}
+                    className="rounded-lg"
+                    contentFit="cover"
+                  />
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
       </View>
 
       {/* Image Zoom Modal */}

@@ -34,7 +34,13 @@ export function Header({
     >
       <View className="flex-1 flex-row items-center">
         {showBack && !leftAction && (
-          <Pressable onPress={handleBackPress} className="mr-3">
+          <Pressable
+            onPress={handleBackPress}
+            className="mr-3"
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
+            accessibilityHint="Navigates to the previous screen"
+          >
             <Text className="text-2xl text-gray-700">←</Text>
           </Pressable>
         )}

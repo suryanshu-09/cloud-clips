@@ -8,6 +8,8 @@ interface IAvatarProps extends ViewProps {
   fallback?: string;
   showBadge?: boolean;
   badgeColor?: string;
+  /** Accessible description of who this avatar belongs to, e.g. "John's profile photo" */
+  accessibilityLabel?: string;
 }
 
 // Blurhash placeholder for avatars - a neutral gray circle
@@ -35,6 +37,7 @@ function AvatarComponent({
   fallback = 'U',
   showBadge = false,
   badgeColor = 'bg-green-500',
+  accessibilityLabel,
   ...props
 }: IAvatarProps) {
   const sizeStyles = {
@@ -68,7 +71,14 @@ function AvatarComponent({
   const badgeStyles = 'absolute bottom-0 right-0 rounded-full border-2 border-white';
 
   return (
-    <View {...props} className="relative">
+    <View
+      {...props}
+      className="relative"
+      accessible={!!accessibilityLabel}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={accessibilityLabel ? 'image' : undefined}
+      importantForAccessibility={accessibilityLabel ? 'yes' : 'no-hide-descendants'}
+    >
       <View className={`${baseStyles} ${sizeStyles[size]} bg-gray-300`}>
         {source ? (
           <Image
@@ -79,14 +89,23 @@ function AvatarComponent({
             placeholder={{ blurhash: AVATAR_BLURHASH }}
             cachePolicy="memory-disk"
             recyclingKey={source}
+            accessibilityIgnoresInvertColors
           />
         ) : (
-          <Text className={`${textSizeStyles[size]} font-semibold text-gray-700`}>
+          <Text
+            className={`${textSizeStyles[size]} font-semibold text-gray-700`}
+            importantForAccessibility="no"
+          >
             {fallbackChar}
           </Text>
         )}
       </View>
-      {showBadge && <View className={`${badgeStyles} ${badgeColor} ${badgeSizeStyles[size]}`} />}
+      {showBadge && (
+        <View
+          className={`${badgeStyles} ${badgeColor} ${badgeSizeStyles[size]}`}
+          importantForAccessibility="no"
+        />
+      )}
     </View>
   );
 }

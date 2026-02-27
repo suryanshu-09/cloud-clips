@@ -74,7 +74,7 @@ const VoiceMessagePlayer: React.FC<IVoiceMessagePlayerProps> = ({
   attachment,
   isCurrentUser,
   onPlay,
-}) => {
+}: IVoiceMessagePlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
@@ -125,11 +125,19 @@ const VoiceMessagePlayer: React.FC<IVoiceMessagePlayerProps> = ({
   };
 
   return (
-    <Pressable onPress={handlePlay} className="flex-row items-center py-2 px-3">
+    <Pressable
+      onPress={handlePlay}
+      className="flex-row items-center py-2 px-3"
+      accessibilityRole="button"
+      accessibilityLabel={isPlaying ? 'Pause voice message' : 'Play voice message'}
+      accessibilityHint={`Voice message, duration ${formatDuration(duration)}`}
+      accessibilityState={{ busy: isPlaying }}
+    >
       <View
         className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
           isCurrentUser ? 'bg-blue-600' : 'bg-gray-200'
         }`}
+        importantForAccessibility="no"
       >
         <Ionicons
           name={isPlaying ? 'pause' : 'play'}
@@ -137,7 +145,7 @@ const VoiceMessagePlayer: React.FC<IVoiceMessagePlayerProps> = ({
           color={isCurrentUser ? '#FFFFFF' : '#374151'}
         />
       </View>
-      <View className="flex-1">
+      <View className="flex-1" importantForAccessibility="no">
         <View className="h-1 bg-gray-300 rounded-full overflow-hidden">
           <View
             className={`h-full rounded-full ${isCurrentUser ? 'bg-white' : 'bg-blue-500'}`}
@@ -178,12 +186,21 @@ const FileAttachment: React.FC<IFileAttachmentProps> = ({ attachment, isCurrentU
     return 'document-outline';
   };
 
+  const fileSizeLabel = formatFileSize(attachment.size);
+
   return (
-    <Pressable onPress={onPress} className="flex-row items-center p-3">
+    <Pressable
+      onPress={onPress}
+      className="flex-row items-center p-3"
+      accessibilityRole="button"
+      accessibilityLabel={`File: ${attachment.name || 'Unnamed file'}${fileSizeLabel ? `, ${fileSizeLabel}` : ''}`}
+      accessibilityHint="Tap to open this file"
+    >
       <View
         className={`w-12 h-12 rounded-xl items-center justify-center mr-3 ${
           isCurrentUser ? 'bg-blue-600' : 'bg-gray-200'
         }`}
+        importantForAccessibility="no"
       >
         <Ionicons
           name={getFileIcon(attachment.name) as any}
@@ -191,7 +208,7 @@ const FileAttachment: React.FC<IFileAttachmentProps> = ({ attachment, isCurrentU
           color={isCurrentUser ? '#FFFFFF' : '#374151'}
         />
       </View>
-      <View className="flex-1">
+      <View className="flex-1" importantForAccessibility="no">
         <Text
           className={`text-sm font-medium ${isCurrentUser ? 'text-white' : 'text-gray-900'}`}
           numberOfLines={1}
@@ -199,7 +216,7 @@ const FileAttachment: React.FC<IFileAttachmentProps> = ({ attachment, isCurrentU
           {attachment.name || 'File'}
         </Text>
         <Text className={`text-xs ${isCurrentUser ? 'text-blue-200' : 'text-gray-500'}`}>
-          {formatFileSize(attachment.size)}
+          {fileSizeLabel}
         </Text>
       </View>
     </Pressable>
@@ -221,14 +238,23 @@ const LocationMessage: React.FC<ILocationMessageProps> = ({
   onPress,
 }) => {
   return (
-    <Pressable onPress={onPress} className="p-3">
+    <Pressable
+      onPress={onPress}
+      className="p-3"
+      accessibilityRole="button"
+      accessibilityLabel={`Shared location at coordinates ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`}
+      accessibilityHint="Tap to view this location on the map"
+    >
       <View className="bg-gray-100 rounded-xl overflow-hidden">
         {/* Map preview placeholder - in production, use a static map image */}
-        <View className="h-32 bg-gray-300 items-center justify-center">
+        <View
+          className="h-32 bg-gray-300 items-center justify-center"
+          importantForAccessibility="no"
+        >
           <Ionicons name="map" size={40} color="#6B7280" />
           <Text className="text-gray-600 text-xs mt-2">Tap to view location</Text>
         </View>
-        <View className="p-2 bg-white">
+        <View className="p-2 bg-white" importantForAccessibility="no">
           <Text className="text-sm font-medium text-gray-900">Location</Text>
           <Text className="text-xs text-gray-500">
             {latitude.toFixed(6)}, {longitude.toFixed(6)}
@@ -427,6 +453,16 @@ export const MessageBubble: React.FC<IMessageBubbleProps> = ({
         onPress={handlePress}
         onLongPress={handleLongPress}
         className={`mb-3 flex-row ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
+        accessibilityRole="button"
+        accessibilityLabel={
+          message.content
+            ? `${isCurrentUser ? 'You' : senderName || 'Them'}: ${message.content}`
+            : isCurrentUser
+              ? 'You sent an attachment'
+              : `${senderName || 'Them'} sent an attachment`
+        }
+        accessibilityHint={selectionMode ? 'Tap to select or deselect' : 'Long press for options'}
+        accessibilityState={{ selected: isSelected }}
       >
         {/* Selection Checkbox */}
         {selectionMode && (
@@ -473,6 +509,9 @@ export const MessageBubble: React.FC<IMessageBubbleProps> = ({
                 key={index}
                 onPress={() => onImagePress?.(attachment.url)}
                 className="relative"
+                accessibilityRole="button"
+                accessibilityLabel={`Image ${index + 1} of ${imageAttachments.length}`}
+                accessibilityHint="Tap to view full size"
               >
                 <Image
                   source={{ uri: attachment.url }}
