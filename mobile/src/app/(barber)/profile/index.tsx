@@ -8,11 +8,15 @@ import { ReviewSummary } from '@/components/review/ReviewSummary';
 import { ReviewCard } from '@/components/review/ReviewCard';
 import { Card } from '@/components/ui/Card';
 import { useRouter } from 'expo-router';
+import { useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 
 export default function BarberProfileScreen() {
   const { currentUser, logout, isLoggingOut } = useAuth();
   const router = useRouter();
   const barberId = currentUser?.id || '';
+
+  const barberProfile = useQuery(api.barbers.queries.getBarberProfile);
 
   const { data: reviewsData, isLoading: reviewsLoading } = useBarberReviews(barberId, {
     limit: 3,
@@ -54,40 +58,85 @@ export default function BarberProfileScreen() {
             <Text className="text-sm font-semibold text-gray-500 uppercase">Business</Text>
           </View>
 
-          <Pressable className="flex-row items-center justify-between p-4 border-b border-gray-100">
-            <View className="flex-row items-center">
-              <Ionicons name="cut-outline" size={24} color="#6b7280" />
-              <Text className="text-base text-gray-900 ml-3">My Services</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-          </Pressable>
-
-          <Pressable className="flex-row items-center justify-between p-4 border-b border-gray-100">
-            <View className="flex-row items-center">
-              <Ionicons name="time-outline" size={24} color="#6b7280" />
-              <Text className="text-base text-gray-900 ml-3">Working Hours</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-          </Pressable>
-
-          <Pressable className="flex-row items-center justify-between p-4 border-b border-gray-100">
-            <View className="flex-row items-center">
-              <Ionicons name="location-outline" size={24} color="#6b7280" />
-              <Text className="text-base text-gray-900 ml-3">Service Locations</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-          </Pressable>
-
-          <Pressable className="flex-row items-center justify-between p-4 border-b border-gray-100">
-            <View className="flex-row items-center">
-              <Ionicons name="pricetag-outline" size={24} color="#6b7280" />
-              <Text className="text-base text-gray-900 ml-3">Pricing</Text>
+          <Pressable
+            className="flex-row items-center justify-between p-4 border-b border-gray-100 active:bg-gray-50"
+            onPress={() => router.push('/(barber)/profile/business')}
+          >
+            <View className="flex-row items-center flex-1">
+              <Ionicons name="business-outline" size={24} color="#6b7280" />
+              <View className="ml-3 flex-1">
+                <Text className="text-base text-gray-900">Business Info</Text>
+                {barberProfile?.businessName ? (
+                  <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+                    {barberProfile.businessName}
+                  </Text>
+                ) : null}
+              </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
           </Pressable>
 
           <Pressable
-            className="flex-row items-center justify-between p-4"
+            className="flex-row items-center justify-between p-4 border-b border-gray-100 active:bg-gray-50"
+            onPress={() => router.push('/(barber)/profile/services')}
+          >
+            <View className="flex-row items-center flex-1">
+              <Ionicons name="pricetag-outline" size={24} color="#6b7280" />
+              <View className="ml-3 flex-1">
+                <Text className="text-base text-gray-900">Service Pricing</Text>
+                {barberProfile?.services ? (
+                  <Text className="text-xs text-gray-500 mt-0.5">
+                    {barberProfile.services.length}{' '}
+                    {barberProfile.services.length === 1 ? 'service' : 'services'}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </Pressable>
+
+          <Pressable
+            className="flex-row items-center justify-between p-4 border-b border-gray-100 active:bg-gray-50"
+            onPress={() => router.push('/(barber)/profile/location')}
+          >
+            <View className="flex-row items-center flex-1">
+              <Ionicons name="location-outline" size={24} color="#6b7280" />
+              <View className="ml-3 flex-1">
+                <Text className="text-base text-gray-900">Location</Text>
+                {barberProfile?.location?.city ? (
+                  <Text className="text-xs text-gray-500 mt-0.5">
+                    {barberProfile.location.city}
+                    {barberProfile.location.state
+                      ? `, ${barberProfile.location.state}`
+                      : ''}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </Pressable>
+
+          <Pressable
+            className="flex-row items-center justify-between p-4 border-b border-gray-100 active:bg-gray-50"
+            onPress={() => router.push('/(barber)/profile/gallery')}
+          >
+            <View className="flex-row items-center flex-1">
+              <Ionicons name="images-outline" size={24} color="#6b7280" />
+              <View className="ml-3 flex-1">
+                <Text className="text-base text-gray-900">Portfolio Gallery</Text>
+                {barberProfile?.portfolioImages ? (
+                  <Text className="text-xs text-gray-500 mt-0.5">
+                    {barberProfile.portfolioImages.length}{' '}
+                    {barberProfile.portfolioImages.length === 1 ? 'photo' : 'photos'}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </Pressable>
+
+          <Pressable
+            className="flex-row items-center justify-between p-4 active:bg-gray-50"
             onPress={() => router.push('/(barber)/offers')}
           >
             <View className="flex-row items-center">
@@ -167,7 +216,10 @@ export default function BarberProfileScreen() {
             <Text className="text-sm font-semibold text-gray-500 uppercase">Account</Text>
           </View>
 
-          <Pressable className="flex-row items-center justify-between p-4 border-b border-gray-100">
+          <Pressable
+            className="flex-row items-center justify-between p-4 border-b border-gray-100 active:bg-gray-50"
+            onPress={() => router.push('/(barber)/profile/edit')}
+          >
             <View className="flex-row items-center">
               <Ionicons name="person-outline" size={24} color="#6b7280" />
               <Text className="text-base text-gray-900 ml-3">Edit Profile</Text>

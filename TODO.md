@@ -287,10 +287,10 @@ A phased approach to building the complete Cloud Clips application with Convex +
 - [ ] Analytics charts
 
 ### 9.4 Profile Management
-- [ ] Business info editor
-- [ ] Service pricing
-- [ ] Portfolio gallery upload
-- [ ] Location management
+- [x] Business info editor
+- [x] Service pricing
+- [x] Portfolio gallery upload
+- [x] Location management
 
 ---
 
