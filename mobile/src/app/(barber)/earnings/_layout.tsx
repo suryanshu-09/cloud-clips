@@ -32,6 +32,13 @@ export default function EarningsLayout() {
           presentation: 'fullScreenModal',
         }}
       />
+      <Stack.Screen
+        name="tax"
+        options={{
+          title: 'Tax Documents',
+          headerBackTitle: 'Back',
+        }}
+      />
     </Stack>
   );
 }

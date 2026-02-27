@@ -1,11 +1,11 @@
 /**
  * useEarnings hook - Convex integration
- * React hooks for Stripe Connect barber earnings using Convex actions
+ * React hooks for Stripe Connect barber earnings using Convex queries and actions
  */
 
 import { useState, useCallback } from 'react';
 import { Linking } from 'react-native';
-import { useAction } from 'convex/react';
+import { useAction, useQuery } from 'convex/react';
 import { api } from '@convex/_generated/api';
 
 import {
@@ -13,16 +13,17 @@ import {
   EarningsPeriod,
   IConnectAccount,
   IDashboardLink,
+  IEarningItem,
   IEarningsHistoryResponse,
   IEarningsSummary,
+  IPayout,
+  IPayoutsResponse,
+  PayoutStatus,
 } from '../types';
 import {
   transformConnectAccountResponse,
   transformCreateAccountResponse,
   transformDashboardLinkResponse,
-  generateMockEarningsSummary,
-  generateMockEarningsHistory,
-  generateMockPayoutsResponse,
 } from '../services/earningsService';
 
 // Query keys for React Query (used for caching earnings data)
@@ -157,110 +158,225 @@ export function useConnectAccount() {
 }
 
 /**
- * Hook to get earnings data (using mock data for now, will integrate with real earnings queries)
+ * Hook to get earnings summary using real Convex query
  */
 export function useEarnings(period: EarningsPeriod = 'week') {
-  const [earnings, setEarnings] = useState<IEarningsSummary | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  // Real-time Convex query for earnings summary
+  const earningsSummaryRaw = useQuery(api.earnings.getBarberEarningsSummary, { period });
 
-  const fetchEarnings = useCallback(
-    async (connectStatus: ConnectStatus = ConnectStatus.NONE) => {
-      setIsLoading(true);
-      setError(null);
+  const isLoading = earningsSummaryRaw === undefined;
 
-      try {
-        // For now, use mock data. In production, this would be a Convex query
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        const data = generateMockEarningsSummary(period, connectStatus);
-        setEarnings(data);
-        return data;
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error('Failed to fetch earnings');
-        setError(error);
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [period]
-  );
+  // Combine the data into IEarningsSummary shape
+  const earnings: IEarningsSummary | null =
+    earningsSummaryRaw != null
+      ? {
+          period: earningsSummaryRaw.period as EarningsPeriod,
+          totalEarnings: earningsSummaryRaw.totalEarnings,
+          serviceEarnings: earningsSummaryRaw.serviceEarnings,
+          productEarnings: earningsSummaryRaw.productEarnings,
+          tips: earningsSummaryRaw.tips,
+          platformFee: earningsSummaryRaw.platformFee,
+          platformFeeRate: earningsSummaryRaw.platformFeeRate,
+          netEarnings: earningsSummaryRaw.netEarnings,
+          serviceCount: earningsSummaryRaw.serviceCount,
+          avgPerService: earningsSummaryRaw.avgPerService,
+          // Balance comes from Stripe Connect account (fetched separately in dashboard hook)
+          availableBalance: 0,
+          pendingBalance: 0,
+          currency: earningsSummaryRaw.currency,
+          payoutsEnabled: false,
+          connectStatus: ConnectStatus.NONE,
+        }
+      : null;
 
   return {
     earnings,
     isLoading,
-    error,
-    fetchEarnings,
+    error: null,
+    // Kept for backward compat; no-op since data is reactive via Convex
+    fetchEarnings: async (_connectStatus?: ConnectStatus) => {
+      return earnings;
+    },
   };
 }
 
 /**
- * Hook to get earnings history
+ * Hook to get earnings history using real Convex query
  */
 export function useEarningsHistory(page: number = 1, limit: number = 20) {
-  const [history, setHistory] = useState<IEarningsHistoryResponse | null>(null);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [allEarnings, setAllEarnings] = useState<IEarningItem[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [isFetched, setIsFetched] = useState(false);
+
+  // We use the Convex query reactively for the first page, then pagination manually
+  const firstPageData = useQuery(api.earnings.getBarberEarningsHistory, {
+    limit,
+    cursor: undefined,
+  });
 
   const fetchHistory = useCallback(async () => {
+    if (firstPageData === undefined) return null;
+
     setIsLoading(true);
     setError(null);
 
     try {
-      // For now, use mock data
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const data = generateMockEarningsHistory(page, limit);
-      setHistory(data);
-      return data;
+      // Transform the data to IEarningItem format
+      const items: IEarningItem[] = firstPageData.earnings.map((e) => ({
+        id: e.id,
+        type: e.type,
+        amount: e.amount,
+        fee: e.fee,
+        net: e.net,
+        description: e.description,
+        customerName: e.customerName,
+        status: e.status,
+        date: e.date,
+      }));
+
+      setAllEarnings(items);
+      setTotalCount(firstPageData.total);
+      setHasMore(firstPageData.hasMore);
+      if (firstPageData.nextCursor) {
+        setCursor(firstPageData.nextCursor);
+      }
+      setIsFetched(true);
+
+      const result: IEarningsHistoryResponse = {
+        earnings: items,
+        total: firstPageData.total,
+        page: 1,
+        limit,
+        totalPages: Math.ceil(firstPageData.total / limit),
+      };
+
+      return result;
     } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to fetch earnings history');
-      setError(error);
-      throw error;
+      const fetchError =
+        err instanceof Error ? err : new Error('Failed to fetch earnings history');
+      setError(fetchError);
+      throw fetchError;
     } finally {
       setIsLoading(false);
     }
-  }, [page, limit]);
+  }, [firstPageData, limit]);
+
+  const history: IEarningsHistoryResponse | null = isFetched
+    ? {
+        earnings: allEarnings,
+        total: totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit),
+      }
+    : firstPageData !== undefined
+      ? {
+          earnings: firstPageData.earnings.map((e) => ({
+            id: e.id,
+            type: e.type,
+            amount: e.amount,
+            fee: e.fee,
+            net: e.net,
+            description: e.description,
+            customerName: e.customerName,
+            status: e.status,
+            date: e.date,
+          })),
+          total: firstPageData.total,
+          page: 1,
+          limit,
+          totalPages: Math.ceil(firstPageData.total / limit),
+        }
+      : null;
 
   return {
     history,
-    isLoading,
+    isLoading: isLoading || firstPageData === undefined,
     error,
     fetchHistory,
+    hasMore,
+    cursor,
   };
 }
 
 /**
- * Hook to get payouts
+ * Hook to get payouts using real Stripe payouts via Convex action
  */
 export function usePayouts(limit: number = 25) {
-  const [payouts, setPayouts] = useState<any>(null);
+  const [payoutsData, setPayoutsData] = useState<IPayoutsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore] = useState(false);
 
-  const fetchPayouts = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const getBarberPayoutsAction = useAction(api.payments.actions.getBarberPayouts);
 
-    try {
-      // For now, use mock data
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const data = generateMockPayoutsResponse(limit);
-      setPayouts(data);
-      return data;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to fetch payouts');
-      setError(error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [limit]);
+  const fetchPayouts = useCallback(
+    async (startingAfter?: string) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const result = await getBarberPayoutsAction({
+          limit,
+          startingAfter,
+        });
+
+        const payouts: IPayout[] = result.payouts.map((p) => ({
+          id: p.id,
+          amount: p.amount,
+          currency: p.currency,
+          status: p.status as PayoutStatus,
+          arrivalDate: p.arrivalDate,
+          createdAt: p.createdAt,
+          failureCode: p.failureCode,
+          failureMessage: p.failureMessage,
+        }));
+
+        const response: IPayoutsResponse = {
+          payouts,
+          total: payouts.length,
+        };
+
+        setPayoutsData((prev) => {
+          if (startingAfter && prev) {
+            // Append for pagination
+            return {
+              payouts: [...prev.payouts, ...payouts],
+              total: prev.total + payouts.length,
+            };
+          }
+          return response;
+        });
+
+        setHasMore(result.hasMore);
+        if (result.nextCursor) {
+          setNextCursor(result.nextCursor);
+        }
+
+        return response;
+      } catch (err) {
+        const fetchError = err instanceof Error ? err : new Error('Failed to fetch payouts');
+        setError(fetchError);
+        throw fetchError;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [getBarberPayoutsAction, limit]
+  );
 
   return {
-    payouts,
+    payouts: payoutsData,
     isLoading,
     error,
     fetchPayouts,
+    hasMore,
+    nextCursor,
   };
 }
 
@@ -282,13 +398,25 @@ export function useEarningsDashboard() {
     error: connectError,
   } = useConnectAccount();
 
-  // Earnings hooks
+  // Earnings hooks - uses reactive Convex query
   const {
-    earnings,
+    earnings: rawEarnings,
     isLoading: isEarningsLoading,
     error: earningsError,
     fetchEarnings,
   } = useEarnings(selectedPeriod);
+
+  // Merge balance info from accountData into earnings if available
+  const earnings =
+    rawEarnings && accountData
+      ? {
+          ...rawEarnings,
+          availableBalance: (accountData as any).availableBalance ?? 0,
+          pendingBalance: (accountData as any).pendingBalance ?? 0,
+          payoutsEnabled: accountData.payoutsEnabled,
+          connectStatus: accountData.status,
+        }
+      : rawEarnings;
 
   // Derived state
   const isConnected = accountData?.status === ConnectStatus.VERIFIED && accountData?.payoutsEnabled;
@@ -316,20 +444,22 @@ export function useEarningsDashboard() {
    */
   const refreshData = useCallback(async () => {
     setRefreshKey((prev) => prev + 1);
-    const status = await getAccountStatus();
-    await fetchEarnings(status.status);
-  }, [getAccountStatus, fetchEarnings]);
-
-  // Initial load
-  const loadData = useCallback(async () => {
     try {
       const status = await getAccountStatus();
       await fetchEarnings(status.status);
-    } catch (error) {
-      // If no account exists, just fetch earnings with NONE status
-      await fetchEarnings(ConnectStatus.NONE);
+    } catch {
+      // Silent - reactive data will update automatically
     }
   }, [getAccountStatus, fetchEarnings]);
+
+  // Initial load - get Connect account status
+  const loadData = useCallback(async () => {
+    try {
+      await getAccountStatus();
+    } catch {
+      // If no account exists, that's fine - the reactive query handles earnings
+    }
+  }, [getAccountStatus]);
 
   return {
     // Earnings data

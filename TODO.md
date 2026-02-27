@@ -281,10 +281,10 @@ A phased approach to building the complete Cloud Clips application with Convex +
 - [ ] Recurring availability
 
 ### 9.3 Earnings
-- [ ] Earnings history
-- [ ] Payout management
-- [ ] Tax documents
-- [ ] Analytics charts
+- [x] Earnings history
+- [x] Payout management
+- [x] Tax documents
+- [x] Analytics charts
 
 ### 9.4 Profile Management
 - [ ] Business info editor

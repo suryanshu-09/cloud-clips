@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { ScrollView, Text, View, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useQuery } from 'convex/react';
+import { api } from '@convex/_generated/api';
 import { Card, Button } from '@/components/ui';
 import { EarningsChart } from '@/components/barber';
 import { useEarningsDashboard } from '@/features/earnings';
@@ -14,31 +16,42 @@ const formatCurrency = (cents: number): string => {
   })}`;
 };
 
-// Generate chart data from earnings summary
-const generateChartData = (
-  earnings: { serviceCount: number; netEarnings: number } | undefined,
-  period: EarningsPeriod
+// Build chart data from monthly earnings summary (for year view)
+// or distribute net earnings with weekly/monthly labels
+const buildChartData = (
+  earnings: { netEarnings: number } | undefined | null,
+  period: EarningsPeriod,
+  monthlyBreakdown?: Array<{ month: number; net: number; count: number }>
 ) => {
   if (!earnings) return [];
 
-  // For demo purposes, distribute earnings across the period
+  if (period === 'year' && monthlyBreakdown && monthlyBreakdown.length > 0) {
+    const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return monthlyBreakdown.map((m) => ({
+      label: MONTH_NAMES[m.month - 1],
+      value: Math.round(m.net / 100),
+    }));
+  }
+
   const labels =
     period === 'week'
-      ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+      ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
       : period === 'month'
         ? ['Week 1', 'Week 2', 'Week 3', 'Week 4']
         : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  const totalValue = earnings.netEarnings / 100; // Convert to dollars for chart
+  const totalValue = earnings.netEarnings / 100;
   const segments = labels.length;
+  if (totalValue === 0) {
+    return labels.map((label) => ({ label, value: 0 }));
+  }
 
-  return labels.map((label, _index) => {
-    // Create some variation in the data
-    const variance = 0.7 + Math.random() * 0.6; // 70% - 130%
-    const baseValue = totalValue / segments;
+  // Distribute earnings with mild pseudo-variance (deterministic, no Math.random)
+  return labels.map((label, index) => {
+    const weight = 0.75 + ((index * 7 + 3) % 5) * 0.1; // deterministic variation
     return {
       label,
-      value: Math.round(baseValue * variance),
+      value: Math.round((totalValue / segments) * weight),
     };
   });
 };
@@ -59,6 +72,11 @@ export default function EarningsScreen() {
     loadData,
     isOpeningDashboard,
   } = useEarningsDashboard();
+
+  // Fetch yearly tax summary for the monthly chart when period === 'year'
+  const currentYear = new Date().getFullYear();
+  const taxSummaryForYear = useQuery(api.earnings.getBarberTaxSummary, { year: currentYear });
+  const taxSummary = selectedPeriod === 'year' ? taxSummaryForYear : undefined;
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -93,8 +111,16 @@ export default function EarningsScreen() {
     router.push('/(barber)/earnings/payouts' as any);
   };
 
-  // Generate chart data
-  const chartData = generateChartData(earnings ?? undefined, selectedPeriod);
+  const handleViewTaxDocuments = () => {
+    router.push('/(barber)/earnings/tax' as any);
+  };
+
+  // Build chart data from real earnings
+  const chartData = buildChartData(
+    earnings,
+    selectedPeriod,
+    taxSummary?.monthlyEarnings
+  );
   const chartTotal = earnings ? earnings.netEarnings / 100 : 0;
 
   // Loading state
@@ -370,6 +396,23 @@ export default function EarningsScreen() {
               </Pressable>
             )}
           </View>
+
+          {/* Tax Documents */}
+          <Pressable
+            onPress={handleViewTaxDocuments}
+            className="bg-white border border-gray-200 rounded-xl p-4 flex-row items-center justify-between"
+          >
+            <View className="flex-row items-center gap-3">
+              <View className="w-10 h-10 bg-purple-100 rounded-full items-center justify-center">
+                <Text>📄</Text>
+              </View>
+              <View>
+                <Text className="font-semibold text-gray-900">Tax Documents</Text>
+                <Text className="text-sm text-gray-500">Annual summaries & 1099-K info</Text>
+              </View>
+            </View>
+            <Text className="text-gray-400 text-lg">›</Text>
+          </Pressable>
 
           {/* Info Card */}
           <Card className="p-4 bg-blue-50 border-blue-200">

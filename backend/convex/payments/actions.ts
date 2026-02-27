@@ -841,6 +841,94 @@ export const getConnectAccountDetails = action({
 });
 
 /**
+ * Get barber's Stripe payouts list
+ * Requires the barber to have a Stripe Connect account
+ */
+export const getBarberPayouts = action({
+  args: {
+    limit: v.optional(v.number()),
+    startingAfter: v.optional(v.string()), // Stripe payout ID for cursor pagination
+  },
+  handler: async (ctx, args) => {
+    const userId = ctx.userId;
+    if (!userId) {
+      throw new ConvexError("Not authenticated");
+    }
+
+    // Get barber profile with Stripe account ID
+    const barberProfile = await ctx.runQuery(api.barbers.getBarberProfile);
+    if (!barberProfile?.stripeAccountId) {
+      return {
+        payouts: [],
+        hasMore: false,
+        nextCursor: null,
+      };
+    }
+
+    try {
+      const listParams: Stripe.PayoutListParams = {
+        limit: Math.min(args.limit ?? 25, 100),
+      };
+      if (args.startingAfter) {
+        listParams.starting_after = args.startingAfter;
+      }
+
+      const payoutsResponse = await stripe.payouts.list(listParams, {
+        stripeAccount: barberProfile.stripeAccountId,
+      });
+
+      return {
+        payouts: payoutsResponse.data.map((payout) => ({
+          id: payout.id,
+          amount: payout.amount,
+          currency: payout.currency,
+          status: payout.status as "paid" | "pending" | "in_transit" | "canceled" | "failed",
+          arrivalDate: new Date(payout.arrival_date * 1000).toISOString(),
+          createdAt: new Date(payout.created * 1000).toISOString(),
+          method: payout.method,
+          type: payout.type,
+          description: payout.description,
+          failureCode: payout.failure_code ?? undefined,
+          failureMessage: payout.failure_message ?? undefined,
+          bankAccount: payout.destination
+            ? {
+                last4:
+                  typeof payout.destination === "object" &&
+                  "last4" in payout.destination
+                    ? (payout.destination as any).last4
+                    : undefined,
+                bankName:
+                  typeof payout.destination === "object" &&
+                  "bank_name" in payout.destination
+                    ? (payout.destination as any).bank_name
+                    : undefined,
+              }
+            : undefined,
+        })),
+        hasMore: payoutsResponse.has_more,
+        nextCursor:
+          payoutsResponse.has_more && payoutsResponse.data.length > 0
+            ? payoutsResponse.data[payoutsResponse.data.length - 1].id
+            : null,
+      };
+    } catch (error: any) {
+      // If account is not fully set up, return empty
+      if (
+        error?.code === "account_invalid" ||
+        error?.message?.includes("No such account")
+      ) {
+        return {
+          payouts: [],
+          hasMore: false,
+          nextCursor: null,
+        };
+      }
+      throw new ConvexError(`Failed to fetch payouts: ${error.message}`);
+    }
+  },
+});
+
+/**
  * Get payment intent status and details
  */
 export const getPaymentIntentStatus = action({
