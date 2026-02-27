@@ -5,13 +5,15 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as JotaiProvider } from 'jotai';
-import { QueryClientProvider, onlineManager } from '@tanstack/react-query';
+import { onlineManager } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient } from '@/services/api/queryClient';
+import { queryClientPersister } from '@/store/utils/storage';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { OfflineBanner } from '@/components/ui/OfflineBanner';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { initSentry, errorTrackingService } from '@/services/errorTracking/sentry';
-import { offlineSyncService } from '@/services/offline/offlineSync';
+import { offlineSyncService, convexOfflineQueue } from '@/services/offline/offlineSync';
 import { StripeProviderWrapper } from '@/services/stripe/provider';
 import { ConvexProviderWrapper } from '@/services/convex/provider';
 import { initializeStripe } from '@/features/payments/services/stripeService';
@@ -20,12 +22,14 @@ import apiClient from '@/services/api/client';
 import '@/services/i18n';
 import { i18nService } from '@/services/i18n';
 import { useNotificationSetup } from '@/features/notifications';
+import { useConvex } from 'convex/react';
 
 /**
  * Inner component that uses hooks requiring providers
  */
 function AppContent() {
   const { isOffline, wasOffline, acknowledgeOnline } = useNetworkStatus();
+  const convexClient = useConvex();
 
   // Initialize push notification handlers and token registration
   const { isAvailable: notificationsAvailable } = useNotificationSetup();
@@ -47,9 +51,12 @@ function AppContent() {
       const syncPendingActions = async () => {
         // eslint-disable-next-line no-console
         console.log('[App] Back online, syncing pending actions...');
-        const pendingCount = offlineSyncService.getPendingCount();
 
-        if (pendingCount > 0) {
+        const restPendingCount = offlineSyncService.getPendingCount();
+        const convexPendingCount = convexOfflineQueue.getCount();
+
+        // ── 1. Replay queued REST mutations ─────────────────────────────────
+        if (restPendingCount > 0) {
           const result = await offlineSyncService.syncAll(async (action) => {
             try {
               await apiClient({
@@ -59,15 +66,35 @@ function AppContent() {
               });
               return true;
             } catch (error) {
-              console.error('[App] Failed to sync action:', action.id, error);
+              console.error('[App] Failed to sync REST action:', action.id, error);
               return false;
             }
           });
-
           // eslint-disable-next-line no-console
-          console.log('[App] Sync complete:', result);
+          console.log('[App] REST sync complete:', result);
+        }
 
-          // Invalidate relevant queries to refresh data
+        // ── 2. Replay queued Convex mutations ────────────────────────────────
+        if (convexPendingCount > 0) {
+          const convexResult = await convexOfflineQueue.syncAll(async (mutation) => {
+            try {
+              // convexClient.mutation() accepts a FunctionReference or a path string.
+              // The mutationPath stored in the queue is the Convex function's _name
+              // (e.g. "appointments:mutations:bookAppointment").
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (convexClient as any).mutation(mutation.mutationPath, mutation.args);
+              return true;
+            } catch (error) {
+              console.error('[App] Failed to sync Convex mutation:', mutation.id, error);
+              return false;
+            }
+          });
+          // eslint-disable-next-line no-console
+          console.log('[App] Convex mutation sync complete:', convexResult);
+        }
+
+        // ── 3. Invalidate all TanStack Query caches so stale UI refreshes ───
+        if (restPendingCount > 0 || convexPendingCount > 0) {
           queryClient.invalidateQueries();
         }
 
@@ -76,7 +103,7 @@ function AppContent() {
 
       syncPendingActions();
     }
-  }, [isOffline, wasOffline, acknowledgeOnline]);
+  }, [isOffline, wasOffline, acknowledgeOnline, convexClient]);
 
   const handleRetry = useCallback(() => {
     queryClient.invalidateQueries();
@@ -103,11 +130,13 @@ function AppContent() {
 /**
  * Root Layout Component
  *
- * Performance optimizations included:
+ * Features:
  * - Sentry error tracking and performance monitoring initialized
- * - Query client with optimized cache settings
+ * - PersistQueryClientProvider: TanStack Query cache persisted to MMKV and
+ *   restored on app launch (offline-first data access)
  * - Error boundary for graceful error handling
- * - Offline support with automatic sync when back online
+ * - Offline support: REST + Convex mutations queued offline and replayed on
+ *   reconnect; all query caches invalidated afterwards
  */
 export default function RootLayout() {
   useEffect(() => {
@@ -147,11 +176,19 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ConvexProviderWrapper>
           <JotaiProvider>
-            <QueryClientProvider client={queryClient}>
+            <PersistQueryClientProvider
+              client={queryClient}
+              persistOptions={{
+                persister: queryClientPersister,
+                // Cache is valid for 24 hours
+                maxAge: 1000 * 60 * 60 * 24,
+                buster: '1',
+              }}
+            >
               <StripeProviderWrapper>
                 <AppContent />
               </StripeProviderWrapper>
-            </QueryClientProvider>
+            </PersistQueryClientProvider>
           </JotaiProvider>
         </ConvexProviderWrapper>
       </SafeAreaProvider>

@@ -14,16 +14,17 @@ export const queryClient = new QueryClient({
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
       // Refetch on window focus
       refetchOnWindowFocus: true,
-      // Don't refetch on reconnect by default (can be overridden per query)
-      refetchOnReconnect: false,
-      // Network mode
-      networkMode: 'online',
+      // Refetch stale queries when connectivity is restored
+      refetchOnReconnect: 'always',
+      // offlineFirst: serve cached data immediately, fetch in background
+      networkMode: 'offlineFirst',
     },
     mutations: {
-      // Retry mutations once
+      // Retry mutations once on failure
       retry: 1,
-      // Network mode for mutations
-      networkMode: 'online',
+      // offlineFirst allows mutations to be submitted while offline;
+      // they will be paused and retried when connectivity is restored
+      networkMode: 'offlineFirst',
     },
   },
 });

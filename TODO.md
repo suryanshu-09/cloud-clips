@@ -338,10 +338,10 @@ A phased approach to building the complete Cloud Clips application with Convex +
 - [ ] Query optimization
 
 ### 11.3 Offline Support
-- [ ] Persistent cache (MMKV)
-- [ ] Optimistic updates
-- [ ] Queue mutations offline
-- [ ] Sync on reconnect
+- [x] Persistent cache (MMKV)
+- [x] Optimistic updates
+- [x] Queue mutations offline
+- [x] Sync on reconnect
 
 ### 11.4 Accessibility
 - [ ] Screen reader labels

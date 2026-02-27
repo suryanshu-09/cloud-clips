@@ -13,6 +13,135 @@ interface IPendingAction {
 const PENDING_ACTIONS_KEY = 'offline_pending_actions';
 const MAX_RETRIES = 3;
 
+// ---------------------------------------------------------------------------
+// Convex pending mutations queue
+// ---------------------------------------------------------------------------
+
+export interface IConvexPendingMutation {
+  /** Unique id generated at queue time */
+  id: string;
+  /** Human-readable label, e.g. 'bookAppointment' */
+  type: string;
+  /** Serialised Convex mutation path, e.g. 'appointments:mutations:bookAppointment' */
+  mutationPath: string;
+  /** Arguments to pass to the mutation when replaying */
+  args: unknown;
+  createdAt: number;
+  retryCount: number;
+}
+
+const CONVEX_PENDING_MUTATIONS_KEY = 'offline_convex_pending_mutations';
+
+/**
+ * Offline queue specifically for Convex mutations.
+ * Mutations are stored in MMKV and replayed when connectivity is restored.
+ */
+export const convexOfflineQueue = {
+  /**
+   * Enqueue a Convex mutation to be replayed when back online.
+   * Returns the generated action id.
+   */
+  enqueue: (mutation: Omit<IConvexPendingMutation, 'id' | 'createdAt' | 'retryCount'>): string => {
+    const queue =
+      storageHelpers.getObject<IConvexPendingMutation[]>(CONVEX_PENDING_MUTATIONS_KEY) || [];
+
+    const entry: IConvexPendingMutation = {
+      ...mutation,
+      id: `convex_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: Date.now(),
+      retryCount: 0,
+    };
+
+    queue.push(entry);
+    storageHelpers.setObject(CONVEX_PENDING_MUTATIONS_KEY, queue);
+    console.log('[ConvexOfflineQueue] Enqueued mutation:', entry.type, entry.id);
+    return entry.id;
+  },
+
+  /** Return all pending Convex mutations. */
+  getAll: (): IConvexPendingMutation[] => {
+    return storageHelpers.getObject<IConvexPendingMutation[]>(CONVEX_PENDING_MUTATIONS_KEY) || [];
+  },
+
+  /** Number of pending Convex mutations. */
+  getCount: (): number => {
+    return convexOfflineQueue.getAll().length;
+  },
+
+  /** Remove a successfully replayed mutation from the queue. */
+  remove: (id: string): void => {
+    const queue =
+      storageHelpers.getObject<IConvexPendingMutation[]>(CONVEX_PENDING_MUTATIONS_KEY) || [];
+    storageHelpers.setObject(
+      CONVEX_PENDING_MUTATIONS_KEY,
+      queue.filter((m) => m.id !== id)
+    );
+    console.log('[ConvexOfflineQueue] Removed mutation:', id);
+  },
+
+  /**
+   * Increment the retry count.  Returns `false` if max retries exceeded (entry is removed).
+   */
+  incrementRetry: (id: string): boolean => {
+    const queue =
+      storageHelpers.getObject<IConvexPendingMutation[]>(CONVEX_PENDING_MUTATIONS_KEY) || [];
+    const idx = queue.findIndex((m) => m.id === id);
+    if (idx === -1) return false;
+
+    queue[idx].retryCount += 1;
+
+    if (queue[idx].retryCount >= MAX_RETRIES) {
+      console.log('[ConvexOfflineQueue] Max retries exceeded, discarding:', id);
+      queue.splice(idx, 1);
+      storageHelpers.setObject(CONVEX_PENDING_MUTATIONS_KEY, queue);
+      return false;
+    }
+
+    storageHelpers.setObject(CONVEX_PENDING_MUTATIONS_KEY, queue);
+    return true;
+  },
+
+  /** Clear the entire Convex mutation queue. */
+  clearAll: (): void => {
+    storageHelpers.delete(CONVEX_PENDING_MUTATIONS_KEY);
+    console.log('[ConvexOfflineQueue] Cleared all pending Convex mutations');
+  },
+
+  /**
+   * Replay all queued Convex mutations using the provided executor function.
+   * The executor receives each pending mutation and should return `true` on success.
+   */
+  syncAll: async (
+    executor: (mutation: IConvexPendingMutation) => Promise<boolean>
+  ): Promise<{ success: number; failed: number }> => {
+    const queue = convexOfflineQueue.getAll();
+    let success = 0;
+    let failed = 0;
+
+    console.log('[ConvexOfflineQueue] Starting sync of', queue.length, 'mutations');
+
+    for (const mutation of queue) {
+      try {
+        const ok = await executor(mutation);
+        if (ok) {
+          convexOfflineQueue.remove(mutation.id);
+          success++;
+        } else {
+          const shouldRetry = convexOfflineQueue.incrementRetry(mutation.id);
+          if (!shouldRetry) failed++;
+        }
+      } catch (err) {
+        console.error('[ConvexOfflineQueue] Error replaying mutation:', mutation.id, err);
+        const shouldRetry = convexOfflineQueue.incrementRetry(mutation.id);
+        if (!shouldRetry) failed++;
+      }
+    }
+
+    console.log('[ConvexOfflineQueue] Sync complete:', { success, failed });
+    return { success, failed };
+  },
+};
+
 /**
  * Offline sync service for managing pending actions when offline
  * Queues actions when offline and syncs them when back online

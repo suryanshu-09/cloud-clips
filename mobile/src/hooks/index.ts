@@ -14,3 +14,7 @@ export { useLocation } from './useLocation';
 export { useCurrentLocation } from './useCurrentLocation';
 export { useReverseGeocoding } from './useReverseGeocoding';
 export { useAddressAutocomplete } from './useAddressAutocomplete';
+export { useOptimisticMutation } from './useOptimisticMutation';
+export { useOfflineConvexMutation } from './useOfflineConvexMutation';
+export type { IOptimisticMutationOptions, OptimisticUpdater } from './useOptimisticMutation';
+export type { IOfflineConvexMutationOptions, ConvexMutationStatus } from './useOfflineConvexMutation';
