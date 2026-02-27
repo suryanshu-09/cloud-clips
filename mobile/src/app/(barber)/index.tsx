@@ -1,91 +1,314 @@
-import { ScrollView, Text, View, Pressable } from 'react-native';
+import { useState, useCallback } from 'react';
+import {
+  ScrollView,
+  Text,
+  View,
+  Pressable,
+  Switch,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Card, Button } from '@/components/ui';
 import { EarningsChart } from '@/components/barber';
+import { useBarberDashboard } from '@/features/dashboard/hooks/useBarberDashboard';
 
-// Mock data - replace with real data from API
-const MOCK_WEEKLY_EARNINGS = [
-  { label: 'Mon', value: 120 },
-  { label: 'Tue', value: 180 },
-  { label: 'Wed', value: 240 },
-  { label: 'Thu', value: 160 },
-  { label: 'Fri', value: 280 },
-  { label: 'Sat', value: 320 },
-  { label: 'Sun', value: 200 },
-];
+// Format a timestamp to "h:mm AM/PM"
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  let hours = d.getUTCHours();
+  const minutes = d.getUTCMinutes();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${hours}:${String(minutes).padStart(2, '0')} ${ampm}`;
+}
 
-const MOCK_STATS = {
-  todayAppointments: 5,
-  upcomingAppointments: 12,
-  completedThisWeek: 18,
-  weeklyEarnings: 1500,
-  pendingReviews: 3,
-  totalReviews: 127,
-  rating: 4.8,
+// Format cents as "$X.XX"
+function formatCurrency(cents: number): string {
+  return `$${(cents / 100).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-yellow-100',
+  confirmed: 'bg-blue-100',
+  in_progress: 'bg-green-100',
+  completed: 'bg-gray-100',
+  cancelled: 'bg-red-100',
+  no_show: 'bg-red-100',
+};
+
+const STATUS_TEXT_COLORS: Record<string, string> = {
+  pending: 'text-yellow-700',
+  confirmed: 'text-blue-700',
+  in_progress: 'text-green-700',
+  completed: 'text-gray-700',
+  cancelled: 'text-red-700',
+  no_show: 'text-red-700',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  no_show: 'No Show',
 };
 
 export default function BarberDashboardScreen() {
   const router = useRouter();
+  const {
+    todayAppointments,
+    todayCount,
+    upcomingCount,
+    pendingCount,
+    completedThisWeek,
+    weeklyEarningsData,
+    weeklyEarningsTotal,
+    averageRating,
+    totalReviews,
+    isAvailable,
+    toggleAvailability,
+    isLoading,
+  } = useBarberDashboard();
+
+  const [isToggling, setIsToggling] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleToggleAvailability = useCallback(
+    async (value: boolean) => {
+      if (isToggling) return;
+      setIsToggling(true);
+      try {
+        await toggleAvailability(value);
+      } catch (error) {
+        console.error('Failed to toggle availability:', error);
+      } finally {
+        setIsToggling(false);
+      }
+    },
+    [toggleAvailability, isToggling]
+  );
+
+  // Convex queries are reactive; this just simulates a visual refresh indicator
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    // Give Convex a moment to settle (data is already reactive)
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    setRefreshing(false);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-gray-50 items-center justify-center">
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text className="text-gray-600 mt-4">Loading dashboard...</Text>
+      </View>
+    );
+  }
+
+  const chartTotal = weeklyEarningsTotal; // cents
+  const chartTotalDollars = chartTotal / 100;
+
+  // EarningsChart expects dollar values, convert from cents
+  const chartData = weeklyEarningsData.map((d) => ({
+    label: d.label,
+    value: Math.round(d.value / 100),
+  }));
 
   return (
     <View className="flex-1 bg-gray-50">
       {/* Header */}
-      <View className="bg-white p-6 border-b border-gray-200">
-        <Text className="text-3xl font-bold text-gray-900 mb-2">Dashboard</Text>
-        <Text className="text-gray-600">Welcome back! Here's your overview</Text>
+      <View className="bg-white px-6 pt-6 pb-4 border-b border-gray-200">
+        <View className="flex-row items-center justify-between">
+          <View>
+            <Text className="text-3xl font-bold text-gray-900">Dashboard</Text>
+            <Text className="text-gray-500 mt-1">Here's your overview</Text>
+          </View>
+
+          {/* Availability Toggle */}
+          <View className="items-center gap-1">
+            <View className="flex-row items-center gap-2">
+              {isToggling ? (
+                <ActivityIndicator size="small" color="#3B82F6" />
+              ) : (
+                <Switch
+                  value={isAvailable}
+                  onValueChange={handleToggleAvailability}
+                  trackColor={{ false: '#D1D5DB', true: '#BFDBFE' }}
+                  thumbColor={isAvailable ? '#3B82F6' : '#9CA3AF'}
+                />
+              )}
+            </View>
+            <Text
+              className={`text-xs font-semibold ${
+                isAvailable ? 'text-blue-600' : 'text-gray-500'
+              }`}
+            >
+              {isAvailable ? 'Available' : 'Unavailable'}
+            </Text>
+          </View>
+        </View>
       </View>
 
-      <ScrollView className="flex-1">
-        <View className="p-6 space-y-4">
-          {/* Quick Stats Grid */}
+      <ScrollView
+        className="flex-1"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="p-6 gap-4">
+          {/* Quick Stats Cards */}
           <View className="flex-row gap-3">
-            <Card className="flex-1 p-4">
-              <Text className="text-2xl font-bold text-gray-900">
-                {MOCK_STATS.todayAppointments}
-              </Text>
-              <Text className="text-sm text-gray-600 mt-1">Today</Text>
+            <Card className="flex-1 p-4 items-center">
+              <Text className="text-2xl font-bold text-gray-900">{todayCount}</Text>
+              <Text className="text-xs text-gray-500 mt-1 text-center">Today</Text>
             </Card>
-            <Card className="flex-1 p-4">
-              <Text className="text-2xl font-bold text-blue-600">
-                {MOCK_STATS.upcomingAppointments}
-              </Text>
-              <Text className="text-sm text-gray-600 mt-1">Upcoming</Text>
+            <Card className="flex-1 p-4 items-center">
+              <Text className="text-2xl font-bold text-blue-600">{upcomingCount}</Text>
+              <Text className="text-xs text-gray-500 mt-1 text-center">Upcoming</Text>
             </Card>
-            <Card className="flex-1 p-4">
-              <Text className="text-2xl font-bold text-green-600">
-                {MOCK_STATS.completedThisWeek}
-              </Text>
-              <Text className="text-sm text-gray-600 mt-1">This Week</Text>
+            <Card className="flex-1 p-4 items-center">
+              <Text className="text-2xl font-bold text-green-600">{completedThisWeek}</Text>
+              <Text className="text-xs text-gray-500 mt-1 text-center">This Week</Text>
+            </Card>
+            <Card className="flex-1 p-4 items-center">
+              <Text className="text-2xl font-bold text-yellow-600">{pendingCount}</Text>
+              <Text className="text-xs text-gray-500 mt-1 text-center">Pending</Text>
             </Card>
           </View>
 
-          {/* Earnings Chart */}
+          {/* Weekly Earnings Chart */}
           <EarningsChart
-            data={MOCK_WEEKLY_EARNINGS}
-            total={MOCK_STATS.weeklyEarnings}
+            data={chartData}
+            total={chartTotalDollars}
             period="week"
           />
+
+          {/* Today's Appointments Widget */}
+          <Card className="p-4">
+            <View className="flex-row items-center justify-between mb-3">
+              <Text className="text-lg font-semibold text-gray-900">
+                Today's Appointments
+              </Text>
+              <Pressable onPress={() => router.push('/(barber)/appointments')}>
+                <Text className="text-sm text-blue-600 font-medium">See all</Text>
+              </Pressable>
+            </View>
+
+            {todayAppointments.length === 0 ? (
+              <View className="py-6 items-center">
+                <Text className="text-3xl mb-2">📅</Text>
+                <Text className="text-gray-500 text-sm">No appointments today</Text>
+              </View>
+            ) : (
+              <View className="gap-3">
+                {todayAppointments.map((apt) => (
+                  <Pressable
+                    key={apt._id}
+                    onPress={() => router.push(`/(barber)/appointments/${apt._id}`)}
+                    className="flex-row items-center gap-3 p-3 bg-gray-50 rounded-xl active:bg-gray-100"
+                  >
+                    {/* Time */}
+                    <View className="w-16 items-center">
+                      <Text className="text-sm font-bold text-gray-900">
+                        {formatTime(apt.scheduledFor)}
+                      </Text>
+                      <Text className="text-xs text-gray-400">{apt.duration}min</Text>
+                    </View>
+
+                    {/* Divider */}
+                    <View className="w-px h-10 bg-gray-200" />
+
+                    {/* Info */}
+                    <View className="flex-1">
+                      <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>
+                        {apt.clientName}
+                      </Text>
+                      <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+                        {apt.serviceName}
+                      </Text>
+                    </View>
+
+                    {/* Status badge */}
+                    <View
+                      className={`px-2 py-1 rounded-full ${STATUS_COLORS[apt.status] ?? 'bg-gray-100'}`}
+                    >
+                      <Text
+                        className={`text-xs font-medium ${STATUS_TEXT_COLORS[apt.status] ?? 'text-gray-700'}`}
+                      >
+                        {STATUS_LABELS[apt.status] ?? apt.status}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </Card>
+
+          {/* Performance Overview */}
+          <Card className="p-4">
+            <Text className="text-lg font-semibold text-gray-900 mb-4">Performance</Text>
+            <View className="gap-3">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-xl">⭐</Text>
+                  <Text className="text-base text-gray-700">Rating</Text>
+                </View>
+                <View className="flex-row items-center gap-1">
+                  <Text className="text-lg font-bold text-gray-900">
+                    {averageRating > 0 ? averageRating.toFixed(1) : '—'}
+                  </Text>
+                  <Text className="text-sm text-gray-400">
+                    ({totalReviews} review{totalReviews !== 1 ? 's' : ''})
+                  </Text>
+                </View>
+              </View>
+
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-xl">💰</Text>
+                  <Text className="text-base text-gray-700">This Week (net)</Text>
+                </View>
+                <Text className="text-lg font-bold text-green-600">
+                  {formatCurrency(weeklyEarningsTotal)}
+                </Text>
+              </View>
+
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-xl">✂️</Text>
+                  <Text className="text-base text-gray-700">Completed</Text>
+                </View>
+                <Text className="text-lg font-bold text-gray-900">{completedThisWeek}</Text>
+              </View>
+            </View>
+          </Card>
 
           {/* Quick Actions */}
           <Card className="p-4">
             <Text className="text-lg font-semibold text-gray-900 mb-3">Quick Actions</Text>
-            <View className="space-y-2">
+            <View className="gap-2">
               <Pressable
                 onPress={() => router.push('/(barber)/appointments')}
-                className="flex-row items-center justify-between p-3 bg-gray-50 rounded-lg active:bg-gray-100"
+                className="flex-row items-center justify-between p-3 bg-gray-50 rounded-xl active:bg-gray-100"
               >
                 <View className="flex-row items-center gap-3">
                   <View className="w-10 h-10 bg-blue-100 rounded-full items-center justify-center">
                     <Text className="text-xl">📅</Text>
                   </View>
-                  <Text className="text-base font-medium text-gray-900">Manage Appointments</Text>
+                  <Text className="text-base font-medium text-gray-900">
+                    Manage Appointments
+                  </Text>
                 </View>
-                <Text className="text-gray-400">›</Text>
+                <Text className="text-gray-400 text-lg">›</Text>
               </Pressable>
 
               <Pressable
                 onPress={() => router.push('/(barber)/schedule')}
-                className="flex-row items-center justify-between p-3 bg-gray-50 rounded-lg active:bg-gray-100"
+                className="flex-row items-center justify-between p-3 bg-gray-50 rounded-xl active:bg-gray-100"
               >
                 <View className="flex-row items-center gap-3">
                   <View className="w-10 h-10 bg-green-100 rounded-full items-center justify-center">
@@ -93,12 +316,12 @@ export default function BarberDashboardScreen() {
                   </View>
                   <Text className="text-base font-medium text-gray-900">Update Schedule</Text>
                 </View>
-                <Text className="text-gray-400">›</Text>
+                <Text className="text-gray-400 text-lg">›</Text>
               </Pressable>
 
               <Pressable
                 onPress={() => router.push('/(barber)/products')}
-                className="flex-row items-center justify-between p-3 bg-gray-50 rounded-lg active:bg-gray-100"
+                className="flex-row items-center justify-between p-3 bg-gray-50 rounded-xl active:bg-gray-100"
               >
                 <View className="flex-row items-center gap-3">
                   <View className="w-10 h-10 bg-purple-100 rounded-full items-center justify-center">
@@ -106,12 +329,12 @@ export default function BarberDashboardScreen() {
                   </View>
                   <Text className="text-base font-medium text-gray-900">Manage Products</Text>
                 </View>
-                <Text className="text-gray-400">›</Text>
+                <Text className="text-gray-400 text-lg">›</Text>
               </Pressable>
 
               <Pressable
                 onPress={() => router.push('/(barber)/profile')}
-                className="flex-row items-center justify-between p-3 bg-gray-50 rounded-lg active:bg-gray-100"
+                className="flex-row items-center justify-between p-3 bg-gray-50 rounded-xl active:bg-gray-100"
               >
                 <View className="flex-row items-center gap-3">
                   <View className="w-10 h-10 bg-orange-100 rounded-full items-center justify-center">
@@ -119,47 +342,12 @@ export default function BarberDashboardScreen() {
                   </View>
                   <Text className="text-base font-medium text-gray-900">Edit Profile</Text>
                 </View>
-                <Text className="text-gray-400">›</Text>
+                <Text className="text-gray-400 text-lg">›</Text>
               </Pressable>
             </View>
           </Card>
 
-          {/* Performance Overview */}
-          <Card className="p-4">
-            <Text className="text-lg font-semibold text-gray-900 mb-4">Performance</Text>
-            <View className="space-y-3">
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-2">
-                  <Text className="text-2xl">⭐</Text>
-                  <Text className="text-base text-gray-700">Rating</Text>
-                </View>
-                <View className="flex-row items-center gap-1">
-                  <Text className="text-lg font-bold text-gray-900">{MOCK_STATS.rating}</Text>
-                  <Text className="text-sm text-gray-500">({MOCK_STATS.totalReviews} reviews)</Text>
-                </View>
-              </View>
-
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-2">
-                  <Text className="text-2xl">💬</Text>
-                  <Text className="text-base text-gray-700">Pending Reviews</Text>
-                </View>
-                <Text className="text-lg font-bold text-gray-900">{MOCK_STATS.pendingReviews}</Text>
-              </View>
-
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-2">
-                  <Text className="text-2xl">💰</Text>
-                  <Text className="text-base text-gray-700">This Week</Text>
-                </View>
-                <Text className="text-lg font-bold text-green-600">
-                  ${MOCK_STATS.weeklyEarnings}
-                </Text>
-              </View>
-            </View>
-          </Card>
-
-          {/* Earnings Button */}
+          {/* Earnings CTA */}
           <Button variant="outline" onPress={() => router.push('/(barber)/earnings')}>
             View Detailed Earnings
           </Button>
