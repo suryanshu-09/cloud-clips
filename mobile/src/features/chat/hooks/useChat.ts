@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
-import { chatService } from '../services/chatService';
-import { IMessage, ISendMessageParams, ITypingStatus } from '../types';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
+import { IMessage, ISendMessageParams } from '../types';
 
 /**
  * useChat Hook
@@ -45,13 +47,23 @@ export const useChat = (
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [isTyping, setIsTypingState] = useState(false);
-  const [otherUserTyping, setOtherUserTyping] = useState(false);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load initial messages
+  const setTypingMutation = useMutation(api.messages.mutations.setTypingStatus);
+  const clearTypingMutation = useMutation(api.messages.mutations.clearTypingStatus);
+
+  const typingStatus = useQuery(
+    api.messages.queries.getTypingStatus,
+    conversationId ? { conversationId: conversationId as Id<'conversations'> } : 'skip'
+  );
+
+  const otherUserTyping = typingStatus && typingStatus.length > 0;
+
   const loadMessages = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
+      const { chatService } = await import('../services/chatService');
       const loadedMessages = await chatService.getMessages(conversationId, messageLimit);
       setMessages(loadedMessages);
     } catch (err) {
@@ -62,61 +74,86 @@ export const useChat = (
     }
   }, [conversationId, messageLimit]);
 
-  // Subscribe to real-time message updates
   useEffect(() => {
     if (!conversationId) return;
 
     const messageMap = new Map<string, IMessage>();
 
-    const unsubscribe = chatService.subscribeToMessages(conversationId, messageLimit, (update) => {
-      const { message } = update;
+    const loadAndSubscribe = async () => {
+      const { chatService } = await import('../services/chatService');
 
-      // Update message map
-      messageMap.set(message.id, message);
+      const unsubscribe = chatService.subscribeToMessages(
+        conversationId,
+        messageLimit,
+        (update) => {
+          const { message } = update;
 
-      // Convert to array and sort by timestamp
-      const sortedMessages = Array.from(messageMap.values()).sort(
-        (a, b) => a.createdAt - b.createdAt
+          messageMap.set(message.id, message);
+
+          const sortedMessages = Array.from(messageMap.values()).sort(
+            (a, b) => a.createdAt - b.createdAt
+          );
+
+          setMessages(sortedMessages);
+        }
       );
 
-      setMessages(sortedMessages);
+      loadMessages();
+
+      return unsubscribe;
+    };
+
+    let unsubscribe: (() => void) | undefined;
+    loadAndSubscribe().then((unsub) => {
+      unsubscribe = unsub;
     });
 
-    // Load initial messages
-    loadMessages();
-
     return () => {
-      unsubscribe();
+      if (unsubscribe) unsubscribe();
     };
   }, [conversationId, messageLimit, loadMessages]);
 
-  // Subscribe to typing status
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId || !isTyping) return;
 
-    const unsubscribe = chatService.subscribeToTypingStatus(
-      conversationId,
-      (status: ITypingStatus) => {
-        // Only show typing indicator for other users
-        if (status.userId !== currentUserId) {
-          setOtherUserTyping(status.isTyping);
-        }
+    const sendTypingStatus = async () => {
+      try {
+        await setTypingMutation({ conversationId: conversationId as Id<'conversations'> });
+      } catch (err) {
+        console.error('[useChat] Error setting typing status:', err);
       }
-    );
+    };
+
+    sendTypingStatus();
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(async () => {
+      try {
+        await clearTypingMutation({ conversationId: conversationId as Id<'conversations'> });
+      } catch (err) {
+        console.error('[useChat] Error clearing typing status:', err);
+      }
+    }, 4000);
 
     return () => {
-      unsubscribe();
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
     };
-  }, [conversationId, currentUserId]);
+  }, [conversationId, isTyping, setTypingMutation, clearTypingMutation]);
 
-  // Send typing status when isTyping changes
   useEffect(() => {
-    if (conversationId && currentUserId) {
-      chatService.setTypingStatus(conversationId, currentUserId, isTyping).catch((err) => {
-        console.error('[useChat] Error setting typing status:', err);
-      });
-    }
-  }, [conversationId, currentUserId, isTyping]);
+    return () => {
+      if (conversationId) {
+        clearTypingMutation({ conversationId: conversationId as Id<'conversations'> }).catch(
+          () => {}
+        );
+      }
+    };
+  }, []);
 
   /**
    * Send a new message
@@ -135,40 +172,43 @@ export const useChat = (
           imageUrl,
         };
 
-        // Optimistic update
         const optimisticMessage: IMessage = {
           id: `temp-${Date.now()}`,
+          _id: `temp-${Date.now()}`,
           conversationId,
           senderId: currentUserId,
-          receiverId: '', // Will be set by service
+          receiverId: '',
           content: params.content,
           type,
           imageUrl,
           createdAt: Date.now(),
           updatedAt: Date.now(),
+          readBy: [],
           read: false,
           status: 'sending',
         };
 
         setMessages((prev) => [...prev, optimisticMessage]);
 
-        // Send message
+        const { chatService } = await import('../services/chatService');
         const messageId = await chatService.sendMessage(params, currentUserId);
 
-        // Update optimistic message with real ID
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === optimisticMessage.id ? { ...msg, id: messageId, status: 'sent' } : msg
+            msg.id === optimisticMessage.id
+              ? { ...msg, id: messageId, _id: messageId, status: 'sent' }
+              : msg
           )
         );
 
-        // Clear typing status after sending
         setIsTypingState(false);
+        await clearTypingMutation({ conversationId: conversationId as Id<'conversations'> }).catch(
+          () => {}
+        );
       } catch (err) {
         console.error('[useChat] Error sending message:', err);
         setError(err as Error);
 
-        // Mark optimistic message as failed
         setMessages((prev) =>
           prev.map((msg) => (msg.status === 'sending' ? { ...msg, status: 'failed' } : msg))
         );
@@ -176,7 +216,7 @@ export const useChat = (
         throw err;
       }
     },
-    [conversationId, currentUserId]
+    [conversationId, currentUserId, clearTypingMutation]
   );
 
   /**
@@ -184,6 +224,7 @@ export const useChat = (
    */
   const markAsRead = useCallback(async () => {
     try {
+      const { chatService } = await import('../services/chatService');
       await chatService.markAsRead({
         conversationId,
         userId: currentUserId,

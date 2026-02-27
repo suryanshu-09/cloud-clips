@@ -81,3 +81,7 @@ Deploy to production:
 ```bash
 npm run deploy
 ```
+
+## Deployment Guide
+
+For detailed deployment instructions, environment variable setup, and OAuth configuration, see [DEPLOYMENT.md](./DEPLOYMENT.md).

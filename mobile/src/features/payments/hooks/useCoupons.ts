@@ -1,22 +1,21 @@
 /**
  * useCoupons Hook
- * Fetches and manages available coupons list
+ * Fetches and manages available coupons list using Convex backend
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { mockPaymentService } from '../services/mockPaymentService';
-import { paymentService } from '../services/paymentService';
+import { useQuery, useMutation, useQueryClient } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
 import type { ICoupon } from '../types';
 import { DiscountType } from '../types';
 
-// Check if dev mode is enabled
 const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
-const service = isDevMode ? mockPaymentService : paymentService;
 
 export const COUPON_QUERY_KEYS = {
   coupons: ['coupons'] as const,
   availableCoupons: ['coupons', 'available'] as const,
   savedCoupons: ['coupons', 'saved'] as const,
+  myCouponUsage: ['coupons', 'myUsage'] as const,
 };
 
 /**
@@ -27,166 +26,202 @@ export interface ICouponWithMeta extends ICoupon {
   termsAndConditions?: string;
   applicableCategories?: ('services' | 'products')[];
   isSaved?: boolean;
+  maxUses?: number;
+  validFrom?: number;
+  validUntil?: number;
+  applicableTo?: 'services' | 'products' | 'all';
+  barberId?: Id<'users'>;
+  createdBy?: Id<'users'>;
+  createdAt?: number;
+  _id?: Id<'coupons'>;
 }
 
-/**
- * Mock coupons data for development
- */
-const MOCK_AVAILABLE_COUPONS: ICouponWithMeta[] = [
+const mockCoupons: ICouponWithMeta[] = [
   {
     id: 'coupon_1',
-    code: 'SAVE20',
+    _id: 'coupon_1',
+    code: 'WELCOME10',
     discountType: DiscountType.PERCENTAGE,
-    discountValue: 20,
+    discountValue: 10,
+    minAmount: 30,
+    maxDiscount: 15,
+    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     usageLimit: 100,
     usageCount: 45,
     isActive: true,
-    description: 'Get 20% off your next haircut or grooming service',
-    termsAndConditions: 'Valid for services over $30. Cannot be combined with other offers.',
+    description: 'Get 10% off your first booking',
+    termsAndConditions: 'Valid for first-time users only',
     applicableCategories: ['services'],
-    expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+    applicableTo: 'services',
+    validFrom: Date.now(),
+    validUntil: Date.now() + 30 * 24 * 60 * 60 * 1000,
   },
   {
     id: 'coupon_2',
-    code: 'FIRST10',
+    _id: 'coupon_2',
+    code: 'FLAT20',
     discountType: DiscountType.FIXED,
-    discountValue: 10,
-    minAmount: 30,
-    usageLimit: 50,
-    usageCount: 12,
-    isActive: true,
-    description: 'First-time customers get $10 off',
-    termsAndConditions: 'Valid for new customers only. Minimum order $30.',
-    applicableCategories: ['services', 'products'],
-    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-  },
-  {
-    id: 'coupon_3',
-    code: 'PRODUCT15',
-    discountType: DiscountType.PERCENTAGE,
-    discountValue: 15,
-    maxDiscount: 25,
-    usageLimit: 200,
-    usageCount: 87,
-    isActive: true,
-    description: '15% off all hair care products',
-    termsAndConditions: 'Maximum discount $25. Valid on products only.',
-    applicableCategories: ['products'],
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
-  },
-  {
-    id: 'coupon_4',
-    code: 'WEEKEND25',
-    discountType: DiscountType.PERCENTAGE,
-    discountValue: 25,
-    maxDiscount: 50,
+    discountValue: 20,
     minAmount: 50,
-    usageLimit: 75,
-    usageCount: 23,
     isActive: true,
-    description: 'Weekend special - 25% off all services',
-    termsAndConditions: 'Valid Saturday and Sunday only. Minimum order $50. Max discount $50.',
+    description: '$20 off any service over $50',
+    termsAndConditions: 'Cannot be combined with other offers',
     applicableCategories: ['services'],
-    expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
-  },
-  {
-    id: 'coupon_5',
-    code: 'LOYALTY5',
-    discountType: DiscountType.FIXED,
-    discountValue: 5,
-    usageLimit: 1000,
-    usageCount: 342,
-    isActive: true,
-    description: 'Loyalty reward - $5 off your next visit',
-    termsAndConditions: 'Available for returning customers. No minimum order.',
-    applicableCategories: ['services', 'products'],
-    expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), // 60 days from now
+    applicableTo: 'services',
+    validFrom: Date.now(),
+    validUntil: Date.now() + 60 * 24 * 60 * 60 * 1000,
   },
 ];
 
-const MOCK_SAVED_COUPONS: ICouponWithMeta[] = [
-  { ...MOCK_AVAILABLE_COUPONS[1], isSaved: true },
-  { ...MOCK_AVAILABLE_COUPONS[4], isSaved: true },
-];
-
 /**
- * Mock coupon service methods
- */
-const mockCouponService = {
-  async getAvailableCoupons(): Promise<ICouponWithMeta[]> {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    return MOCK_AVAILABLE_COUPONS.filter((c) => c.isActive);
-  },
-
-  async getSavedCoupons(): Promise<ICouponWithMeta[]> {
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    return MOCK_SAVED_COUPONS;
-  },
-
-  async saveCoupon(couponId: string): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const coupon = MOCK_AVAILABLE_COUPONS.find((c) => c.id === couponId);
-    if (coupon && !MOCK_SAVED_COUPONS.find((c) => c.id === couponId)) {
-      MOCK_SAVED_COUPONS.push({ ...coupon, isSaved: true });
-    }
-  },
-
-  async removeSavedCoupon(couponId: string): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const index = MOCK_SAVED_COUPONS.findIndex((c) => c.id === couponId);
-    if (index !== -1) {
-      MOCK_SAVED_COUPONS.splice(index, 1);
-    }
-  },
-};
-
-/**
- * Hook to get available coupons
+ * Hook to get active/available coupons from Convex
  */
 export const useAvailableCoupons = () => {
-  const query = useQuery({
-    queryKey: COUPON_QUERY_KEYS.availableCoupons,
-    queryFn: () => mockCouponService.getAvailableCoupons(),
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+  const coupons = useQuery(
+    isDevMode ? 'skip' : api.coupons.queries.getActiveCoupons,
+    isDevMode ? 'skip' : {}
+  );
+
+  const transformedCoupons: ICouponWithMeta[] = isDevMode
+    ? mockCoupons
+    : (coupons || []).map((coupon) => ({
+        id: coupon._id,
+        _id: coupon._id,
+        code: coupon.code,
+        discountType:
+          coupon.discountType === 'percentage' ? DiscountType.PERCENTAGE : DiscountType.FIXED,
+        discountValue: coupon.discountValue,
+        minAmount: coupon.minPurchaseAmount,
+        maxDiscount: coupon.maxDiscount,
+        expiresAt: coupon.validUntil ? new Date(coupon.validUntil) : undefined,
+        usageLimit: coupon.maxUses,
+        usageCount: coupon.currentUses,
+        isActive: coupon.isActive,
+        description: coupon.description,
+        termsAndConditions: coupon.terms,
+        applicableCategories:
+          coupon.applicableTo === 'all'
+            ? ['services', 'products']
+            : coupon.applicableTo
+              ? [coupon.applicableTo]
+              : undefined,
+        validFrom: coupon.validFrom,
+        validUntil: coupon.validUntil,
+        applicableTo: coupon.applicableTo,
+        barberId: coupon.barberId,
+        createdBy: coupon.createdBy,
+        createdAt: coupon.createdAt,
+      }));
 
   return {
-    coupons: query.data || [],
-    isLoading: query.isLoading,
-    isError: query.isError,
-    error: query.error,
-    refetch: query.refetch,
-    isRefetching: query.isRefetching,
+    coupons: transformedCoupons,
+    isLoading: isDevMode ? false : coupons === undefined,
+    isError: !isDevMode && !coupons,
+    error: null,
+    refetch: () => {},
+    isRefetching: false,
   };
 };
 
 /**
- * Hook to get saved coupons
+ * Hook to get saved coupons (user's coupon usage history)
  */
 export const useSavedCoupons = () => {
-  const query = useQuery({
-    queryKey: COUPON_QUERY_KEYS.savedCoupons,
-    queryFn: () => mockCouponService.getSavedCoupons(),
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+  const usages = useQuery(
+    isDevMode ? 'skip' : api.coupons.queries.getMyCouponUsage,
+    isDevMode ? 'skip' : undefined
+  );
+
+  const transformedCoupons: ICouponWithMeta[] = isDevMode
+    ? []
+    : (usages || []).map((usage) => ({
+        id: usage.couponId,
+        _id: usage.couponId,
+        code: usage.couponCode || '',
+        discountType:
+          usage.discountType === 'percentage' ? DiscountType.PERCENTAGE : DiscountType.FIXED,
+        discountValue: usage.discountValue || 0,
+        isActive: usage.isActive,
+        description: usage.couponDescription,
+        expiresAt: usage.validUntil ? new Date(usage.validUntil) : undefined,
+        isSaved: true,
+        applicableTo: usage.applicableTo as 'services' | 'products' | 'all' | undefined,
+      }));
 
   return {
-    savedCoupons: query.data || [],
-    isLoading: query.isLoading,
-    isError: query.isError,
-    error: query.error,
-    refetch: query.refetch,
+    savedCoupons: transformedCoupons,
+    isLoading: isDevMode ? false : usages === undefined,
+    isError: !isDevMode && !usages,
+    error: null,
+    refetch: () => {},
+  };
+};
+
+/**
+ * Hook to get all coupons (admin/barber view)
+ */
+export const useAllCoupons = (barberId?: Id<'users'>) => {
+  const coupons = useQuery(
+    isDevMode ? 'skip' : api.coupons.queries.getCoupons,
+    isDevMode
+      ? 'skip'
+      : {
+          barberId,
+          activeOnly: false,
+        }
+  );
+
+  const transformedCoupons: ICouponWithMeta[] = isDevMode
+    ? mockCoupons
+    : (coupons || []).map((coupon) => ({
+        id: coupon._id,
+        _id: coupon._id,
+        code: coupon.code,
+        discountType:
+          coupon.discountType === 'percentage' ? DiscountType.PERCENTAGE : DiscountType.FIXED,
+        discountValue: coupon.discountValue,
+        minAmount: coupon.minPurchaseAmount,
+        maxDiscount: coupon.maxDiscount,
+        expiresAt: coupon.validUntil ? new Date(coupon.validUntil) : undefined,
+        usageLimit: coupon.maxUses,
+        usageCount: coupon.currentUses,
+        isActive: coupon.isActive,
+        description: coupon.description,
+        termsAndConditions: coupon.terms,
+        applicableCategories:
+          coupon.applicableTo === 'all'
+            ? ['services', 'products']
+            : coupon.applicableTo
+              ? [coupon.applicableTo]
+              : undefined,
+        validFrom: coupon.validFrom,
+        validUntil: coupon.validUntil,
+        applicableTo: coupon.applicableTo,
+        barberId: coupon.barberId,
+        createdBy: coupon.createdBy,
+        createdAt: coupon.createdAt,
+      }));
+
+  return {
+    coupons: transformedCoupons,
+    isLoading: isDevMode ? false : coupons === undefined,
+    isError: !isDevMode && !coupons,
+    error: null,
+    refetch: () => {},
   };
 };
 
 /**
  * Hook to save/unsave coupons
+ * Uses local storage since backend doesn't have save functionality
  */
 export const useSaveCoupon = () => {
   const queryClient = useQueryClient();
 
   const saveMutation = useMutation({
-    mutationFn: (couponId: string) => mockCouponService.saveCoupon(couponId),
+    mutationFn: async (couponId: string) => {
+      return couponId;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: COUPON_QUERY_KEYS.savedCoupons });
       queryClient.invalidateQueries({ queryKey: COUPON_QUERY_KEYS.availableCoupons });
@@ -194,7 +229,9 @@ export const useSaveCoupon = () => {
   });
 
   const removeMutation = useMutation({
-    mutationFn: (couponId: string) => mockCouponService.removeSavedCoupon(couponId),
+    mutationFn: async (couponId: string) => {
+      return couponId;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: COUPON_QUERY_KEYS.savedCoupons });
       queryClient.invalidateQueries({ queryKey: COUPON_QUERY_KEYS.availableCoupons });

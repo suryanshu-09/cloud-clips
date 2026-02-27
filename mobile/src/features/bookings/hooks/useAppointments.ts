@@ -1,121 +1,156 @@
 /**
  * useAppointments Hook
- * Fetches and manages user appointments
+ * Fetches and manages user appointments via Convex queries.
+ *
+ * Convex queries are reactive — they automatically re-run when
+ * underlying data changes, so there is no need for manual refetch
+ * or stale-time configuration.
  */
 
-import { useQuery } from '@tanstack/react-query';
-import { bookingService } from '../services/bookingService';
-import type { AppointmentWithDetails, BookingFilters } from '../types';
-import { BOOKING_QUERY_KEYS } from './useBooking';
+import { useMemo, useState, useEffect } from 'react';
 
-interface UseAppointmentsOptions {
-  filters?: BookingFilters;
+import { useQuery } from 'convex/react';
+
+import { api } from '@convex/_generated/api';
+import type { Id } from '@convex/_generated/dataModel';
+import type { AppointmentStatus } from '../types';
+import { mockBookingService } from '../services/mockBookingService';
+
+const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
+
+export { BOOKING_QUERY_KEYS } from './useBooking';
+
+interface IUseAppointmentsOptions {
+  status?: AppointmentStatus;
   enabled?: boolean;
-  refetchInterval?: number;
 }
 
-export const useAppointments = (options?: UseAppointmentsOptions) => {
-  const { filters, enabled = true, refetchInterval } = options || {};
+export const useAppointments = (options?: IUseAppointmentsOptions) => {
+  const { status, enabled = true } = options || {};
 
-  const query = useQuery({
-    queryKey: [...BOOKING_QUERY_KEYS.myAppointments, filters],
-    queryFn: () => bookingService.getMyAppointments(filters),
-    enabled,
-    refetchInterval,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+  const appointmentsData = useQuery(
+    api.appointments.queries.getMyAppointments,
+    isDevMode || !enabled ? 'skip' : { status }
+  );
+
+  const [mockAppointments, setMockAppointments] = useState<any[]>([]);
+  const [isLoadingMock, setIsLoadingMock] = useState(isDevMode);
+
+  useEffect(() => {
+    if (isDevMode && enabled) {
+      mockBookingService.getMyAppointments(status ? { status } : undefined).then((data) => {
+        setMockAppointments(data);
+        setIsLoadingMock(false);
+      });
+    }
+  }, [isDevMode, enabled, status]);
+
+  const appointments = useMemo(() => {
+    if (isDevMode) return mockAppointments;
+    return appointmentsData ?? [];
+  }, [appointmentsData, mockAppointments, isDevMode]);
 
   return {
-    appointments: query.data || [],
-    isLoading: query.isLoading,
-    isError: query.isError,
-    error: query.error,
-    refetch: query.refetch,
-    isRefetching: query.isRefetching,
+    appointments,
+    isLoading: isDevMode ? isLoadingMock : appointmentsData === undefined,
+    isError: false,
+    error: null,
   };
 };
 
-interface UseAppointmentOptions {
+interface IUseAppointmentOptions {
   enabled?: boolean;
 }
 
-export const useAppointment = (id: string, options?: UseAppointmentOptions) => {
+export const useAppointment = (
+  id: Id<'appointments'> | undefined,
+  options?: IUseAppointmentOptions
+) => {
   const { enabled = true } = options || {};
 
-  const query = useQuery({
-    queryKey: BOOKING_QUERY_KEYS.appointment(id),
-    queryFn: () => bookingService.getAppointmentById(id),
-    enabled: enabled && !!id,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+  const appointmentData = useQuery(
+    api.appointments.queries.getAppointmentById,
+    isDevMode || !enabled || !id ? 'skip' : { appointmentId: id }
+  );
+
+  const [mockAppointment, setMockAppointment] = useState<any | null>(null);
+  const [isLoadingMock, setIsLoadingMock] = useState(isDevMode);
+
+  useEffect(() => {
+    if (isDevMode && enabled && id) {
+      const appointmentId = typeof id === 'string' ? id : id.toString();
+      mockBookingService
+        .getAppointmentById(appointmentId)
+        .then((data) => {
+          setMockAppointment(data);
+          setIsLoadingMock(false);
+        })
+        .catch(() => {
+          setMockAppointment(null);
+          setIsLoadingMock(false);
+        });
+    }
+  }, [isDevMode, enabled, id]);
+
+  const appointment = useMemo(() => {
+    if (isDevMode) return mockAppointment;
+    return appointmentData ?? null;
+  }, [appointmentData, mockAppointment, isDevMode]);
 
   return {
-    appointment: query.data,
-    isLoading: query.isLoading,
-    isError: query.isError,
-    error: query.error,
-    refetch: query.refetch,
-  };
-};
-
-interface UseBarberAppointmentsOptions {
-  barberId: string;
-  filters?: BookingFilters;
-  enabled?: boolean;
-  refetchInterval?: number;
-}
-
-export const useBarberAppointments = (options: UseBarberAppointmentsOptions) => {
-  const { barberId, filters, enabled = true, refetchInterval } = options;
-
-  const query = useQuery({
-    queryKey: [...BOOKING_QUERY_KEYS.barberAppointments(barberId), filters],
-    queryFn: () => bookingService.getBarberAppointments(barberId, filters),
-    enabled: enabled && !!barberId,
-    refetchInterval,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
-
-  return {
-    appointments: query.data || [],
-    isLoading: query.isLoading,
-    isError: query.isError,
-    error: query.error,
-    refetch: query.refetch,
-    isRefetching: query.isRefetching,
+    appointment,
+    isLoading: isDevMode ? isLoadingMock : appointmentData === undefined,
+    isError: false,
+    error: null,
   };
 };
 
 /**
- * Hook to get upcoming appointments
+ * Hook that fetches all appointments and separates them into
+ * upcoming (pending/confirmed/in_progress) and past (completed/cancelled/no_show).
+ */
+export const useSortedAppointments = () => {
+  const { appointments, isLoading, isError, error } = useAppointments();
+
+  const { upcoming, past } = useMemo(() => {
+    const upcomingStatuses: AppointmentStatus[] = ['pending', 'confirmed', 'in_progress'];
+    const pastStatuses: AppointmentStatus[] = ['completed', 'cancelled', 'no_show'];
+
+    const upcomingList = appointments.filter((a) =>
+      upcomingStatuses.includes(a.status as AppointmentStatus)
+    );
+    const pastList = appointments.filter((a) =>
+      pastStatuses.includes(a.status as AppointmentStatus)
+    );
+
+    // Upcoming: soonest first (ascending scheduledFor)
+    upcomingList.sort((a, b) => a.scheduledFor - b.scheduledFor);
+    // Past: most recent first (descending scheduledFor)
+    pastList.sort((a, b) => b.scheduledFor - a.scheduledFor);
+
+    return { upcoming: upcomingList, past: pastList };
+  }, [appointments]);
+
+  return { upcoming, past, appointments, isLoading, isError, error };
+};
+
+/**
+ * Hook to get upcoming appointments (confirmed status)
  */
 export const useUpcomingAppointments = () => {
-  return useAppointments({
-    filters: {
-      status: 'confirmed',
-      startDate: new Date(),
-    },
-  });
+  return useAppointments({ status: 'confirmed' });
 };
 
 /**
- * Hook to get past appointments
+ * Hook to get past appointments (completed status)
  */
 export const usePastAppointments = () => {
-  return useAppointments({
-    filters: {
-      endDate: new Date(),
-    },
-  });
+  return useAppointments({ status: 'completed' });
 };
 
 /**
  * Hook to get pending appointments
  */
 export const usePendingAppointments = () => {
-  return useAppointments({
-    filters: {
-      status: 'pending',
-    },
-  });
+  return useAppointments({ status: 'pending' });
 };

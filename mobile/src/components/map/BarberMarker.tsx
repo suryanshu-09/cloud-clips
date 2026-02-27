@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Marker, Callout } from 'react-native-maps';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, Image, Pressable } from 'react-native';
 import type { IBarberProfile } from '@/features/barbers/types';
 
 interface IBarberMarkerProps {
@@ -8,14 +8,23 @@ interface IBarberMarkerProps {
   distance?: number;
   onPress?: (barber: IBarberProfile) => void;
   onCalloutPress?: (barber: IBarberProfile) => void;
+  isSelected?: boolean;
 }
 
-export function BarberMarker({ barber, distance, onPress, onCalloutPress }: IBarberMarkerProps) {
+function BarberMarkerComponent({
+  barber,
+  distance,
+  onPress,
+  onCalloutPress,
+  isSelected = false,
+}: IBarberMarkerProps) {
   if (!barber.location?.coordinates || barber.location.coordinates.length !== 2) {
     return null;
   }
 
   const [longitude, latitude] = barber.location.coordinates;
+  const displayName = barber.businessName || barber.name;
+  const avatarLetter = (displayName || 'B').charAt(0).toUpperCase();
 
   return (
     <Marker
@@ -23,137 +32,130 @@ export function BarberMarker({ barber, distance, onPress, onCalloutPress }: IBar
         latitude,
         longitude,
       }}
-      title={barber.businessName || barber.name}
-      description={barber.bio}
       onPress={() => onPress?.(barber)}
-      pinColor="#8B5CF6"
     >
-      <View style={styles.markerContainer}>
-        <View style={styles.avatarContainer}>
+      {/* Custom Marker Container */}
+      <View className="items-center">
+        {/* Avatar with Rating Badge */}
+        <View
+          className={`rounded-full border-4 bg-white overflow-hidden ${
+            isSelected ? 'border-indigo-600' : 'border-indigo-500'
+          }`}
+          style={{
+            width: 48,
+            height: 48,
+            elevation: 6,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: 0.3,
+            shadowRadius: 4.65,
+          }}
+        >
           {barber.profileImage ? (
-            <Image source={{ uri: barber.profileImage }} style={styles.avatar} resizeMode="cover" />
+            <Image
+              source={{ uri: barber.profileImage }}
+              className="w-full h-full"
+              resizeMode="cover"
+            />
           ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>
-                {(barber.businessName || barber.name || 'B').charAt(0).toUpperCase()}
-              </Text>
+            <View className="w-full h-full bg-indigo-500 items-center justify-center">
+              <Text className="text-white text-xl font-bold">{avatarLetter}</Text>
             </View>
           )}
         </View>
-        <View style={styles.markerPin} />
+
+        {/* Rating Badge - Positioned at bottom right of avatar */}
+        {barber.rating > 0 && (
+          <View
+            className="absolute -bottom-1 -right-1 bg-yellow-400 rounded-full flex-row items-center justify-center px-1.5 py-0.5 border-2 border-white"
+            style={{
+              elevation: 4,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.2,
+              shadowRadius: 1.5,
+              minWidth: 32,
+            }}
+          >
+            <Text className="text-yellow-900 text-xs font-bold">★</Text>
+            <Text className="text-yellow-900 text-xs font-bold ml-0.5">
+              {barber.rating.toFixed(1)}
+            </Text>
+          </View>
+        )}
+
+        {/* Pin Triangle */}
+        <View
+          className="w-0 h-0 mt-[-2px]"
+          style={{
+            borderLeftWidth: 10,
+            borderRightWidth: 10,
+            borderTopWidth: 14,
+            borderLeftColor: 'transparent',
+            borderRightColor: 'transparent',
+            borderTopColor: isSelected ? '#4F46E5' : '#8B5CF6',
+          }}
+        />
       </View>
-      <Callout
-        onPress={() => onCalloutPress?.(barber)}
-        tooltip={false}
-        style={styles.calloutContainer}
-      >
-        <View style={styles.callout}>
-          <Text style={styles.businessName} numberOfLines={1}>
-            {barber.businessName || barber.name}
+
+      {/* Callout */}
+      <Callout onPress={() => onCalloutPress?.(barber)} tooltip={false} style={{ width: 220 }}>
+        <Pressable className="bg-white rounded-xl p-3 min-w-[180px]">
+          {/* Business Name */}
+          <Text className="text-base font-bold text-gray-900 mb-1" numberOfLines={1}>
+            {displayName}
           </Text>
-          {barber.rating && (
-            <View style={styles.ratingContainer}>
-              <Text style={styles.ratingText}>⭐ {barber.rating.toFixed(1)}</Text>
-              <Text style={styles.reviewCount}>({barber.totalReviews || 0})</Text>
+
+          {/* Rating and Reviews Row */}
+          <View className="flex-row items-center mb-1">
+            <Text className="text-yellow-500 text-sm">★</Text>
+            <Text className="text-sm font-semibold text-gray-900 ml-1">
+              {barber.rating.toFixed(1)}
+            </Text>
+            <Text className="text-xs text-gray-500 ml-1">({barber.totalReviews || 0} reviews)</Text>
+          </View>
+
+          {/* Distance */}
+          {distance !== undefined && (
+            <Text className="text-xs text-gray-500 mb-2">
+              {distance < 1
+                ? `${Math.round(distance * 1000)}m away`
+                : `${distance.toFixed(1)}km away`}
+            </Text>
+          )}
+
+          {/* Specialties */}
+          {barber.specialties && barber.specialties.length > 0 && (
+            <View className="flex-row flex-wrap gap-1 mb-2">
+              {barber.specialties.slice(0, 2).map((specialty, index) => (
+                <View key={index} className="bg-gray-100 rounded-full px-2 py-0.5">
+                  <Text className="text-xs text-gray-600">{specialty}</Text>
+                </View>
+              ))}
+              {barber.specialties.length > 2 && (
+                <View className="bg-gray-100 rounded-full px-2 py-0.5">
+                  <Text className="text-xs text-gray-600">+{barber.specialties.length - 2}</Text>
+                </View>
+              )}
             </View>
           )}
-          {distance && <Text style={styles.distance}>{distance.toFixed(1)} km away</Text>}
-          <Text style={styles.tapHint}>Tap for details</Text>
-        </View>
+
+          {/* Verified Badge */}
+          {barber.isVerified && (
+            <View className="flex-row items-center mb-1">
+              <Text className="text-blue-500 text-xs">✓</Text>
+              <Text className="text-xs text-blue-600 ml-1">Verified Barber</Text>
+            </View>
+          )}
+
+          {/* Tap Hint */}
+          <Text className="text-xs text-indigo-600 font-medium text-center mt-1">
+            Tap for details →
+          </Text>
+        </Pressable>
       </Callout>
     </Marker>
   );
 }
 
-const styles = StyleSheet.create({
-  markerContainer: {
-    alignItems: 'center',
-  },
-  avatarContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: '#8B5CF6',
-    backgroundColor: 'white',
-    overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  avatar: {
-    width: '100%',
-    height: '100%',
-  },
-  avatarPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#8B5CF6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  markerPin: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderTopWidth: 12,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#8B5CF6',
-    marginTop: -2,
-  },
-  calloutContainer: {
-    width: 200,
-  },
-  callout: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 12,
-    minWidth: 180,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  businessName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  ratingText: {
-    fontSize: 14,
-    color: '#F59E0B',
-    fontWeight: '600',
-    marginRight: 4,
-  },
-  reviewCount: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  distance: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 6,
-  },
-  tapHint: {
-    fontSize: 11,
-    color: '#8B5CF6',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-});
+export const BarberMarker = memo(BarberMarkerComponent);

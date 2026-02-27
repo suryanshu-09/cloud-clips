@@ -17,8 +17,7 @@ import {
   IAppleSignInResult,
   IPhoneSignInResult,
 } from '@/services/firebase/auth';
-import { initializeNotifications, cleanupNotifications } from '@/services/notifications';
-import { messagingService } from '@/services/firebase/messaging';
+import { cleanupNotifications } from '@/services/notifications';
 import type { ILoginCredentials, IAuthResponse, IAuthUser } from '../types';
 
 /**
@@ -31,7 +30,7 @@ export const useAuth = () => {
   const isInitializing = useRef(true);
 
   // Atoms
-  const [auth, setAuth] = useAtom(authAtom);
+  const [_auth, setAuth] = useAtom(authAtom);
   const setLogin = useSetAtom(loginAtom);
   const setLogout = useSetAtom(logoutAtom);
   const isAuthenticated = useAtomValue(isAuthenticatedAtom);
@@ -56,7 +55,7 @@ export const useAuth = () => {
         // Firebase user exists but app state shows logged out
         // This can happen after app restart - try to sync
         try {
-          const token = await firebaseUser.getIdToken();
+          const _token = await firebaseUser.getIdToken();
           // The existing stored auth should handle this case
           console.log('[useAuth] Firebase user detected, syncing state');
         } catch (error) {
@@ -72,14 +71,8 @@ export const useAuth = () => {
     };
   }, [isAuthenticated]);
 
-  // Initialize notifications when authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      initializeNotifications().catch((error) => {
-        console.warn('[useAuth] Failed to initialize notifications:', error);
-      });
-    }
-  }, [isAuthenticated]);
+  // Notifications are now initialized globally via useNotificationSetup in _layout.tsx
+  // Token registration is handled automatically when auth state changes
 
   // Handle successful login
   const handleLoginSuccess = useCallback(
@@ -90,10 +83,8 @@ export const useAuth = () => {
         refreshToken: data.refreshToken,
       });
 
-      // Register push token after login
-      messagingService.registerTokenWithBackend().catch((error) => {
-        console.warn('[useAuth] Failed to register push token:', error);
-      });
+      // Push token registration is handled automatically by useNotificationSetup
+      // when auth state changes to authenticated
 
       // Navigate based on user role
       if (data.user.role === 'barber') {

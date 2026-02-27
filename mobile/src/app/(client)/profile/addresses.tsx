@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SafeView } from '@/components/ui/SafeView';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -19,8 +18,8 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useAddresses } from '@/features/products/hooks/useAddresses';
 
-// Address types
 interface IAddress {
   id: string;
   label: string;
@@ -52,115 +51,6 @@ const INITIAL_FORM_DATA: IAddressFormData = {
   zip: '',
   country: 'United States',
 };
-
-// Mock address service (would be replaced with real API)
-const mockAddresses: IAddress[] = [
-  {
-    id: '1',
-    label: 'Home',
-    line1: '123 Main Street',
-    line2: 'Apt 4B',
-    city: 'New York',
-    state: 'NY',
-    zip: '10001',
-    country: 'United States',
-    isDefault: true,
-  },
-  {
-    id: '2',
-    label: 'Work',
-    line1: '456 Business Ave',
-    line2: 'Suite 100',
-    city: 'New York',
-    state: 'NY',
-    zip: '10002',
-    country: 'United States',
-    isDefault: false,
-  },
-];
-
-// Custom hook for address management
-function useAddresses() {
-  const queryClient = useQueryClient();
-
-  const { data, isLoading, refetch } = useQuery<IAddress[]>({
-    queryKey: ['addresses'],
-    queryFn: async () => {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      return mockAddresses;
-    },
-  });
-
-  const addAddressMutation = useMutation({
-    mutationFn: async (address: Omit<IAddress, 'id' | 'isDefault'>) => {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const newAddress: IAddress = {
-        ...address,
-        id: Date.now().toString(),
-        isDefault: false,
-      };
-      mockAddresses.push(newAddress);
-      return newAddress;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['addresses'] });
-    },
-  });
-
-  const updateAddressMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<IAddress> & { id: string }) => {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const index = mockAddresses.findIndex((a) => a.id === id);
-      if (index !== -1) {
-        mockAddresses[index] = { ...mockAddresses[index], ...updates };
-      }
-      return mockAddresses[index];
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['addresses'] });
-    },
-  });
-
-  const deleteAddressMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const index = mockAddresses.findIndex((a) => a.id === id);
-      if (index !== -1) {
-        mockAddresses.splice(index, 1);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['addresses'] });
-    },
-  });
-
-  const setDefaultMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      mockAddresses.forEach((a) => {
-        a.isDefault = a.id === id;
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['addresses'] });
-    },
-  });
-
-  return {
-    addresses: data || [],
-    isLoading,
-    refetch,
-    addAddress: addAddressMutation.mutate,
-    isAdding: addAddressMutation.isPending,
-    updateAddress: updateAddressMutation.mutate,
-    isUpdating: updateAddressMutation.isPending,
-    deleteAddress: deleteAddressMutation.mutate,
-    isDeleting: deleteAddressMutation.isPending,
-    setDefaultAddress: setDefaultMutation.mutate,
-    isSettingDefault: setDefaultMutation.isPending,
-  };
-}
 
 interface IAddressCardProps {
   address: IAddress;
@@ -382,19 +272,16 @@ export default function AddressesScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState<IAddress | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const {
     addresses,
     isLoading,
     refetch,
     addAddress,
-    isAdding,
     updateAddress,
-    isUpdating,
     deleteAddress,
-    isDeleting,
     setDefaultAddress,
-    isSettingDefault,
   } = useAddresses();
 
   const onRefresh = async () => {
@@ -403,44 +290,64 @@ export default function AddressesScreen() {
     setRefreshing(false);
   };
 
-  const handleAddAddress = (data: IAddressFormData) => {
-    addAddress(data, {
-      onSuccess: () => {
-        setShowAddModal(false);
-        Alert.alert('Success', 'Address added successfully');
-      },
-      onError: (error: Error) => {
-        Alert.alert('Error', error.message || 'Failed to add address');
-      },
-    });
+  const handleAddAddress = async (data: IAddressFormData) => {
+    try {
+      setSubmitting(true);
+      await addAddress({
+        label: data.label,
+        line1: data.line1,
+        line2: data.line2 || undefined,
+        city: data.city,
+        state: data.state,
+        zipCode: data.zip,
+        country: data.country,
+      });
+      setShowAddModal(false);
+      Alert.alert('Success', 'Address added successfully');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add address');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleUpdateAddress = (data: IAddressFormData) => {
+  const handleUpdateAddress = async (data: IAddressFormData) => {
     if (!editingAddress) return;
-
-    updateAddress(
-      { id: editingAddress.id, ...data },
-      {
-        onSuccess: () => {
-          setEditingAddress(null);
-          Alert.alert('Success', 'Address updated successfully');
-        },
-        onError: (error: Error) => {
-          Alert.alert('Error', error.message || 'Failed to update address');
-        },
-      }
-    );
+    try {
+      setSubmitting(true);
+      await updateAddress(editingAddress.id, {
+        label: data.label,
+        line1: data.line1,
+        line2: data.line2 || undefined,
+        city: data.city,
+        state: data.state,
+        zipCode: data.zip,
+        country: data.country,
+      });
+      setEditingAddress(null);
+      Alert.alert('Success', 'Address updated successfully');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update address');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleDeleteAddress = (id: string) => {
-    deleteAddress(id, {
-      onSuccess: () => {
-        Alert.alert('Success', 'Address deleted successfully');
-      },
-      onError: (error: Error) => {
-        Alert.alert('Error', error.message || 'Failed to delete address');
-      },
-    });
+  const handleDeleteAddress = async (id: string) => {
+    try {
+      await deleteAddress(id);
+      Alert.alert('Success', 'Address deleted successfully');
+    } catch (error) {
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to delete address');
+    }
+  };
+
+  const handleSetDefault = async (id: string) => {
+    try {
+      await setDefaultAddress(id);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to set default address');
+    }
   };
 
   if (isLoading) {
@@ -495,9 +402,9 @@ export default function AddressesScreen() {
                   address={address}
                   onEdit={() => setEditingAddress(address)}
                   onDelete={() => handleDeleteAddress(address.id)}
-                  onSetDefault={() => setDefaultAddress(address.id)}
-                  isSettingDefault={isSettingDefault}
-                  isDeleting={isDeleting}
+                  onSetDefault={() => handleSetDefault(address.id)}
+                  isSettingDefault={submitting}
+                  isDeleting={submitting}
                 />
               ))}
             </View>
@@ -537,7 +444,7 @@ export default function AddressesScreen() {
         <AddressForm
           onSubmit={handleAddAddress}
           onCancel={() => setShowAddModal(false)}
-          isSubmitting={isAdding}
+          isSubmitting={submitting}
         />
       </Modal>
 
@@ -561,7 +468,7 @@ export default function AddressesScreen() {
             }}
             onSubmit={handleUpdateAddress}
             onCancel={() => setEditingAddress(null)}
-            isSubmitting={isUpdating}
+            isSubmitting={submitting}
             isEdit
           />
         )}

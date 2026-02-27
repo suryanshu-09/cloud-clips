@@ -1,5 +1,6 @@
-import { query } from "./_generated/server";
-import { v } from "convex/values";
+import { query } from "../_generated/server";
+import { v, ConvexError } from "convex/values";
+import { fromTimestamp, getDateRange, toUTCTimestamp, formatTime } from "../lib/timezone";
 
 /**
  * Appointment Queries
@@ -20,16 +21,16 @@ export const getMyAppointments = query({
   handler: async (ctx, args) => {
     const userId = await ctx.auth.getUserIdentity();
     if (!userId) {
-      throw new Error("Not authenticated");
+      throw new ConvexError("Not authenticated");
     }
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email!))
       .first();
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ConvexError("User not found");
     }
 
     let appointments;
@@ -98,12 +99,11 @@ export const checkAvailability = query({
       .first();
 
     if (!barberProfile) {
-      throw new Error("Barber not found");
+      throw new ConvexError("Barber not found");
     }
 
-    // Get day of week
-    const date = new Date(args.date);
-    const dayOfWeek = date.getDay();
+    // Get day of week and date string in UTC
+    const { date: dateStr, dayOfWeek } = fromTimestamp(args.date);
 
     // Get working hours for this day
     const workingHours = barberProfile.workingHours.find(
@@ -114,29 +114,32 @@ export const checkAvailability = query({
       return []; // No availability on this day
     }
 
-    // Get existing appointments for this day
-    const startOfDay = new Date(args.date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(args.date);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Get UTC start/end of day boundaries
+    const { startOfDay, endOfDay } = getDateRange(dateStr);
 
     const existingAppointments = await ctx.db
       .query("appointments")
       .withIndex("by_barber_scheduled", (q) =>
-        q.eq("barberId", args.barberId)
+        q
+          .eq("barberId", args.barberId)
+          .gte("scheduledFor", startOfDay)
+          .lte("scheduledFor", endOfDay)
       )
       .filter((q) =>
-        q.gte("scheduledFor", startOfDay.getTime()) &&
-        q.lte("scheduledFor", endOfDay.getTime()) &&
-        q.neq("status", "cancelled")
+        q.or(
+          q.eq(q.field("status"), "pending"),
+          q.eq(q.field("status"), "confirmed"),
+          q.eq(q.field("status"), "in_progress")
+        )
       )
       .collect();
 
-    // Generate available time slots
+    // Generate available time slots using UTC-based date string
     const slots = generateTimeSlots(
       workingHours.startTime,
       workingHours.endTime,
-      existingAppointments
+      existingAppointments,
+      dateStr
     );
 
     return slots;
@@ -147,35 +150,33 @@ export const checkAvailability = query({
 function generateTimeSlots(
   startTime: string,
   endTime: string,
-  bookedAppointments: any[]
+  bookedAppointments: Array<{ scheduledFor: number; endTime: number }>,
+  dateStr: string
 ): string[] {
   const slots: string[] = [];
-  const [startHour, startMinute] = startTime.split(":").map(Number);
-  const [endHour, endMinute] = endTime.split(":").map(Number);
 
-  const start = new Date();
-  start.setHours(startHour, startMinute, 0, 0);
+  // Use UTC-based timestamps from the timezone utilities
+  const startMs = toUTCTimestamp(dateStr, startTime);
+  const endMs = toUTCTimestamp(dateStr, endTime);
 
-  const end = new Date();
-  end.setHours(endHour, endMinute, 0, 0);
+  const slotDurationMs = 30 * 60 * 1000; // 30 minutes in ms
 
   // Generate 30-minute slots
-  const current = new Date(start);
-  while (current < end) {
-    const timeString = current.toTimeString().slice(0, 5);
-    
-    // Check if this slot is booked
+  let currentMs = startMs;
+  while (currentMs < endMs) {
+    const slotEndMs = currentMs + slotDurationMs;
+
+    // Check if this slot overlaps with any booked appointment
     const isBooked = bookedAppointments.some((apt) => {
-      const aptTime = new Date(apt.scheduledFor);
-      const aptTimeString = aptTime.toTimeString().slice(0, 5);
-      return aptTimeString === timeString;
+      // Two intervals overlap if one starts before the other ends and vice versa
+      return apt.scheduledFor < slotEndMs && apt.endTime > currentMs;
     });
 
     if (!isBooked) {
-      slots.push(timeString);
+      slots.push(formatTime(currentMs));
     }
 
-    current.setMinutes(current.getMinutes() + 30);
+    currentMs += slotDurationMs;
   }
 
   return slots;

@@ -15,6 +15,7 @@ export default function ProfileLayout() {
       <Stack.Screen name="addresses" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="help" />
+      <Stack.Screen name="my-coupons" />
     </Stack>
   );
 }

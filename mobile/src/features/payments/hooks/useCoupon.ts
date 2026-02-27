@@ -1,91 +1,106 @@
 /**
  * useCoupon Hook
- * Handles coupon validation and discount calculation
+ * Handles coupon validation and discount calculation using Convex
  */
 
-import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useState, useCallback } from 'react';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { Alert } from 'react-native';
-import { paymentService } from '../services/paymentService';
-import { mockPaymentService } from '../services/mockPaymentService';
-import type { IValidateCouponRequest, IValidateCouponResponse, ICoupon } from '../types';
+import type { Id } from '@/convex/_generated/dataModel';
 
-// Check if dev mode is enabled
-const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
-const service = isDevMode ? mockPaymentService : paymentService;
+interface ValidatedCoupon {
+  code: string;
+  description?: string;
+  discountType: 'percentage' | 'fixed_amount';
+  discountValue: number;
+  applicableTo: 'services' | 'products' | 'both';
+}
 
 export const useCoupon = () => {
-  const [appliedCoupon, setAppliedCoupon] = useState<ICoupon | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<ValidatedCoupon | null>(null);
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [isValidating, setIsValidating] = useState(false);
 
-  // Validate coupon mutation
-  const validateCouponMutation = useMutation({
-    mutationFn: (data: IValidateCouponRequest) => service.validateCoupon(data),
-    onSuccess: (response: IValidateCouponResponse) => {
-      if (response.valid && response.coupon) {
-        setAppliedCoupon(response.coupon);
-        setDiscountAmount(response.discountAmount || 0);
-      } else {
+  const validateCouponMutation = useMutation(api.coupons.mutations.applyDiscount);
+
+  const validateCoupon = useCallback(
+    async (
+      code: string,
+      amount: number,
+      serviceIds?: string[],
+      type: 'service' | 'product' = 'service',
+      barberId?: Id<'users'>
+    ) => {
+      if (!code.trim()) {
+        Alert.alert('Error', 'Please enter a coupon code');
+        return;
+      }
+
+      setIsValidating(true);
+
+      try {
+        const result = await validateCouponMutation({
+          couponCode: code.trim(),
+          amount,
+          type,
+          barberId,
+        });
+
+        if (result.valid) {
+          setAppliedCoupon({
+            code: result.couponCode || code.toUpperCase(),
+            description: result.description,
+            discountType: 'percentage',
+            discountValue: result.discount ? (result.discount / amount) * 100 : 0,
+            applicableTo: 'both',
+          });
+          setDiscountAmount(result.discount || 0);
+        } else {
+          setAppliedCoupon(null);
+          setDiscountAmount(0);
+          Alert.alert('Invalid Coupon', 'The coupon code is not valid or has expired.');
+        }
+      } catch (error: any) {
         setAppliedCoupon(null);
         setDiscountAmount(0);
-        if (response.error) {
-          Alert.alert('Invalid Coupon', response.error);
-        }
+        Alert.alert('Error', error?.message || 'Failed to validate coupon');
+      } finally {
+        setIsValidating(false);
       }
     },
-    onError: (error: Error) => {
-      setAppliedCoupon(null);
-      setDiscountAmount(0);
-      Alert.alert('Error', error.message || 'Failed to validate coupon');
-    },
-  });
+    [validateCouponMutation]
+  );
 
-  // Validate coupon code
-  const validateCoupon = async (code: string, amount: number, serviceIds?: string[]) => {
-    if (!code.trim()) {
-      Alert.alert('Error', 'Please enter a coupon code');
-      return;
-    }
-
-    validateCouponMutation.mutate({
-      code: code.trim(),
-      amount,
-      serviceIds,
-    });
-  };
-
-  // Remove applied coupon
-  const removeCoupon = () => {
+  const removeCoupon = useCallback(() => {
     setAppliedCoupon(null);
     setDiscountAmount(0);
-  };
+  }, []);
 
-  // Calculate final amount with discount
-  const calculateFinalAmount = (subtotal: number): number => {
-    if (!appliedCoupon) {
-      return subtotal;
-    }
-
-    let discount = 0;
-
-    if (appliedCoupon.discountType === 'percentage') {
-      discount = (subtotal * appliedCoupon.discountValue) / 100;
-      if (appliedCoupon.maxDiscount && discount > appliedCoupon.maxDiscount) {
-        discount = appliedCoupon.maxDiscount;
+  const calculateFinalAmount = useCallback(
+    (subtotal: number): number => {
+      if (!appliedCoupon) {
+        return subtotal;
       }
-    } else {
-      discount = appliedCoupon.discountValue;
-    }
 
-    return Math.max(0, subtotal - discount);
-  };
+      let discount = 0;
 
-  // Check if a coupon is currently applied
+      if (appliedCoupon.discountType === 'percentage') {
+        discount = (subtotal * appliedCoupon.discountValue) / 100;
+      } else {
+        discount = appliedCoupon.discountValue;
+      }
+
+      return Math.max(0, subtotal - discount);
+    },
+    [appliedCoupon]
+  );
+
   const hasCouponApplied = !!appliedCoupon;
 
   return {
     validateCoupon,
-    isValidating: validateCouponMutation.isPending,
+    isValidating,
     appliedCoupon,
     discountAmount,
     removeCoupon,

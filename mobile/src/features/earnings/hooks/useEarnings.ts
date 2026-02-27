@@ -1,173 +1,134 @@
 /**
- * useEarnings hook
- * React Query hooks for Stripe Connect barber earnings and payouts
+ * useEarnings hook - Convex integration
+ * React hooks for Stripe Connect barber earnings using Convex actions
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useCallback } from 'react';
 import { Linking } from 'react-native';
+import { useAction } from 'convex/react';
+import { api } from '@convex/_generated/api';
 
-import { earningsService } from '../services/earningsService';
-import { mockEarningsService } from '../services/mockEarningsService';
 import {
   ConnectStatus,
   EarningsPeriod,
   IConnectAccount,
-  ICreateOnboardingLinkRequest,
+  IDashboardLink,
   IEarningsHistoryResponse,
   IEarningsSummary,
-  IPayoutsResponse,
 } from '../types';
+import {
+  transformConnectAccountResponse,
+  transformCreateAccountResponse,
+  transformDashboardLinkResponse,
+  generateMockEarningsSummary,
+  generateMockEarningsHistory,
+  generateMockPayoutsResponse,
+} from '../services/earningsService';
 
-// Use mock service in development
-const service = __DEV__ ? mockEarningsService : earningsService;
-
-// Query keys
+// Query keys for React Query (used for caching earnings data)
 export const EARNINGS_QUERY_KEYS = {
   all: ['earnings'] as const,
-  summary: (barberId: string, period: EarningsPeriod) =>
-    [...EARNINGS_QUERY_KEYS.all, 'summary', barberId, period] as const,
-  history: (barberId: string, page: number) =>
-    [...EARNINGS_QUERY_KEYS.all, 'history', barberId, page] as const,
-  payouts: (barberId: string) => [...EARNINGS_QUERY_KEYS.all, 'payouts', barberId] as const,
-  connectStatus: (barberId: string) => [...EARNINGS_QUERY_KEYS.all, 'connect', barberId] as const,
+  summary: (period: EarningsPeriod) => [...EARNINGS_QUERY_KEYS.all, 'summary', period] as const,
+  history: (page: number) => [...EARNINGS_QUERY_KEYS.all, 'history', page] as const,
+  payouts: () => [...EARNINGS_QUERY_KEYS.all, 'payouts'] as const,
+  connectStatus: () => [...EARNINGS_QUERY_KEYS.all, 'connect'] as const,
 };
 
 /**
- * Hook to get earnings summary for a barber
+ * Hook to manage Stripe Connect account using Convex actions
  */
-export function useEarnings(barberId: string, period: EarningsPeriod = 'week') {
-  return useQuery({
-    queryKey: EARNINGS_QUERY_KEYS.summary(barberId, period),
-    queryFn: () => service.getEarnings(barberId, { period }),
-    enabled: !!barberId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchOnWindowFocus: true,
-  });
-}
-
-/**
- * Hook to get earnings history with pagination
- */
-export function useEarningsHistory(barberId: string, page: number = 1, limit: number = 20) {
-  return useQuery({
-    queryKey: EARNINGS_QUERY_KEYS.history(barberId, page),
-    queryFn: () => service.getEarningsHistory(barberId, { page, limit }),
-    enabled: !!barberId,
-    staleTime: 1000 * 60 * 5,
-    placeholderData: (previousData) => previousData, // Keep previous data while fetching
-  });
-}
-
-/**
- * Hook to get payout history
- */
-export function usePayouts(barberId: string, limit: number = 25) {
-  return useQuery({
-    queryKey: EARNINGS_QUERY_KEYS.payouts(barberId),
-    queryFn: () => service.getPayouts(barberId, { limit }),
-    enabled: !!barberId,
-    staleTime: 1000 * 60 * 5,
-  });
-}
-
-/**
- * Hook to get Connect account status
- */
-export function useConnectStatus(barberId: string) {
-  return useQuery({
-    queryKey: EARNINGS_QUERY_KEYS.connectStatus(barberId),
-    queryFn: () => service.getConnectStatus(barberId),
-    enabled: !!barberId,
-    staleTime: 1000 * 60, // 1 minute
-    refetchOnWindowFocus: true,
-  });
-}
-
-/**
- * Hook to create Connect account
- */
-export function useCreateConnectAccount() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (barberId: string) => service.createConnectAccount(barberId),
-    onSuccess: (data, barberId) => {
-      // Update connect status in cache
-      queryClient.setQueryData(EARNINGS_QUERY_KEYS.connectStatus(barberId), {
-        accountId: data.accountId,
-        status: data.status,
-        hasAccount: true,
-        detailsSubmitted: data.detailsSubmitted,
-        chargesEnabled: data.chargesEnabled,
-        payoutsEnabled: data.payoutsEnabled,
-      });
-    },
-  });
-}
-
-/**
- * Hook to get onboarding link and open it
- */
-export function useOnboarding(barberId: string) {
-  const queryClient = useQueryClient();
+export function useConnectAccount() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [accountData, setAccountData] = useState<IConnectAccount | null>(null);
 
-  const startOnboarding = useCallback(
-    async (params?: ICreateOnboardingLinkRequest) => {
+  // Convex actions
+  const createConnectAccountAction = useAction(api.payments.actions.createConnectAccount);
+  const getConnectAccountDetailsAction = useAction(api.payments.actions.getConnectAccountDetails);
+  const getConnectLoginLinkAction = useAction(api.payments.actions.getConnectLoginLink);
+
+  /**
+   * Create a new Stripe Connect account or get existing account onboarding link
+   */
+  const createAccount = useCallback(
+    async (country?: string, businessType?: 'individual' | 'company') => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const link = await service.getOnboardingLink(barberId, params);
+        const result = await createConnectAccountAction({ country, businessType });
+        const transformed = transformCreateAccountResponse(result);
 
-        // Open the onboarding URL in browser
-        const canOpen = await Linking.canOpenURL(link.url);
-        if (canOpen) {
-          await Linking.openURL(link.url);
-        } else {
-          throw new Error('Cannot open onboarding URL');
+        // If there's an onboarding URL, open it
+        if (result.onboardingUrl) {
+          const canOpen = await Linking.canOpenURL(result.onboardingUrl);
+          if (canOpen) {
+            await Linking.openURL(result.onboardingUrl);
+          } else {
+            throw new Error('Cannot open onboarding URL');
+          }
         }
 
-        return link;
+        setAccountData(
+          transformConnectAccountResponse({
+            accountId: result.accountId,
+            detailsSubmitted: false,
+            chargesEnabled: false,
+            payoutsEnabled: false,
+          })
+        );
+
+        return transformed;
       } catch (err) {
-        setError(err instanceof Error ? err : new Error('Failed to start onboarding'));
-        throw err;
+        const error = err instanceof Error ? err : new Error('Failed to create Connect account');
+        setError(error);
+        throw error;
       } finally {
         setIsLoading(false);
       }
     },
-    [barberId]
+    [createConnectAccountAction]
   );
 
-  const refreshStatus = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: EARNINGS_QUERY_KEYS.connectStatus(barberId) });
-  }, [barberId, queryClient]);
-
-  return {
-    startOnboarding,
-    refreshStatus,
-    isLoading,
-    error,
-  };
-}
-
-/**
- * Hook to open Stripe Express Dashboard
- */
-export function useDashboardLink(barberId: string) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-
-  const openDashboard = useCallback(async () => {
+  /**
+   * Get Connect account status
+   */
+  const getAccountStatus = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const link = await service.getDashboardLink(barberId);
+      const result = await getConnectAccountDetailsAction({});
+      const transformed = transformConnectAccountResponse({
+        accountId: result.accountId,
+        detailsSubmitted: result.detailsSubmitted,
+        chargesEnabled: result.chargesEnabled,
+        payoutsEnabled: result.payoutsEnabled,
+        requirements: result.requirements,
+      });
 
-      // Open the dashboard URL in browser
+      setAccountData(transformed);
+      return transformed;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to get Connect account status');
+      setError(error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getConnectAccountDetailsAction]);
+
+  /**
+   * Get Stripe Express dashboard link and open it
+   */
+  const openDashboard = useCallback(async (): Promise<IDashboardLink> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await getConnectLoginLinkAction({});
+      const link = transformDashboardLinkResponse(result);
+
       const canOpen = await Linking.canOpenURL(link.url);
       if (canOpen) {
         await Linking.openURL(link.url);
@@ -177,75 +138,213 @@ export function useDashboardLink(barberId: string) {
 
       return link;
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to open dashboard'));
-      throw err;
+      const error = err instanceof Error ? err : new Error('Failed to open dashboard');
+      setError(error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
-  }, [barberId]);
+  }, [getConnectLoginLinkAction]);
 
   return {
+    createAccount,
+    getAccountStatus,
     openDashboard,
+    accountData,
     isLoading,
     error,
   };
 }
 
 /**
- * Combined hook for earnings dashboard functionality
+ * Hook to get earnings data (using mock data for now, will integrate with real earnings queries)
  */
-export function useEarningsDashboard(barberId: string) {
+export function useEarnings(period: EarningsPeriod = 'week') {
+  const [earnings, setEarnings] = useState<IEarningsSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchEarnings = useCallback(
+    async (connectStatus: ConnectStatus = ConnectStatus.NONE) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // For now, use mock data. In production, this would be a Convex query
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const data = generateMockEarningsSummary(period, connectStatus);
+        setEarnings(data);
+        return data;
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error('Failed to fetch earnings');
+        setError(error);
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [period]
+  );
+
+  return {
+    earnings,
+    isLoading,
+    error,
+    fetchEarnings,
+  };
+}
+
+/**
+ * Hook to get earnings history
+ */
+export function useEarningsHistory(page: number = 1, limit: number = 20) {
+  const [history, setHistory] = useState<IEarningsHistoryResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchHistory = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // For now, use mock data
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const data = generateMockEarningsHistory(page, limit);
+      setHistory(data);
+      return data;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to fetch earnings history');
+      setError(error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [page, limit]);
+
+  return {
+    history,
+    isLoading,
+    error,
+    fetchHistory,
+  };
+}
+
+/**
+ * Hook to get payouts
+ */
+export function usePayouts(limit: number = 25) {
+  const [payouts, setPayouts] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchPayouts = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // For now, use mock data
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const data = generateMockPayoutsResponse(limit);
+      setPayouts(data);
+      return data;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to fetch payouts');
+      setError(error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [limit]);
+
+  return {
+    payouts,
+    isLoading,
+    error,
+    fetchPayouts,
+  };
+}
+
+/**
+ * Combined hook for earnings dashboard functionality
+ * Integrates Connect account management with earnings data
+ */
+export function useEarningsDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState<EarningsPeriod>('week');
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const earningsQuery = useEarnings(barberId, selectedPeriod);
-  const connectStatusQuery = useConnectStatus(barberId);
-  const createAccountMutation = useCreateConnectAccount();
+  // Connect account hooks
   const {
-    startOnboarding,
-    refreshStatus: refreshConnectStatus,
-    isLoading: onboardingLoading,
-  } = useOnboarding(barberId);
-  const { openDashboard, isLoading: dashboardLoading } = useDashboardLink(barberId);
+    createAccount,
+    getAccountStatus,
+    openDashboard,
+    accountData,
+    isLoading: isConnectLoading,
+    error: connectError,
+  } = useConnectAccount();
 
-  const isConnected =
-    connectStatusQuery.data?.status === ConnectStatus.VERIFIED &&
-    connectStatusQuery.data?.payoutsEnabled;
+  // Earnings hooks
+  const {
+    earnings,
+    isLoading: isEarningsLoading,
+    error: earningsError,
+    fetchEarnings,
+  } = useEarnings(selectedPeriod);
 
-  const needsOnboarding =
-    !connectStatusQuery.data?.hasAccount || connectStatusQuery.data?.status === ConnectStatus.NONE;
+  // Derived state
+  const isConnected = accountData?.status === ConnectStatus.VERIFIED && accountData?.payoutsEnabled;
+
+  const needsOnboarding = !accountData?.hasAccount || accountData?.status === ConnectStatus.NONE;
 
   const hasRestrictions =
-    connectStatusQuery.data?.status === ConnectStatus.PENDING ||
-    connectStatusQuery.data?.status === ConnectStatus.RESTRICTED;
+    accountData?.status === ConnectStatus.PENDING ||
+    accountData?.status === ConnectStatus.RESTRICTED;
 
+  /**
+   * Setup Connect - creates account if needed and opens onboarding
+   */
   const setupConnect = useCallback(async () => {
     if (needsOnboarding) {
-      // Create account first
-      const result = await createAccountMutation.mutateAsync(barberId);
-      if (result.accountId) {
-        // Then start onboarding
-        await startOnboarding();
-      }
+      await createAccount();
     } else if (hasRestrictions) {
-      // Account exists but needs more info
-      await startOnboarding();
+      // Re-open onboarding for accounts that need more info
+      await createAccount();
     }
-  }, [barberId, needsOnboarding, hasRestrictions, createAccountMutation, startOnboarding]);
+  }, [needsOnboarding, hasRestrictions, createAccount]);
+
+  /**
+   * Refresh all data
+   */
+  const refreshData = useCallback(async () => {
+    setRefreshKey((prev) => prev + 1);
+    const status = await getAccountStatus();
+    await fetchEarnings(status.status);
+  }, [getAccountStatus, fetchEarnings]);
+
+  // Initial load
+  const loadData = useCallback(async () => {
+    try {
+      const status = await getAccountStatus();
+      await fetchEarnings(status.status);
+    } catch (error) {
+      // If no account exists, just fetch earnings with NONE status
+      await fetchEarnings(ConnectStatus.NONE);
+    }
+  }, [getAccountStatus, fetchEarnings]);
 
   return {
     // Earnings data
-    earnings: earningsQuery.data,
-    isLoadingEarnings: earningsQuery.isLoading,
-    earningsError: earningsQuery.error,
-    refetchEarnings: earningsQuery.refetch,
+    earnings,
+    isLoadingEarnings: isEarningsLoading,
+    earningsError,
 
     // Period selection
     selectedPeriod,
     setSelectedPeriod,
 
     // Connect status
-    connectStatus: connectStatusQuery.data,
-    isLoadingConnect: connectStatusQuery.isLoading,
+    connectStatus: accountData,
+    isLoadingConnect: isConnectLoading,
+    connectError,
     isConnected,
     needsOnboarding,
     hasRestrictions,
@@ -253,10 +352,17 @@ export function useEarningsDashboard(barberId: string) {
     // Actions
     setupConnect,
     openDashboard,
-    refreshConnectStatus,
+    refreshData,
+    loadData,
 
     // Loading states
-    isSettingUp: createAccountMutation.isPending || onboardingLoading,
-    isOpeningDashboard: dashboardLoading,
+    isSettingUp: isConnectLoading,
+    isOpeningDashboard: isConnectLoading,
+
+    // Refresh key for triggering updates
+    refreshKey,
   };
 }
+
+// Re-export for backward compatibility
+export { ConnectStatus, EarningsPeriod } from '../types';

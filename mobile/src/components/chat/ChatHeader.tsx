@@ -3,7 +3,7 @@ import { View, Text, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '@/components/ui/Avatar';
-import { IChatUser } from '@/features/chat/types';
+import { IChatUserWithStatus } from '@/features/chat/types';
 
 /**
  * ChatHeader Component
@@ -28,7 +28,7 @@ import { IChatUser } from '@/features/chat/types';
  */
 
 interface IChatHeaderProps {
-  user: IChatUser;
+  user: IChatUserWithStatus;
   onBackPress: () => void;
   onOptionsPress?: () => void;
   isTyping?: boolean;

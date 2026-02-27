@@ -18,6 +18,13 @@ export default function ClientLayout() {
         }}
       />
       <Tabs.Screen
+        name="discover"
+        options={{
+          title: 'Discover',
+          tabBarIcon: ({ color, size }) => <Ionicons name="compass" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="search"
         options={{
           title: 'Search',
@@ -55,6 +62,12 @@ export default function ClientLayout() {
       />
       <Tabs.Screen
         name="store"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="receipts"
         options={{
           href: null, // Hide from tab bar
         }}

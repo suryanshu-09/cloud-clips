@@ -1,5 +1,6 @@
-import { mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { mutation } from "../_generated/server";
+import { v, ConvexError } from "convex/values";
+import { calculateAverageRating } from "../reviews";
 
 /**
  * Review Mutations
@@ -39,6 +40,16 @@ export const submitReview = mutation({
       throw new Error("Not authorized to review this appointment");
     }
 
+    // Verify appointment is completed
+    if (appointment.status !== "completed") {
+      throw new ConvexError("Reviews can only be submitted for completed appointments");
+    }
+
+    // Validate rating (1-5 stars)
+    if (args.rating < 1 || args.rating > 5) {
+      throw new ConvexError("Rating must be between 1 and 5 stars");
+    }
+
     // Check if already reviewed
     const existingReview = await ctx.db
       .query("reviews")
@@ -67,27 +78,8 @@ export const submitReview = mutation({
       updatedAt: Date.now(),
     });
 
-    // Update barber's average rating
-    const barberProfile = await ctx.db
-      .query("barberProfiles")
-      .withIndex("by_user", (q) => q.eq("userId", appointment.barberId))
-      .first();
-
-    if (barberProfile) {
-      const allReviews = await ctx.db
-        .query("reviews")
-        .withIndex("by_barber", (q) => q.eq("barberId", appointment.barberId))
-        .collect();
-
-      const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0);
-      const averageRating = totalRating / allReviews.length;
-
-      await ctx.db.patch(barberProfile._id, {
-        averageRating,
-        reviewCount: allReviews.length,
-        updatedAt: Date.now(),
-      });
-    }
+    // Update barber's average rating using helper function
+    await calculateAverageRating(ctx, appointment.barberId);
 
     return review;
   },
@@ -134,11 +126,12 @@ export const respondToReview = mutation({
   },
 });
 
-// Report review
+// Report review for moderation
 export const reportReview = mutation({
   args: {
     reviewId: v.id("reviews"),
     reason: v.string(),
+    details: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await ctx.auth.getUserIdentity();
@@ -146,14 +139,53 @@ export const reportReview = mutation({
       throw new Error("Not authenticated");
     }
 
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .first();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
     const review = await ctx.db.get(args.reviewId);
     if (!review) {
       throw new Error("Review not found");
     }
 
+    // Prevent users from reporting their own reviews
+    if (review.clientId === user._id) {
+      throw new ConvexError("Cannot report your own review");
+    }
+
+    // Check if user already reported this review
+    const existingReport = await ctx.db
+      .query("reviewReports")
+      .withIndex("by_review_reporter", (q) =>
+        q.eq("reviewId", args.reviewId).eq("reporterId", user._id)
+      )
+      .first();
+
+    if (existingReport) {
+      throw new ConvexError("You have already reported this review");
+    }
+
+    // Create the report record
+    await ctx.db.insert("reviewReports", {
+      reviewId: args.reviewId,
+      reporterId: user._id,
+      reason: args.reason,
+      details: args.details,
+      status: "pending",
+      createdAt: Date.now(),
+    });
+
+    // Update the review to mark it as reported
+    const currentReportCount = review.reportCount || 0;
     await ctx.db.patch(args.reviewId, {
       isReported: true,
       reportReason: args.reason,
+      reportCount: currentReportCount + 1,
       updatedAt: Date.now(),
     });
 

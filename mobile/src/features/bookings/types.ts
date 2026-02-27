@@ -1,89 +1,157 @@
 /**
  * Booking Feature Types
  * Type definitions for appointment booking and scheduling
+ * Aligned with backend/convex/schema.ts appointments table
  */
 
-export type AppointmentStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
-export type PaymentStatus = 'pending' | 'completed' | 'refunded';
+export type AppointmentStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'no_show';
+
+export type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'failed';
+
 export type HairType = 'curly' | 'straight' | 'wavy';
+
 export type LocationType = 'in_home' | 'in_salon';
 
-export interface ServiceType {
-  name: string;
-  price: number;
-  duration: number;
-  description?: string;
-}
-
-export interface AppointmentLocation {
+export interface IAppointmentLocation {
   type: LocationType;
   address?: string;
-  coordinates?: [number, number]; // [longitude, latitude]
+  coordinates?: { lat: number; lng: number };
 }
 
-export interface Appointment {
+export interface IAppointment {
   _id: string;
   clientId: string;
   barberId: string;
   status: AppointmentStatus;
-  serviceType: string;
-  hairType: HairType;
+  serviceId: string;
+  serviceName: string;
   specialRequests?: string;
-  location: AppointmentLocation;
-  scheduledFor: Date;
-  duration: number;
+  locationType: LocationType;
+  address?: string;
+  addressCoords?: { lat: number; lng: number };
+  scheduledFor: number; // timestamp
+  endTime: number; // timestamp
+  duration: number; // in minutes
   price: number;
-  appliedCouponId?: string;
   paymentStatus: PaymentStatus;
-  paymentId?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  paymentIntentId?: string;
+  hasReview?: boolean;
+  createdAt: number; // timestamp
+  updatedAt: number; // timestamp
 }
 
-export interface CreateAppointmentDTO {
+export interface ICreateAppointmentDTO {
   barberId: string;
-  serviceType: string;
-  hairType: HairType;
+  serviceId: string;
+  serviceName: string;
   specialRequests?: string;
-  location: AppointmentLocation;
-  scheduledFor: Date;
-  appliedCouponId?: string;
+  locationType: LocationType;
+  address?: string;
+  addressCoords?: { lat: number; lng: number };
+  scheduledFor: number; // timestamp
+  endTime: number; // timestamp
+  duration: number; // in minutes
+  price: number;
 }
 
-export interface UpdateAppointmentDTO {
+export interface IUpdateAppointmentDTO {
   status?: AppointmentStatus;
-  scheduledFor?: Date;
+  scheduledFor?: number; // timestamp
+  endTime?: number; // timestamp
   specialRequests?: string;
-  location?: AppointmentLocation;
+  locationType?: LocationType;
+  address?: string;
+  addressCoords?: { lat: number; lng: number };
 }
 
-export interface TimeSlot {
-  time: Date;
+export interface ITimeSlot {
+  time: number; // timestamp
   available: boolean;
 }
 
-export interface AvailabilityDay {
-  date: Date;
-  slots: TimeSlot[];
+export interface IAvailabilityDay {
+  date: number; // timestamp
+  slots: ITimeSlot[];
 }
 
-export interface BarberAvailability {
+export interface IBarberAvailability {
   barberId: string;
-  availability: AvailabilityDay[];
+  availability: IAvailabilityDay[];
 }
 
-export interface BookingFilters {
+export interface IBookingFilters {
   status?: AppointmentStatus;
-  startDate?: Date;
-  endDate?: Date;
+  startDate?: number; // timestamp
+  endDate?: number; // timestamp
   barberId?: string;
   clientId?: string;
 }
 
-export interface AppointmentWithDetails extends Appointment {
+export interface IAppointmentWithDetails extends IAppointment {
   barberName: string;
   barberAvatar?: string;
   clientName: string;
   clientAvatar?: string;
-  serviceName: string;
 }
+
+/**
+ * Booking form state used by Jotai atoms in the booking flow.
+ * Stores user selections before creating an appointment.
+ */
+export interface IBookingForm {
+  barberId?: string;
+  serviceId?: string;
+  serviceName?: string;
+  locationType?: LocationType;
+  address?: string;
+  addressCoords?: { lat: number; lng: number };
+  specialRequests?: string;
+  price?: number;
+  duration?: number; // in minutes
+}
+
+/**
+ * Booking schedule state used by Jotai atoms in the booking flow.
+ * Stores the selected date/time as timestamps.
+ */
+export interface IBookingSchedule {
+  selectedDate?: number; // timestamp
+  selectedTime?: number; // timestamp
+}
+
+// ============================================================================
+// Legacy type aliases for backward compatibility
+// ============================================================================
+
+/** @deprecated Use IAppointment instead */
+export type Appointment = IAppointment;
+
+/** @deprecated Use IAppointmentWithDetails instead */
+export type AppointmentWithDetails = IAppointmentWithDetails;
+
+/** @deprecated Use ICreateAppointmentDTO instead */
+export type CreateAppointmentDTO = ICreateAppointmentDTO;
+
+/** @deprecated Use IUpdateAppointmentDTO instead */
+export type UpdateAppointmentDTO = IUpdateAppointmentDTO;
+
+/** @deprecated Use ITimeSlot instead */
+export type TimeSlot = ITimeSlot;
+
+/** @deprecated Use IAvailabilityDay instead */
+export type AvailabilityDay = IAvailabilityDay;
+
+/** @deprecated Use IBarberAvailability instead */
+export type BarberAvailability = IBarberAvailability;
+
+/** @deprecated Use IBookingFilters instead */
+export type BookingFilters = IBookingFilters;
+
+/** @deprecated Use IAppointmentLocation instead */
+export type AppointmentLocation = IAppointmentLocation;

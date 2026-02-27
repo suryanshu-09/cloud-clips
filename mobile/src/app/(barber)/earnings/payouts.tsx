@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
 import { Card } from '@/components/ui';
-import { usePayouts, IPayout, PayoutStatus, useDashboardLink } from '@/features/earnings';
-import { useAuth } from '@/features/auth';
+import { usePayouts, useConnectAccount } from '@/features/earnings';
+import type { IPayout, PayoutStatus } from '@/features/earnings';
 
 // Helper to format currency from cents
 const formatCurrency = (cents: number): string => {
@@ -25,35 +25,35 @@ const formatDate = (dateString: string): string => {
 // Get status display info
 const getStatusInfo = (status: PayoutStatus) => {
   switch (status) {
-    case PayoutStatus.PAID:
+    case 'paid':
       return {
         label: 'Paid',
         color: 'text-green-600',
         bgColor: 'bg-green-100',
         icon: '✓',
       };
-    case PayoutStatus.IN_TRANSIT:
+    case 'in_transit':
       return {
         label: 'In Transit',
         color: 'text-blue-600',
         bgColor: 'bg-blue-100',
         icon: '→',
       };
-    case PayoutStatus.PENDING:
+    case 'pending':
       return {
         label: 'Pending',
         color: 'text-yellow-600',
         bgColor: 'bg-yellow-100',
         icon: '⏳',
       };
-    case PayoutStatus.FAILED:
+    case 'failed':
       return {
         label: 'Failed',
         color: 'text-red-600',
         bgColor: 'bg-red-100',
         icon: '✗',
       };
-    case PayoutStatus.CANCELED:
+    case 'canceled':
       return {
         label: 'Canceled',
         color: 'text-gray-600',
@@ -86,9 +86,9 @@ function PayoutItemCard({ item }: { item: IPayout }) {
           <View>
             <Text className="font-semibold text-gray-900">{formatCurrency(item.amount)}</Text>
             <Text className="text-sm text-gray-500">
-              {item.status === PayoutStatus.PAID
+              {item.status === 'paid'
                 ? `Arrived ${formatDate(item.arrivalDate)}`
-                : item.status === PayoutStatus.IN_TRANSIT
+                : item.status === 'in_transit'
                   ? `Expected ${formatDate(item.arrivalDate)}`
                   : `Created ${formatDate(item.createdAt)}`}
             </Text>
@@ -109,19 +109,29 @@ function PayoutItemCard({ item }: { item: IPayout }) {
 }
 
 export default function PayoutsScreen() {
-  const { currentUser } = useAuth();
-  const barberId = (currentUser as any)?.barberProfileId || currentUser?.id || '';
-
-  const { data, isLoading, refetch } = usePayouts(barberId);
-  const { openDashboard, isLoading: isOpeningDashboard } = useDashboardLink(barberId);
+  const { payouts, isLoading, fetchPayouts } = usePayouts(25);
+  const { openDashboard, isLoading: isOpeningDashboard } = useConnectAccount();
 
   const [refreshing, setRefreshing] = useState(false);
 
+  // Initial load
+  useEffect(() => {
+    fetchPayouts();
+  }, [fetchPayouts]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
+    await fetchPayouts();
     setRefreshing(false);
-  }, [refetch]);
+  }, [fetchPayouts]);
+
+  const handleOpenDashboard = useCallback(async () => {
+    try {
+      await openDashboard();
+    } catch (error) {
+      console.error('Failed to open dashboard:', error);
+    }
+  }, [openDashboard]);
 
   const renderItem = useCallback(({ item }: { item: IPayout }) => {
     return <PayoutItemCard item={item} />;
@@ -137,7 +147,7 @@ export default function PayoutsScreen() {
               View detailed payout information and manage your bank account
             </Text>
           </View>
-          <View className="bg-blue-500 px-4 py-2 rounded-lg" onTouchEnd={() => openDashboard()}>
+          <View className="bg-blue-500 px-4 py-2 rounded-lg" onTouchEnd={handleOpenDashboard}>
             {isOpeningDashboard ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
@@ -162,7 +172,7 @@ export default function PayoutsScreen() {
     );
   };
 
-  if (isLoading && !data) {
+  if (isLoading && !payouts) {
     return (
       <View className="flex-1 bg-gray-50 items-center justify-center">
         <ActivityIndicator size="large" color="#3B82F6" />
@@ -174,7 +184,7 @@ export default function PayoutsScreen() {
   return (
     <View className="flex-1 bg-gray-50">
       <FlatList
-        data={data?.payouts || []}
+        data={payouts?.payouts || []}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 16, flexGrow: 1 }}

@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Text, View, ScrollView, ActivityIndicator, Pressable, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+
+import { Marker } from 'react-native-maps';
+
 import { SafeView } from '@/components/ui/SafeView';
 import { Header } from '@/components/ui/Header';
 import { Button } from '@/components/ui/Button';
@@ -9,6 +12,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ImageZoomModal } from '@/components/ui/ImageZoomModal';
+import { MapView } from '@/components/map/MapView';
 import { ServiceList } from '@/components/barber/ServiceList';
 import { useBarberProfile } from '@/features/barbers';
 import { useBarberReviews } from '@/features/reviews';
@@ -172,10 +176,37 @@ export default function BarberProfileScreen() {
           </View>
         </View>
 
-        {/* Location Section */}
+        {/* Location Section with Map Preview */}
         {barber.location && (
           <View className="p-6 border-b border-gray-200">
             <Text className="text-lg font-bold text-gray-900 mb-3">Location</Text>
+            {barber.location.coordinates && barber.location.coordinates.length === 2 && (
+              <View className="rounded-xl overflow-hidden mb-3" style={{ height: 180 }}>
+                <MapView
+                  initialRegion={{
+                    latitude: barber.location.coordinates[1],
+                    longitude: barber.location.coordinates[0],
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  }}
+                  scrollEnabled={false}
+                  zoomEnabled={false}
+                  rotateEnabled={false}
+                  pitchEnabled={false}
+                  showsUserLocation={false}
+                  showsMyLocationButton={false}
+                  style={{ flex: 1 }}
+                >
+                  <Marker
+                    coordinate={{
+                      latitude: barber.location.coordinates[1],
+                      longitude: barber.location.coordinates[0],
+                    }}
+                    title={barber.businessName || barber.name}
+                  />
+                </MapView>
+              </View>
+            )}
             <Card variant="outlined" padding="md">
               <View className="flex-row items-center gap-3">
                 <Text className="text-2xl">📍</Text>

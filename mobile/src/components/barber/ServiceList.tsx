@@ -25,7 +25,7 @@ export function ServiceList({
   };
 
   const renderService = ({ item }: { item: IService }) => {
-    const isSelected = selectedServiceId === item.name;
+    const isSelected = selectedServiceId === item.id;
 
     return (
       <Card
@@ -73,7 +73,7 @@ export function ServiceList({
   return (
     <FlatList
       data={services}
-      keyExtractor={(item, index) => `${item.name}-${index}`}
+      keyExtractor={(item) => item.id}
       renderItem={renderService}
       scrollEnabled={false}
       contentContainerStyle={{ paddingHorizontal: 16 }}

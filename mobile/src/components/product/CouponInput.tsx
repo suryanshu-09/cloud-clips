@@ -7,10 +7,12 @@ import { useState } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native';
 import { useCoupon } from '@/features/payments';
 import type { ICoupon } from '@/features/payments/types';
+import type { Id } from '@/convex/_generated/dataModel';
 
 interface ICouponInputProps {
   amount: number;
   serviceIds?: string[];
+  barberId?: Id<'users'>;
   onCouponApplied?: (coupon: ICoupon, discountAmount: number) => void;
   onCouponRemoved?: () => void;
   className?: string;
@@ -19,6 +21,7 @@ interface ICouponInputProps {
 export function CouponInput({
   amount,
   serviceIds,
+  barberId,
   onCouponApplied,
   onCouponRemoved,
   className = '',
@@ -38,7 +41,7 @@ export function CouponInput({
       return;
     }
 
-    await validateCoupon(couponCode, amount, serviceIds);
+    await validateCoupon(couponCode, amount, serviceIds, 'service', barberId);
   };
 
   const handleRemoveCoupon = () => {

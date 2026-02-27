@@ -1,8 +1,9 @@
-import { memo, useMemo, useCallback } from 'react';
+import { memo, useMemo } from 'react';
 import { View, Text, Pressable, type PressableProps } from 'react-native';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
+import { RatingStars } from '@/components/shared/RatingStars';
 import type { IBarberProfile } from '@/features/barbers';
 
 interface IBarberCardProps extends Omit<PressableProps, 'children'> {
@@ -99,13 +100,12 @@ function BarberCardComponent({
             <View className="flex-row items-center justify-between flex-wrap gap-2">
               <View className="flex-row items-center gap-3 flex-wrap">
                 {/* Rating */}
-                <View className="flex-row items-center gap-1">
-                  <Text className="text-yellow-500 text-base">⭐</Text>
-                  <Text className="text-sm font-semibold text-gray-900">
-                    {barber.rating.toFixed(1)}
-                  </Text>
-                  <Text className="text-xs text-gray-500">({barber.totalReviews})</Text>
-                </View>
+                <RatingStars
+                  rating={barber.rating}
+                  size="sm"
+                  showCount
+                  reviewCount={barber.totalReviews}
+                />
 
                 {/* Experience */}
                 {barber.experience > 0 && (

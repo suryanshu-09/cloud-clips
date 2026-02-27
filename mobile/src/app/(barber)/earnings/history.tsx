@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text, FlatList, RefreshControl, ActivityIndicator, Pressable } from 'react-native';
 import { Card } from '@/components/ui';
-import { useEarningsHistory, IEarningItem } from '@/features/earnings';
-import { useAuth } from '@/features/auth';
+import { useEarningsHistory } from '@/features/earnings';
+import type { IEarningItem } from '@/features/earnings';
 
 // Helper to format currency from cents
 const formatCurrency = (cents: number): string => {
@@ -109,33 +109,45 @@ function EarningItemCard({ item }: { item: IEarningItem }) {
 }
 
 export default function EarningsHistoryScreen() {
-  const { currentUser } = useAuth();
-  const barberId = (currentUser as any)?.barberProfileId || currentUser?.id || '';
-
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching, refetch } = useEarningsHistory(barberId, page);
+  const { history, isLoading, fetchHistory } = useEarningsHistory(page, 20);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
 
   const [refreshing, setRefreshing] = useState(false);
+
+  // Initial load
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setPage(1);
-    await refetch();
+    await fetchHistory();
     setRefreshing(false);
-  }, [refetch]);
+  }, [fetchHistory]);
 
-  const loadMore = useCallback(() => {
-    if (data && data.totalPages && page < data.totalPages && !isFetching) {
+  const loadMore = useCallback(async () => {
+    if (
+      history &&
+      history.totalPages &&
+      page < history.totalPages &&
+      !isFetchingMore &&
+      !isLoading
+    ) {
+      setIsFetchingMore(true);
       setPage((prev) => prev + 1);
+      await fetchHistory();
+      setIsFetchingMore(false);
     }
-  }, [data, page, isFetching]);
+  }, [history, page, isFetchingMore, isLoading, fetchHistory]);
 
   const renderItem = useCallback(({ item }: { item: IEarningItem }) => {
     return <EarningItemCard item={item} />;
   }, []);
 
   const renderFooter = () => {
-    if (!isFetching) return null;
+    if (!isFetchingMore) return null;
     return (
       <View className="py-4">
         <ActivityIndicator size="small" color="#3B82F6" />
@@ -156,7 +168,7 @@ export default function EarningsHistoryScreen() {
     );
   };
 
-  if (isLoading && !data) {
+  if (isLoading && !history) {
     return (
       <View className="flex-1 bg-gray-50 items-center justify-center">
         <ActivityIndicator size="large" color="#3B82F6" />
@@ -168,16 +180,16 @@ export default function EarningsHistoryScreen() {
   return (
     <View className="flex-1 bg-gray-50">
       {/* Summary Header */}
-      {data && data.total !== undefined && data.total > 0 && (
+      {history && history.total !== undefined && history.total > 0 && (
         <View className="bg-white p-4 border-b border-gray-200">
           <Text className="text-gray-600 text-sm">
-            Showing {data.earnings?.length || 0} of {data.total} transactions
+            Showing {history.earnings?.length || 0} of {history.total} transactions
           </Text>
         </View>
       )}
 
       <FlatList
-        data={data?.earnings || []}
+        data={history?.earnings || []}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 16, flexGrow: 1 }}

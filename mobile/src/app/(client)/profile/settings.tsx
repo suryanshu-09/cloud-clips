@@ -5,7 +5,9 @@ import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { authService } from '@/features/auth/services/authService';
 import { useTranslation } from '@/services/i18n/useTranslation';
-import { Card, Button } from '@/components/ui';
+import { Card } from '@/components/ui';
+import { useMapConfig } from '@/hooks/useMapConfig';
+import { MapStyleSelector } from '@/components/map';
 
 interface ISettingItemProps {
   title: string;
@@ -43,14 +45,16 @@ function SettingItem({
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { logout, isLoggingOut } = useAuth();
+  const { logout } = useAuth();
   const { t, currentLanguageInfo } = useTranslation();
+  const { mapConfig } = useMapConfig();
 
   // Settings state (these would typically be persisted)
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
   const [marketingEmails, setMarketingEmails] = useState(false);
+  const [showMapStyleSelector, setShowMapStyleSelector] = useState(false);
 
   // Delete account mutation
   const deleteAccountMutation = useMutation({
@@ -221,6 +225,25 @@ export default function SettingsScreen() {
                 Alert.alert(t('common.comingSoon'), t('settings.app.themeDescription'))
               }
             />
+            <SettingItem
+              title="Map Style"
+              description={mapConfig.name}
+              onPress={() => setShowMapStyleSelector(!showMapStyleSelector)}
+              showChevron={!showMapStyleSelector}
+              rightElement={
+                showMapStyleSelector ? (
+                  <Text className="text-blue-500 text-sm">Done</Text>
+                ) : undefined
+              }
+            />
+            {showMapStyleSelector && (
+              <View className="mt-2 -mx-4">
+                <MapStyleSelector
+                  horizontal={false}
+                  onStyleChange={() => setShowMapStyleSelector(false)}
+                />
+              </View>
+            )}
             <SettingItem
               title={t('settings.app.clearCache')}
               description={t('settings.app.clearCacheDescription')}

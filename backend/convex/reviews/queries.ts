@@ -1,4 +1,4 @@
-import { query } from "./_generated/server";
+import { query } from "../_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -69,5 +69,27 @@ export const getMyReviews = query({
       .query("reviews")
       .withIndex("by_client", (q) => q.eq("clientId", user._id))
       .collect();
+  },
+});
+
+// Get barber rating summary (average rating and count)
+export const getBarberRatingSummary = query({
+  args: {
+    barberId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const barberProfile = await ctx.db
+      .query("barberProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", args.barberId))
+      .first();
+
+    if (!barberProfile) {
+      throw new Error("Barber profile not found");
+    }
+
+    return {
+      averageRating: barberProfile.averageRating ?? 0,
+      reviewCount: barberProfile.reviewCount ?? 0,
+    };
   },
 });

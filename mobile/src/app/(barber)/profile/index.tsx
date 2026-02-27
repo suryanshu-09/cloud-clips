@@ -3,12 +3,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeView } from '@/components/ui/SafeView';
 import { Header } from '@/components/ui/Header';
 import { useAuth } from '@/features/auth';
+import { useBarberReviews } from '@/features/reviews';
+import { ReviewSummary } from '@/components/review/ReviewSummary';
+import { ReviewCard } from '@/components/review/ReviewCard';
+import { Card } from '@/components/ui/Card';
+import { useRouter } from 'expo-router';
 
 export default function BarberProfileScreen() {
   const { currentUser, logout, isLoggingOut } = useAuth();
+  const router = useRouter();
+  const barberId = currentUser?.id || '';
+
+  const { data: reviewsData, isLoading: reviewsLoading } = useBarberReviews(barberId, {
+    limit: 3,
+    enabled: !!barberId,
+  });
 
   const handleLogout = () => {
     logout();
+  };
+
+  const handleSeeAllReviews = () => {
+    // Navigate to reviews screen (can be implemented later)
+    // router.push('/(barber)/profile/reviews');
   };
 
   return (
@@ -61,13 +78,87 @@ export default function BarberProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
           </Pressable>
 
-          <Pressable className="flex-row items-center justify-between p-4">
+          <Pressable className="flex-row items-center justify-between p-4 border-b border-gray-100">
             <View className="flex-row items-center">
               <Ionicons name="pricetag-outline" size={24} color="#6b7280" />
               <Text className="text-base text-gray-900 ml-3">Pricing</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
           </Pressable>
+
+          <Pressable
+            className="flex-row items-center justify-between p-4"
+            onPress={() => router.push('/(barber)/offers')}
+          >
+            <View className="flex-row items-center">
+              <Ionicons name="gift-outline" size={24} color="#6b7280" />
+              <Text className="text-base text-gray-900 ml-3">Offers & Coupons</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </Pressable>
+        </View>
+
+        {/* Reviews Section */}
+        <View className="bg-white mb-4">
+          <View className="px-4 py-3 border-b border-gray-100 flex-row items-center justify-between">
+            <Text className="text-sm font-semibold text-gray-500 uppercase">Reviews</Text>
+            {reviewsData && reviewsData.stats.totalReviews > 0 && (
+              <Pressable onPress={handleSeeAllReviews}>
+                <Text className="text-sm text-blue-600 font-semibold">See All</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {reviewsLoading ? (
+            <View className="p-4 items-center">
+              <ActivityIndicator size="small" color="#0066CC" />
+              <Text className="text-gray-600 mt-2 text-sm">Loading reviews...</Text>
+            </View>
+          ) : reviewsData && reviewsData.stats.totalReviews > 0 ? (
+            <View className="p-4">
+              {/* Review Summary */}
+              <ReviewSummary
+                summary={{
+                  averageRating: reviewsData.stats.averageRating,
+                  totalReviews: reviewsData.stats.totalReviews,
+                  distribution: {
+                    oneStar: reviewsData.stats.ratingDistribution[1],
+                    twoStar: reviewsData.stats.ratingDistribution[2],
+                    threeStar: reviewsData.stats.ratingDistribution[3],
+                    fourStar: reviewsData.stats.ratingDistribution[4],
+                    fiveStar: reviewsData.stats.ratingDistribution[5],
+                  },
+                }}
+                showDistribution
+                size="md"
+                variant="default"
+              />
+
+              {/* Recent Reviews */}
+              <View className="mt-4">
+                <Text className="text-sm font-semibold text-gray-900 mb-3">Recent Reviews</Text>
+                {reviewsData.reviews.slice(0, 3).map((review) => (
+                  <View key={review.id} className="mb-3">
+                    <ReviewCard review={review} />
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <View className="p-4">
+              <Card variant="outlined" padding="lg">
+                <View className="items-center justify-center py-6">
+                  <Text className="text-4xl mb-3">⭐</Text>
+                  <Text className="text-lg font-bold text-gray-900 text-center mb-2">
+                    No reviews yet
+                  </Text>
+                  <Text className="text-sm text-gray-600 text-center">
+                    Complete appointments to start receiving reviews from clients
+                  </Text>
+                </View>
+              </Card>
+            </View>
+          )}
         </View>
 
         {/* Account Section */}

@@ -84,3 +84,22 @@ export const removeSavedLocationAtom = atom(null, (get, set, location: ILocation
   );
   set(locationAtom, { ...state, savedLocations: newSavedLocations });
 });
+
+// ============================================================================
+// Search Radius
+// ============================================================================
+
+const DEFAULT_SEARCH_RADIUS_MILES = 10;
+
+// Persistent search radius atom
+export const searchRadiusAtom = atomWithStorage<number>(
+  'searchRadius',
+  DEFAULT_SEARCH_RADIUS_MILES,
+  storage,
+  { getOnInit: true }
+);
+
+// Action to set search radius
+export const setSearchRadiusAtom = atom(null, (get, set, radius: number) => {
+  set(searchRadiusAtom, radius);
+});

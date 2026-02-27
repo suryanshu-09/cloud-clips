@@ -1,5 +1,5 @@
-import { mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { mutation } from "../_generated/server";
+import { v, ConvexError } from "convex/values";
 
 /**
  * Barber Mutations
@@ -35,11 +35,12 @@ export const createBarberProfile = mutation({
     })),
     offersInHomeService: v.optional(v.boolean()),
     inHomeServiceRadius: v.optional(v.number()),
+    timezone: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await ctx.auth.getUserIdentity();
     if (!userId) {
-      throw new Error("Not authenticated");
+      throw new ConvexError("Not authenticated");
     }
 
     const user = await ctx.db
@@ -48,7 +49,7 @@ export const createBarberProfile = mutation({
       .first();
 
     if (!user) {
-      throw new Error("User not found");
+      throw new ConvexError("User not found");
     }
 
     // Check if user is already a barber
@@ -58,7 +59,7 @@ export const createBarberProfile = mutation({
       .first();
 
     if (existingProfile) {
-      throw new Error("Barber profile already exists");
+      throw new ConvexError("Barber profile already exists");
     }
 
     // Update user role to barber
@@ -78,6 +79,7 @@ export const createBarberProfile = mutation({
       workingHours: args.workingHours,
       offersInHomeService: args.offersInHomeService || false,
       inHomeServiceRadius: args.inHomeServiceRadius,
+      timezone: args.timezone,
       isAvailable: true,
       isVerified: false,
       averageRating: 0,
@@ -121,11 +123,12 @@ export const updateBarberProfile = mutation({
     isAvailable: v.optional(v.boolean()),
     offersInHomeService: v.optional(v.boolean()),
     inHomeServiceRadius: v.optional(v.number()),
+    timezone: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await ctx.auth.getUserIdentity();
     if (!userId) {
-      throw new Error("Not authenticated");
+      throw new ConvexError("Not authenticated");
     }
 
     const user = await ctx.db
@@ -133,8 +136,13 @@ export const updateBarberProfile = mutation({
       .withIndex("by_email", (q) => q.eq("email", userId.email))
       .first();
 
-    if (!user || user.role !== "barber") {
-      throw new Error("Not authorized");
+    // Role-based access control - only barbers can update their profile
+    if (!user) {
+      throw new ConvexError("User not found");
+    }
+
+    if (user.role !== "barber") {
+      throw new ConvexError("Access denied: Only barbers can update barber profiles");
     }
 
     const profile = await ctx.db
@@ -143,11 +151,60 @@ export const updateBarberProfile = mutation({
       .first();
 
     if (!profile) {
-      throw new Error("Barber profile not found");
+      throw new ConvexError("Barber profile not found");
     }
 
     await ctx.db.patch(profile._id, {
       ...args,
+      updatedAt: Date.now(),
+    });
+
+    return await ctx.db.get(profile._id);
+  },
+});
+
+/**
+ * Update barber's Stripe Connect account ID
+ * Called during Stripe Connect onboarding
+ */
+export const updateStripeAccount = mutation({
+  args: {
+    userId: v.id("users"),
+    stripeAccountId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Check authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError("Not authenticated");
+    }
+
+    // Get the user performing the update
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .first();
+
+    if (!currentUser) {
+      throw new ConvexError("User not found");
+    }
+
+    // Only allow users to update their own stripe account, or admin users
+    if (currentUser._id !== args.userId && currentUser.role !== "admin") {
+      throw new ConvexError("Not authorized to update this barber's Stripe account");
+    }
+
+    const profile = await ctx.db
+      .query("barberProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+
+    if (!profile) {
+      throw new ConvexError("Barber profile not found");
+    }
+
+    await ctx.db.patch(profile._id, {
+      stripeAccountId: args.stripeAccountId,
       updatedAt: Date.now(),
     });
 
@@ -168,7 +225,7 @@ export const updateWorkingHours = mutation({
   handler: async (ctx, args) => {
     const userId = await ctx.auth.getUserIdentity();
     if (!userId) {
-      throw new Error("Not authenticated");
+      throw new ConvexError("Not authenticated");
     }
 
     const user = await ctx.db
@@ -176,8 +233,13 @@ export const updateWorkingHours = mutation({
       .withIndex("by_email", (q) => q.eq("email", userId.email))
       .first();
 
-    if (!user || user.role !== "barber") {
-      throw new Error("Not authorized");
+    // Role-based access control - only barbers can update working hours
+    if (!user) {
+      throw new ConvexError("User not found");
+    }
+
+    if (user.role !== "barber") {
+      throw new ConvexError("Access denied: Only barbers can update working hours");
     }
 
     const profile = await ctx.db
@@ -186,7 +248,7 @@ export const updateWorkingHours = mutation({
       .first();
 
     if (!profile) {
-      throw new Error("Barber profile not found");
+      throw new ConvexError("Barber profile not found");
     }
 
     await ctx.db.patch(profile._id, {

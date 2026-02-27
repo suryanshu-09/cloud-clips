@@ -1,10 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ScrollView, Text, View, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Card, Button } from '@/components/ui';
 import { EarningsChart } from '@/components/barber';
-import { useEarningsDashboard, ConnectStatus, EarningsPeriod } from '@/features/earnings';
-import { useAuth } from '@/features/auth';
+import { useEarningsDashboard } from '@/features/earnings';
+import type { EarningsPeriod } from '@/features/earnings';
 
 // Helper to format currency from cents
 const formatCurrency = (cents: number): string => {
@@ -32,7 +32,7 @@ const generateChartData = (
   const totalValue = earnings.netEarnings / 100; // Convert to dollars for chart
   const segments = labels.length;
 
-  return labels.map((label, index) => {
+  return labels.map((label, _index) => {
     // Create some variation in the data
     const variance = 0.7 + Math.random() * 0.6; // 70% - 130%
     const baseValue = totalValue / segments;
@@ -45,42 +45,36 @@ const generateChartData = (
 
 export default function EarningsScreen() {
   const router = useRouter();
-  const { currentUser } = useAuth();
-  // Use the user's id as barber ID for now - in production this would come from barber profile
-  const barberId = (currentUser as any)?.barberProfileId || currentUser?.id || '';
 
   const {
     earnings,
     isLoadingEarnings,
-    earningsError,
-    refetchEarnings,
     selectedPeriod,
     setSelectedPeriod,
-    connectStatus,
-    isLoadingConnect,
     isConnected,
     needsOnboarding,
     hasRestrictions,
-    setupConnect,
     openDashboard,
-    isSettingUp,
+    refreshData,
+    loadData,
     isOpeningDashboard,
-  } = useEarningsDashboard(barberId);
+  } = useEarningsDashboard();
 
   const [refreshing, setRefreshing] = useState(false);
 
+  // Load data on mount
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetchEarnings();
+    await refreshData();
     setRefreshing(false);
-  }, [refetchEarnings]);
+  }, [refreshData]);
 
-  const handleSetupPayouts = async () => {
-    try {
-      await setupConnect();
-    } catch (error) {
-      console.error('Failed to setup payouts:', error);
-    }
+  const handleSetupPayouts = () => {
+    router.push('/(barber)/earnings/onboarding' as any);
   };
 
   const handleOpenDashboard = async () => {
@@ -100,7 +94,7 @@ export default function EarningsScreen() {
   };
 
   // Generate chart data
-  const chartData = generateChartData(earnings, selectedPeriod);
+  const chartData = generateChartData(earnings ?? undefined, selectedPeriod);
   const chartTotal = earnings ? earnings.netEarnings / 100 : 0;
 
   // Loading state
@@ -157,18 +151,10 @@ export default function EarningsScreen() {
                         : 'Your account is set up and ready to receive payouts.'}
                   </Text>
                   {(needsOnboarding || hasRestrictions) && (
-                    <Button
-                      onPress={handleSetupPayouts}
-                      disabled={isSettingUp}
-                      className="self-start"
-                    >
-                      {isSettingUp ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Text className="text-white font-semibold">
-                          {needsOnboarding ? 'Set Up Now' : 'Continue Setup'}
-                        </Text>
-                      )}
+                    <Button onPress={handleSetupPayouts} className="self-start">
+                      <Text className="text-white font-semibold">
+                        {needsOnboarding ? 'Set Up Now' : 'Continue Setup'}
+                      </Text>
                     </Button>
                   )}
                 </View>

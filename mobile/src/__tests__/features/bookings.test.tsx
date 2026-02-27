@@ -1,195 +1,236 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useBooking, BOOKING_QUERY_KEYS } from '@/features/bookings/hooks/useBooking';
-import { bookingService } from '@/features/bookings/services/bookingService';
-import type { Appointment, CreateAppointmentDTO } from '@/features/bookings/types';
+/**
+ * Booking hooks test suite
+ *
+ * These tests verify the Convex-based booking hooks.
+ * Because useBooking now calls Convex mutations directly (not TanStack
+ * Query), the tests mock the Convex client and mutation functions.
+ */
 
-jest.mock('@/features/bookings/services/bookingService');
+import { renderHook, act } from '@testing-library/react-native';
+
+import { useBooking } from '@/features/bookings/hooks/useBooking';
+import { bookingService } from '@/features/bookings/services/bookingService';
+import { convex } from '@/services/convex/client';
+
+// Mock the Convex client used by bookingService
+jest.mock('@/services/convex/client', () => ({
+  convex: {
+    mutation: jest.fn(),
+    query: jest.fn(),
+  },
+}));
+
+// Mock the Convex API references
+jest.mock('@convex/_generated/api', () => ({
+  api: {
+    appointments: {
+      queries: {
+        getMyAppointments: 'getMyAppointments',
+        getAppointmentById: 'getAppointmentById',
+        checkAvailability: 'checkAvailability',
+      },
+      mutations: {
+        bookAppointment: 'bookAppointment',
+        cancelAppointment: 'cancelAppointment',
+        updateAppointmentStatus: 'updateAppointmentStatus',
+        updatePaymentStatus: 'updatePaymentStatus',
+      },
+    },
+  },
+}));
+
+// Mock convex/react hooks
+const mockUseMutation = jest.fn();
+const mockUseQuery = jest.fn();
+jest.mock('convex/react', () => ({
+  ...jest.requireActual('convex/react'),
+  useMutation: (ref: string) => mockUseMutation(ref),
+  useQuery: (ref: string, args: unknown) => mockUseQuery(ref, args),
+  ConvexProvider: ({ children }: { children: React.ReactNode }) => children,
+  ConvexReactClient: jest.fn(),
+}));
 
 describe('useBooking', () => {
-  let queryClient: QueryClient;
+  const mockBookMutation = jest.fn();
+  const mockCancelMutation = jest.fn();
+  const mockUpdateStatusMutation = jest.fn();
 
   beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
     jest.clearAllMocks();
+
+    // Set up useMutation to return the appropriate mock function
+    mockUseMutation.mockImplementation((ref: string) => {
+      switch (ref) {
+        case 'bookAppointment':
+          return mockBookMutation;
+        case 'cancelAppointment':
+          return mockCancelMutation;
+        case 'updateAppointmentStatus':
+          return mockUpdateStatusMutation;
+        default:
+          return jest.fn();
+      }
+    });
   });
-
-  const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-  );
-
-  const mockAppointment: Appointment = {
-    _id: '1',
-    clientId: 'client-1',
-    barberId: 'barber-1',
-    serviceType: 'haircut',
-    hairType: 'curly',
-    location: { type: 'in_salon' },
-    scheduledFor: new Date('2025-12-15T10:00:00'),
-    duration: 60,
-    price: 50,
-    status: 'pending',
-    paymentStatus: 'pending',
-    specialRequests: 'Test appointment',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
 
   describe('createAppointment', () => {
     it('should create appointment successfully', async () => {
-      (bookingService.createAppointment as jest.Mock).mockResolvedValue(mockAppointment);
+      const mockResult = 'appointment-id-123';
+      mockBookMutation.mockResolvedValue(mockResult);
 
       const onSuccessMock = jest.fn();
-      const { result } = renderHook(() => useBooking({ onSuccess: onSuccessMock }), { wrapper });
+      const { result } = renderHook(() => useBooking({ onSuccess: onSuccessMock }));
 
-      const createData: CreateAppointmentDTO = {
-        barberId: 'barber-1',
-        serviceType: 'haircut',
-        hairType: 'curly',
-        location: { type: 'in_salon' },
-        scheduledFor: new Date('2025-12-15T10:00:00'),
-        specialRequests: 'Test appointment',
+      const bookingArgs = {
+        barberId: 'barber-1' as any,
+        serviceId: 'svc-1',
+        serviceName: 'Haircut',
+        price: 50,
+        duration: 60,
+        scheduledFor: Date.now() + 86400000,
+        locationType: 'in_salon' as const,
       };
 
-      result.current.createAppointment.mutate(createData);
-
-      await waitFor(() => {
-        expect(result.current.isCreating).toBe(false);
+      await act(async () => {
+        await result.current.createAppointment(bookingArgs);
       });
 
-      expect(bookingService.createAppointment).toHaveBeenCalledWith(createData);
-      expect(onSuccessMock).toHaveBeenCalledWith(mockAppointment);
+      expect(mockBookMutation).toHaveBeenCalledWith(bookingArgs);
+      expect(onSuccessMock).toHaveBeenCalled();
     });
 
     it('should handle create error', async () => {
       const mockError = new Error('Failed to create appointment');
-      (bookingService.createAppointment as jest.Mock).mockRejectedValue(mockError);
+      mockBookMutation.mockRejectedValue(mockError);
 
       const onErrorMock = jest.fn();
-      const { result } = renderHook(() => useBooking({ onError: onErrorMock }), { wrapper });
+      const { result } = renderHook(() => useBooking({ onError: onErrorMock }));
 
-      result.current.createAppointment.mutate({
-        barberId: 'barber-1',
-        serviceType: 'haircut',
-        hairType: 'curly',
-        location: { type: 'in_salon' },
-        scheduledFor: new Date(),
-      });
-
-      await waitFor(() => {
-        expect(result.current.createError).toEqual(mockError);
-      });
+      await expect(
+        act(async () => {
+          await result.current.createAppointment({
+            barberId: 'barber-1' as any,
+            serviceId: 'svc-1',
+            serviceName: 'Haircut',
+            price: 50,
+            duration: 60,
+            scheduledFor: Date.now(),
+            locationType: 'in_salon' as const,
+          });
+        })
+      ).rejects.toThrow('Failed to create appointment');
 
       expect(onErrorMock).toHaveBeenCalledWith(mockError);
     });
   });
 
-  describe('updateAppointment', () => {
-    it('should update appointment successfully', async () => {
-      const updatedAppointment = { ...mockAppointment, specialRequests: 'Updated notes' };
-      (bookingService.updateAppointment as jest.Mock).mockResolvedValue(updatedAppointment);
-
-      const { result } = renderHook(() => useBooking(), { wrapper });
-
-      result.current.updateAppointment.mutate({
-        id: '1',
-        data: { specialRequests: 'Updated notes' },
-      });
-
-      await waitFor(() => {
-        expect(result.current.isUpdating).toBe(false);
-      });
-
-      expect(bookingService.updateAppointment).toHaveBeenCalledWith('1', {
-        specialRequests: 'Updated notes',
-      });
-    });
-  });
-
   describe('cancelAppointment', () => {
     it('should cancel appointment successfully', async () => {
-      const canceledAppointment = { ...mockAppointment, status: 'cancelled' as const };
-      (bookingService.cancelAppointment as jest.Mock).mockResolvedValue(canceledAppointment);
+      const mockResult = { status: 'cancelled' };
+      mockCancelMutation.mockResolvedValue(mockResult);
 
-      const { result } = renderHook(() => useBooking(), { wrapper });
+      const { result } = renderHook(() => useBooking());
 
-      result.current.cancelAppointment.mutate({
-        id: '1',
+      await act(async () => {
+        await result.current.cancelAppointment('appointment-1' as any, 'Personal reasons');
+      });
+
+      expect(mockCancelMutation).toHaveBeenCalledWith({
+        appointmentId: 'appointment-1',
         reason: 'Personal reasons',
       });
-
-      await waitFor(() => {
-        expect(result.current.isCanceling).toBe(false);
-      });
-
-      expect(bookingService.cancelAppointment).toHaveBeenCalledWith('1', 'Personal reasons');
     });
   });
 
   describe('confirmAppointment', () => {
     it('should confirm appointment successfully', async () => {
-      const confirmedAppointment = { ...mockAppointment, status: 'confirmed' as const };
-      (bookingService.confirmAppointment as jest.Mock).mockResolvedValue(confirmedAppointment);
+      const mockResult = { status: 'confirmed' };
+      mockUpdateStatusMutation.mockResolvedValue(mockResult);
 
-      const { result } = renderHook(() => useBooking(), { wrapper });
+      const { result } = renderHook(() => useBooking());
 
-      result.current.confirmAppointment.mutate('1');
-
-      await waitFor(() => {
-        expect(result.current.isConfirming).toBe(false);
+      await act(async () => {
+        await result.current.confirmAppointment('appointment-1' as any);
       });
 
-      expect(bookingService.confirmAppointment).toHaveBeenCalledWith('1');
+      expect(mockUpdateStatusMutation).toHaveBeenCalledWith({
+        appointmentId: 'appointment-1',
+        status: 'confirmed',
+      });
     });
   });
 
   describe('completeAppointment', () => {
     it('should complete appointment successfully', async () => {
-      const completedAppointment = { ...mockAppointment, status: 'completed' as const };
-      (bookingService.completeAppointment as jest.Mock).mockResolvedValue(completedAppointment);
+      const mockResult = { status: 'completed' };
+      mockUpdateStatusMutation.mockResolvedValue(mockResult);
 
-      const { result } = renderHook(() => useBooking(), { wrapper });
+      const { result } = renderHook(() => useBooking());
 
-      result.current.completeAppointment.mutate('1');
-
-      await waitFor(() => {
-        expect(result.current.isCompleting).toBe(false);
+      await act(async () => {
+        await result.current.completeAppointment('appointment-1' as any);
       });
 
-      expect(bookingService.completeAppointment).toHaveBeenCalledWith('1');
+      expect(mockUpdateStatusMutation).toHaveBeenCalledWith({
+        appointmentId: 'appointment-1',
+        status: 'completed',
+      });
     });
   });
+});
 
-  describe('query invalidation', () => {
-    it('should invalidate relevant queries after creating appointment', async () => {
-      (bookingService.createAppointment as jest.Mock).mockResolvedValue(mockAppointment);
+describe('bookingService (imperative)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
-      const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
-      const { result } = renderHook(() => useBooking(), { wrapper });
+  it('should call Convex mutation for bookAppointment', async () => {
+    const mockResult = 'new-appointment-id';
+    (convex.mutation as jest.Mock).mockResolvedValue(mockResult);
 
-      result.current.createAppointment.mutate({
-        barberId: 'barber-1',
-        serviceType: 'haircut',
-        hairType: 'curly',
-        location: { type: 'in_salon' },
-        scheduledFor: new Date(),
-      });
+    const args = {
+      barberId: 'barber-1' as any,
+      serviceId: 'svc-1',
+      serviceName: 'Haircut',
+      price: 50,
+      duration: 60,
+      scheduledFor: Date.now(),
+      locationType: 'in_salon' as const,
+    };
 
-      await waitFor(() => {
-        expect(result.current.isCreating).toBe(false);
-      });
+    const result = await bookingService.bookAppointment(args);
 
-      expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: BOOKING_QUERY_KEYS.appointments,
-      });
-      expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: BOOKING_QUERY_KEYS.myAppointments,
-      });
-    });
+    expect(convex.mutation).toHaveBeenCalled();
+    expect(result).toBe(mockResult);
+  });
+
+  it('should call Convex mutation for cancelAppointment', async () => {
+    const mockResult = { status: 'cancelled' };
+    (convex.mutation as jest.Mock).mockResolvedValue(mockResult);
+
+    const result = await bookingService.cancelAppointment('appt-1' as any, 'Changed plans');
+
+    expect(convex.mutation).toHaveBeenCalled();
+    expect(result).toEqual(mockResult);
+  });
+
+  it('should call Convex query for getMyAppointments', async () => {
+    const mockAppointments = [{ _id: 'appt-1', status: 'pending' }];
+    (convex.query as jest.Mock).mockResolvedValue(mockAppointments);
+
+    const result = await bookingService.getMyAppointments('pending');
+
+    expect(convex.query).toHaveBeenCalled();
+    expect(result).toEqual(mockAppointments);
+  });
+
+  it('should call Convex query for checkAvailability', async () => {
+    const mockSlots = ['09:00', '09:30', '10:00'];
+    (convex.query as jest.Mock).mockResolvedValue(mockSlots);
+
+    const result = await bookingService.checkAvailability('barber-1' as any, Date.now());
+
+    expect(convex.query).toHaveBeenCalled();
+    expect(result).toEqual(mockSlots);
   });
 });

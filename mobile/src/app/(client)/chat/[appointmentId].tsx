@@ -61,7 +61,6 @@ export default function ChatConversationScreen() {
     messages,
     sendMessage,
     isLoading: isLoadingMessages,
-    error,
     otherUserTyping,
     setIsTyping,
     markAsRead,
@@ -151,7 +150,7 @@ export default function ChatConversationScreen() {
   /**
    * Handle message long press
    */
-  const handleMessageLongPress = useCallback((message: IMessage) => {
+  const handleMessageLongPress = useCallback((_message: IMessage) => {
     // TODO: Show options menu (copy, delete, etc.)
     Alert.alert('Message Options', 'Copy or delete this message?', [
       { text: 'Cancel', style: 'cancel' },
@@ -215,13 +214,25 @@ export default function ChatConversationScreen() {
   const otherUser = useMemo((): IChatUser | null => {
     if (!conversation) return null;
 
+    // Get participant info from participants object or fallback to legacy fields
+    const participants = Array.isArray(conversation.participants)
+      ? {
+          clientName: conversation.clientName,
+          clientAvatar: conversation.clientAvatar,
+          barberName: conversation.barberName,
+          barberAvatar: conversation.barberAvatar,
+        }
+      : conversation.participants;
+
     const isClient = userType === 'client';
     return {
       id: isClient ? conversation.barberId : conversation.clientId,
-      name: isClient ? conversation.participants.barberName : conversation.participants.clientName,
+      name: isClient
+        ? participants?.barberName || conversation.barberName || 'Barber'
+        : participants?.clientName || conversation.clientName || 'Client',
       avatar: isClient
-        ? conversation.participants.barberAvatar
-        : conversation.participants.clientAvatar,
+        ? participants?.barberAvatar || conversation.barberAvatar
+        : participants?.clientAvatar || conversation.clientAvatar,
       online: false, // TODO: Implement online status
     };
   }, [conversation, userType]);

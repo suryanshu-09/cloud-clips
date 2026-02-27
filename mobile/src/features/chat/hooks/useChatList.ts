@@ -1,27 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
-import { chatService } from '../services/chatService';
+import { useMemo, useState, useEffect } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
 import { IConversation, ICreateConversationParams } from '../types';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 
-/**
- * useChatList Hook
- *
- * Manages the list of chat conversations for a user.
- *
- * Features:
- * - Real-time conversation updates
- * - Create new conversations
- * - Delete conversations
- * - Sort by last message time
- * - Unread message counts
- *
- * @param userId - The current user's ID
- * @param userType - Whether the user is a 'client' or 'barber'
- *
- * @example
- * ```tsx
- * const { conversations, createConversation, isLoading } = useChatList(userId, 'client');
- * ```
- */
+const isDevMode = process.env.EXPO_PUBLIC_DEV_MODE === 'true';
 
 interface IUseChatListResult {
   conversations: IConversation[];
@@ -37,152 +21,109 @@ interface IUseChatListResult {
   totalUnreadCount: number;
 }
 
-export const useChatList = (userId: string, userType: 'client' | 'barber'): IUseChatListResult => {
-  const [conversations, setConversations] = useState<IConversation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+export const useChatList = (): IUseChatListResult => {
+  const { currentUser } = useAuth();
 
-  // Subscribe to real-time conversation updates
+  const conversationsData = useQuery(
+    isDevMode ? 'skip' : undefined,
+    api.messages.queries.getConversations
+  );
+  const createConversationMutation = useMutation(api.messages.mutations.createConversation);
+
+  const [mockConversations, setMockConversations] = useState<IConversation[]>([]);
+  const [isLoadingMock, setIsLoadingMock] = useState(isDevMode);
+
   useEffect(() => {
-    if (!userId) {
-      console.log('[useChatList] No userId provided, skipping subscription');
-      setIsLoading(false);
-      return;
-    }
-
-    console.log('[useChatList] Setting up subscription for user:', userId);
-    const conversationMap = new Map<string, IConversation>();
-    let hasReceivedData = false;
-
-    try {
-      const unsubscribe = chatService.subscribeToConversations(userId, (update) => {
-        console.log('[useChatList] Received update:', update.type, update.conversation?.id);
-        hasReceivedData = true;
-        const { conversation } = update;
-
-        if (update.type === 'removed') {
-          conversationMap.delete(conversation.id);
-        } else {
-          conversationMap.set(conversation.id, conversation);
+    if (isDevMode) {
+      import('../services/mockChatService').then((module) => {
+        const mockService = module.mockChatService;
+        if (currentUser?.id) {
+          mockService.subscribeToConversations(currentUser.id, (update) => {
+            if (update.type === 'added') {
+              setMockConversations((prev) => {
+                const exists = prev.find((c) => c.id === update.conversation.id);
+                if (exists) return prev;
+                return [...prev, update.conversation];
+              });
+            }
+          });
         }
-
-        // Convert to array and sort by last message time (newest first)
-        const sortedConversations = Array.from(conversationMap.values()).sort(
-          (a, b) => b.lastMessageAt - a.lastMessageAt
-        );
-
-        console.log('[useChatList] Setting conversations:', sortedConversations.length);
-        setConversations(sortedConversations);
-        setIsLoading(false);
+        setIsLoadingMock(false);
       });
-
-      // Set a timeout to ensure loading state is cleared even if no data
-      const timeoutId = setTimeout(() => {
-        if (!hasReceivedData) {
-          console.log('[useChatList] No data received after timeout, clearing loading state');
-          setIsLoading(false);
-        }
-      }, 2000);
-
-      return () => {
-        clearTimeout(timeoutId);
-        unsubscribe();
-      };
-    } catch (err) {
-      console.error('[useChatList] Error subscribing to conversations:', err);
-      setError(err as Error);
-      setIsLoading(false);
     }
-  }, [userId]);
+  }, [currentUser?.id]);
 
-  /**
-   * Create a new conversation
-   */
-  const createConversation = useCallback(
-    async (params: ICreateConversationParams): Promise<string> => {
-      try {
-        setError(null);
-        const conversationId = await chatService.createConversation(params);
-        return conversationId;
-      } catch (err) {
-        console.error('[useChatList] Error creating conversation:', err);
-        setError(err as Error);
-        throw err;
-      }
-    },
-    []
-  );
+  const conversations = useMemo(() => {
+    if (isDevMode) return mockConversations;
+    if (!conversationsData) return [];
 
-  /**
-   * Get existing conversation by appointment ID or create a new one
-   */
-  const getOrCreateConversation = useCallback(
-    async (appointmentId: string, params: ICreateConversationParams): Promise<string> => {
-      try {
-        setError(null);
+    return conversationsData.map(
+      (conv): IConversation => ({
+        _id: conv._id,
+        id: conv._id,
+        participants: conv.participants,
+        appointmentId: conv.appointmentId,
+        clientName: conv.otherParticipant?.name,
+        clientAvatar: conv.otherParticipant?.avatar,
+        barberName: conv.otherParticipant?.name,
+        barberAvatar: conv.otherParticipant?.avatar,
+        lastMessage: conv.lastMessage,
+        lastMessageAt: conv.lastMessageAt,
+        lastMessageSenderId: conv.lastMessageSenderId,
+        unreadCounts: conv.unreadCounts,
+        unreadCount: conv.unreadCount,
+        createdAt: conv.createdAt,
+        updatedAt: conv.updatedAt,
+      })
+    );
+  }, [conversationsData, mockConversations, isDevMode]);
 
-        // Check if conversation already exists
-        const existingConversation = await chatService.getConversationByAppointment(appointmentId);
+  const totalUnreadCount = useMemo(() => {
+    return conversations.reduce((total, conv) => total + (conv.unreadCount || 0), 0);
+  }, [conversations]);
 
-        if (existingConversation) {
-          return existingConversation.id;
-        }
+  const createConversation = async (params: ICreateConversationParams): Promise<string> => {
+    if (!params.participantId) {
+      throw new Error('Participant ID is required');
+    }
 
-        // Create new conversation
-        const conversationId = await chatService.createConversation(params);
-        return conversationId;
-      } catch (err) {
-        console.error('[useChatList] Error getting or creating conversation:', err);
-        setError(err as Error);
-        throw err;
-      }
-    },
-    []
-  );
+    const result = await createConversationMutation({
+      participantId: params.participantId as Id<'users'>,
+      appointmentId: params.appointmentId as Id<'appointments'> | undefined,
+      initialMessage: params.initialMessage,
+    });
 
-  /**
-   * Delete a conversation
-   */
-  const deleteConversation = useCallback(
-    async (conversationId: string): Promise<void> => {
-      try {
-        setError(null);
-        await chatService.deleteConversation(conversationId, userId);
+    return result._id;
+  };
 
-        // Remove from local state
-        setConversations((prev) => prev.filter((conv) => conv.id !== conversationId));
-      } catch (err) {
-        console.error('[useChatList] Error deleting conversation:', err);
-        setError(err as Error);
-        throw err;
-      }
-    },
-    [userId]
-  );
+  const getOrCreateConversation = async (
+    appointmentId: string,
+    params: ICreateConversationParams
+  ): Promise<string> => {
+    const existing = conversations.find((c) => c.appointmentId === appointmentId);
+    if (existing) {
+      return existing._id;
+    }
+    return createConversation(params);
+  };
 
-  /**
-   * Refresh conversations manually
-   */
-  const refreshConversations = useCallback(async () => {
-    // The subscription will handle updates automatically
-    // This is a no-op for now but can be used for pull-to-refresh
-  }, []);
+  const deleteConversation = async (conversationId: string): Promise<void> => {
+    console.warn(
+      '[useChatList] Delete conversation not implemented - Convex does not support soft deletes for chat'
+    );
+  };
 
-  /**
-   * Calculate total unread count
-   */
-  const totalUnreadCount = conversations.reduce(
-    (total, conversation) => total + conversation.unreadCount,
-    0
-  );
+  const refreshConversations = async (): Promise<void> => {
+    // Convex queries auto-refresh, no manual refresh needed
+  };
 
   return {
     conversations,
     createConversation,
     getOrCreateConversation,
     deleteConversation,
-    isLoading,
-    error,
+    isLoading: isDevMode ? isLoadingMock : conversationsData === undefined,
+    error: null,
     refreshConversations,
     totalUnreadCount,
   };

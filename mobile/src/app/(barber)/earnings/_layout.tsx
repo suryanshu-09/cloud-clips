@@ -24,6 +24,14 @@ export default function EarningsLayout() {
           headerBackTitle: 'Back',
         }}
       />
+      <Stack.Screen
+        name="onboarding"
+        options={{
+          title: 'Stripe Connect Setup',
+          headerShown: false,
+          presentation: 'fullScreenModal',
+        }}
+      />
     </Stack>
   );
 }

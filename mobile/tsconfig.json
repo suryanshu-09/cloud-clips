@@ -34,6 +34,15 @@
       ],
       "@utils/*": [
         "./src/utils/*"
+      ],
+      "@convex/*": [
+        "./src/convex/*"
+      ],
+      "@/convex/*": [
+        "./src/convex/*"
+      ],
+      "@/convex/_generated/*": [
+        "./src/convex/_generated/*"
       ]
     }
   },

@@ -1,10 +1,18 @@
 /**
  * Client Appointments List Screen
  * Displays user's appointments with tab navigation (Upcoming/Past/Cancelled)
+ *
+ * Uses Convex reactive queries — data auto-updates when the backend changes,
+ * so there is no manual refetch or pull-to-refresh required.
+ *
+ * Backend statuses: pending | confirmed | in_progress | completed | cancelled | no_show
+ *   Upcoming tab  → pending + confirmed + in_progress
+ *   Past tab       → completed + no_show
+ *   Cancelled tab  → cancelled
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { View, Text, FlatList, RefreshControl, Pressable, Alert } from 'react-native';
+import { View, Text, FlatList, Pressable, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeView } from '@/components/ui/SafeView';
 import { Button } from '@/components/ui/Button';
@@ -16,9 +24,15 @@ import { AppointmentCard } from '@/components/booking/AppointmentCard';
 import { useAppointments } from '@/features/bookings/hooks/useAppointments';
 import { useBooking } from '@/features/bookings/hooks/useBooking';
 import { useTranslation } from '@/services/i18n/useTranslation';
-import type { AppointmentWithDetails, AppointmentStatus } from '@/features/bookings/types';
+import type { IAppointmentWithDetails, AppointmentStatus } from '@/features/bookings/types';
+import type { Id } from '@convex/_generated/dataModel';
 
 type TabType = 'upcoming' | 'past' | 'cancelled';
+
+// Status groupings for tabs — defined outside component to avoid re-creation
+const UPCOMING_STATUSES: AppointmentStatus[] = ['pending', 'confirmed', 'in_progress'];
+const PAST_STATUSES: AppointmentStatus[] = ['completed', 'no_show'];
+const CANCELLED_STATUSES: AppointmentStatus[] = ['cancelled'];
 
 interface ITabButtonProps {
   label: string;
@@ -74,8 +88,8 @@ export default function AppointmentsListScreen() {
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
-  // Fetch all appointments
-  const { appointments, isLoading, isError, refetch, isRefetching } = useAppointments();
+  // Fetch all appointments — Convex queries are reactive and auto-update
+  const { appointments, isLoading, isError } = useAppointments();
 
   // Booking mutations
   const { cancelAppointment, isCanceling } = useBooking({
@@ -83,7 +97,6 @@ export default function AppointmentsListScreen() {
       setCancelModalVisible(false);
       setSelectedAppointmentId(null);
       setCancelReason('');
-      refetch();
       Alert.alert(t('common.success'), t('appointments.cancel.success'));
     },
     onError: (error) => {
@@ -91,20 +104,16 @@ export default function AppointmentsListScreen() {
     },
   });
 
-  // Filter appointments by tab
+  // Filter appointments by tab (status-based, no date logic)
   const filteredAppointments = useMemo(() => {
-    const now = new Date();
-
     return appointments.filter((apt) => {
-      const scheduledDate = new Date(apt.scheduledFor);
-
       switch (activeTab) {
         case 'upcoming':
-          return (apt.status === 'pending' || apt.status === 'confirmed') && scheduledDate >= now;
+          return UPCOMING_STATUSES.includes(apt.status as AppointmentStatus);
         case 'past':
-          return apt.status === 'completed' || scheduledDate < now;
+          return PAST_STATUSES.includes(apt.status as AppointmentStatus);
         case 'cancelled':
-          return apt.status === 'cancelled';
+          return CANCELLED_STATUSES.includes(apt.status as AppointmentStatus);
         default:
           return true;
       }
@@ -113,18 +122,15 @@ export default function AppointmentsListScreen() {
 
   // Count appointments per tab
   const appointmentCounts = useMemo(() => {
-    const now = new Date();
-
     return {
-      upcoming: appointments.filter((apt) => {
-        const scheduledDate = new Date(apt.scheduledFor);
-        return (apt.status === 'pending' || apt.status === 'confirmed') && scheduledDate >= now;
-      }).length,
-      past: appointments.filter((apt) => {
-        const scheduledDate = new Date(apt.scheduledFor);
-        return apt.status === 'completed' || scheduledDate < now;
-      }).length,
-      cancelled: appointments.filter((apt) => apt.status === 'cancelled').length,
+      upcoming: appointments.filter((apt) =>
+        UPCOMING_STATUSES.includes(apt.status as AppointmentStatus)
+      ).length,
+      past: appointments.filter((apt) => PAST_STATUSES.includes(apt.status as AppointmentStatus))
+        .length,
+      cancelled: appointments.filter((apt) =>
+        CANCELLED_STATUSES.includes(apt.status as AppointmentStatus)
+      ).length,
     };
   }, [appointments]);
 
@@ -141,12 +147,12 @@ export default function AppointmentsListScreen() {
     setCancelModalVisible(true);
   }, []);
 
-  const handleConfirmCancel = useCallback(() => {
+  const handleConfirmCancel = useCallback(async () => {
     if (selectedAppointmentId) {
-      cancelAppointment.mutate({
-        id: selectedAppointmentId,
-        reason: cancelReason || undefined,
-      });
+      await cancelAppointment(
+        selectedAppointmentId as Id<'appointments'>,
+        cancelReason || undefined
+      );
     }
   }, [selectedAppointmentId, cancelReason, cancelAppointment]);
 
@@ -158,7 +164,7 @@ export default function AppointmentsListScreen() {
   );
 
   const handleRebook = useCallback(
-    (appointment: AppointmentWithDetails) => {
+    (appointment: IAppointmentWithDetails) => {
       // Navigate to booking flow with pre-filled data
       router.push({
         pathname: '/search',
@@ -171,13 +177,26 @@ export default function AppointmentsListScreen() {
     [router]
   );
 
+  const handleLeaveReview = useCallback(
+    (appointment: IAppointmentWithDetails) => {
+      router.push({
+        pathname: '/appointments/review',
+        params: {
+          appointmentId: appointment._id,
+          barberId: appointment.barberId,
+        },
+      });
+    },
+    [router]
+  );
+
   const handleBookNew = useCallback(() => {
     router.push('/search');
   }, [router]);
 
   // Render appointment item
   const renderAppointment = useCallback(
-    ({ item }: { item: AppointmentWithDetails }) => (
+    ({ item }: { item: IAppointmentWithDetails }) => (
       <View className="px-4 mb-4">
         <AppointmentCard
           appointment={item}
@@ -185,11 +204,20 @@ export default function AppointmentsListScreen() {
           onCancel={handleCancel}
           onReschedule={handleReschedule}
           onRebook={handleRebook}
+          onLeaveReview={handleLeaveReview}
           isLoading={isCanceling}
+          hasReview={item.hasReview}
         />
       </View>
     ),
-    [handleViewDetails, handleCancel, handleReschedule, handleRebook, isCanceling]
+    [
+      handleViewDetails,
+      handleCancel,
+      handleReschedule,
+      handleRebook,
+      handleLeaveReview,
+      isCanceling,
+    ]
   );
 
   // Empty state config per tab
@@ -261,9 +289,6 @@ export default function AppointmentsListScreen() {
         <View className="flex-1 items-center justify-center p-8">
           <Text className="text-xl mb-2">{t('errors.generic')}</Text>
           <Text className="text-gray-600 text-center mb-4">{t('errors.network')}</Text>
-          <Button onPress={() => refetch()} variant="primary">
-            {t('common.tryAgain')}
-          </Button>
         </View>
       ) : filteredAppointments.length === 0 ? (
         <EmptyState
@@ -280,7 +305,6 @@ export default function AppointmentsListScreen() {
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ paddingTop: 16, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
         />
       )}
 

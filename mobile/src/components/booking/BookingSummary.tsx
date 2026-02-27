@@ -1,10 +1,12 @@
 /**
  * BookingSummary Component
  * Displays booking details for confirmation
+ * Aligned with IAppointment / ICreateAppointmentDTO types
  */
 
 import { View, Text, ScrollView } from 'react-native';
-import type { CreateAppointmentDTO, HairType, LocationType } from '@/features/bookings/types';
+import { format } from 'date-fns';
+import type { LocationType } from '@/features/bookings/types';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 
@@ -12,14 +14,11 @@ interface IBookingSummaryProps {
   barberName: string;
   barberAvatar?: string;
   serviceName: string;
-  servicePrice: number;
-  serviceDuration: number;
-  hairType: HairType;
-  scheduledFor: Date;
-  location: {
-    type: LocationType;
-    address?: string;
-  };
+  price: number;
+  duration: number; // in minutes
+  scheduledFor: number; // timestamp
+  locationType: LocationType;
+  address?: string;
   specialRequests?: string;
   discount?: number;
   couponCode?: string;
@@ -29,48 +28,29 @@ export function BookingSummary({
   barberName,
   barberAvatar,
   serviceName,
-  servicePrice,
-  serviceDuration,
-  hairType,
+  price,
+  duration,
   scheduledFor,
-  location,
+  locationType,
+  address,
   specialRequests,
   discount = 0,
   couponCode,
 }: IBookingSummaryProps) {
-  const formatDate = (date: Date): string => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const formatTime = (date: Date): string => {
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
-
   const formatCurrency = (amount: number): string => {
     return `$${amount.toFixed(2)}`;
   };
 
-  const hairTypeLabels: Record<HairType, string> = {
-    straight: 'Straight Hair',
-    wavy: 'Wavy Hair',
-    curly: 'Curly Hair',
+  const locationLabel: Record<LocationType, string> = {
+    in_home: 'In-Home',
+    in_salon: 'In-Salon',
   };
 
-  const locationLabels: Record<LocationType, string> = {
-    in_home: 'In Home',
-    in_salon: 'In Salon',
-  };
+  const scheduledDate = new Date(scheduledFor);
+  const formattedDate = format(scheduledDate, 'EEEE, MMMM d, yyyy');
+  const formattedTime = format(scheduledDate, 'h:mm a');
 
-  const subtotal = servicePrice;
+  const subtotal = price;
   const discountAmount = (subtotal * discount) / 100;
   const total = subtotal - discountAmount;
 
@@ -101,11 +81,11 @@ export function BookingSummary({
             <View className="flex-row gap-4">
               <View className="flex-1">
                 <Text className="text-sm font-medium text-gray-500">Duration</Text>
-                <Text className="text-base text-gray-900">{serviceDuration} minutes</Text>
+                <Text className="text-base text-gray-900">{duration} minutes</Text>
               </View>
               <View className="flex-1">
-                <Text className="text-sm font-medium text-gray-500">Hair Type</Text>
-                <Text className="text-base text-gray-900">{hairTypeLabels[hairType]}</Text>
+                <Text className="text-sm font-medium text-gray-500">Price</Text>
+                <Text className="text-base text-gray-900">{formatCurrency(price)}</Text>
               </View>
             </View>
           </View>
@@ -116,11 +96,11 @@ export function BookingSummary({
           <View className="gap-3">
             <View>
               <Text className="text-sm font-medium text-gray-500">Date</Text>
-              <Text className="text-base text-gray-900">{formatDate(scheduledFor)}</Text>
+              <Text className="text-base text-gray-900">{formattedDate}</Text>
             </View>
             <View>
               <Text className="text-sm font-medium text-gray-500">Time</Text>
-              <Text className="text-base text-gray-900">{formatTime(scheduledFor)}</Text>
+              <Text className="text-base text-gray-900">{formattedTime}</Text>
             </View>
           </View>
         </Card>
@@ -130,12 +110,12 @@ export function BookingSummary({
           <View className="gap-3">
             <View>
               <Text className="text-sm font-medium text-gray-500">Location</Text>
-              <Text className="text-base text-gray-900">{locationLabels[location.type]}</Text>
+              <Text className="text-base text-gray-900">{locationLabel[locationType]}</Text>
             </View>
-            {location.address && (
+            {locationType === 'in_home' && address && (
               <View>
                 <Text className="text-sm font-medium text-gray-500">Address</Text>
-                <Text className="text-base text-gray-900">{location.address}</Text>
+                <Text className="text-base text-gray-900">{address}</Text>
               </View>
             )}
           </View>

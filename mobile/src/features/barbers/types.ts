@@ -7,10 +7,12 @@ export interface IWorkingHour {
 }
 
 export interface IService {
+  id: string;
   name: string;
   price: number;
   duration: number;
   description?: string;
+  category: string;
 }
 
 export interface IGalleryItem {

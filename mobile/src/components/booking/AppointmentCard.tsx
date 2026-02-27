@@ -5,63 +5,78 @@
 
 import { memo, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, type PressableProps } from 'react-native';
+import { format, formatDistanceToNow, isPast } from 'date-fns';
+
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import type { AppointmentWithDetails, AppointmentStatus } from '@/features/bookings/types';
+import type { IAppointmentWithDetails, AppointmentStatus } from '@/features/bookings/types';
 
 interface IAppointmentCardProps extends Omit<PressableProps, 'children'> {
-  appointment: AppointmentWithDetails;
+  appointment: IAppointmentWithDetails;
   onCancel?: (id: string) => void;
   onReschedule?: (id: string) => void;
-  onRebook?: (appointment: AppointmentWithDetails) => void;
+  onRebook?: (appointment: IAppointmentWithDetails) => void;
   onViewDetails?: (id: string) => void;
+  onLeaveReview?: (appointment: IAppointmentWithDetails) => void;
   isLoading?: boolean;
   showActions?: boolean;
+  hasReview?: boolean;
 }
 
 const STATUS_CONFIG: Record<
   AppointmentStatus,
-  { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'default' }
+  {
+    label: string;
+    variant: 'success' | 'warning' | 'danger' | 'info' | 'default';
+    bgClass: string;
+    textClass: string;
+  }
 > = {
-  pending: { label: 'Pending', variant: 'warning' },
-  confirmed: { label: 'Confirmed', variant: 'success' },
-  completed: { label: 'Completed', variant: 'info' },
-  cancelled: { label: 'Cancelled', variant: 'danger' },
+  pending: {
+    label: 'Pending',
+    variant: 'warning',
+    bgClass: 'bg-yellow-100',
+    textClass: 'text-yellow-700',
+  },
+  confirmed: {
+    label: 'Confirmed',
+    variant: 'info',
+    bgClass: 'bg-blue-100',
+    textClass: 'text-blue-700',
+  },
+  in_progress: {
+    label: 'In Progress',
+    variant: 'success',
+    bgClass: 'bg-green-100',
+    textClass: 'text-green-700',
+  },
+  completed: {
+    label: 'Completed',
+    variant: 'default',
+    bgClass: 'bg-gray-100',
+    textClass: 'text-gray-700',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    variant: 'danger',
+    bgClass: 'bg-red-100',
+    textClass: 'text-red-700',
+  },
+  no_show: {
+    label: 'No Show',
+    variant: 'danger',
+    bgClass: 'bg-red-200',
+    textClass: 'text-red-900',
+  },
 };
 
 /**
- * Format date to a readable string
+ * Format a price number as USD currency (e.g. $25.00)
  */
-function formatDate(date: Date): string {
-  const d = new Date(date);
-  const options: Intl.DateTimeFormatOptions = {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  };
-  return d.toLocaleDateString('en-US', options);
-}
-
-/**
- * Format time to a readable string
- */
-function formatTime(date: Date): string {
-  const d = new Date(date);
-  return d.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-}
-
-/**
- * Check if appointment is in the past
- */
-function isPastAppointment(scheduledFor: Date): boolean {
-  return new Date(scheduledFor) < new Date();
+function formatPrice(price: number): string {
+  return `$${price.toFixed(2)}`;
 }
 
 /**
@@ -73,27 +88,34 @@ function AppointmentCardComponent({
   onReschedule,
   onRebook,
   onViewDetails,
+  onLeaveReview,
   isLoading = false,
   showActions = true,
+  hasReview = false,
   ...props
 }: IAppointmentCardProps) {
   const statusConfig = STATUS_CONFIG[appointment.status];
-  const isPast = useMemo(
-    () => isPastAppointment(appointment.scheduledFor),
+
+  const scheduledDate = useMemo(
+    () => new Date(appointment.scheduledFor),
     [appointment.scheduledFor]
   );
 
-  // Memoize formatted date/time
-  const formattedDate = useMemo(
-    () => formatDate(appointment.scheduledFor),
-    [appointment.scheduledFor]
-  );
-  const formattedTime = useMemo(
-    () => formatTime(appointment.scheduledFor),
-    [appointment.scheduledFor]
+  const _isPastAppointment = useMemo(() => isPast(scheduledDate), [scheduledDate]);
+
+  // Format date using date-fns: e.g. "Sat, Jan 15, 2026"
+  const formattedDate = useMemo(() => format(scheduledDate, 'EEE, MMM d, yyyy'), [scheduledDate]);
+
+  // Format time using date-fns: e.g. "2:30 PM"
+  const formattedTime = useMemo(() => format(scheduledDate, 'h:mm a'), [scheduledDate]);
+
+  // Relative time: e.g. "in 3 hours" or "2 days ago"
+  const relativeTime = useMemo(
+    () => formatDistanceToNow(scheduledDate, { addSuffix: true }),
+    [scheduledDate]
   );
 
-  // Memoize duration display
+  // Duration display
   const durationDisplay = useMemo(() => {
     const hours = Math.floor(appointment.duration / 60);
     const minutes = appointment.duration % 60;
@@ -105,13 +127,13 @@ function AppointmentCardComponent({
     return `${minutes}m`;
   }, [appointment.duration]);
 
-  // Memoize location display
+  // Location display using locationType field
   const locationDisplay = useMemo(() => {
-    if (appointment.location.type === 'in_home') {
-      return '🏠 At Your Location';
+    if (appointment.locationType === 'in_home') {
+      return { icon: '🏠', label: 'In-Home' };
     }
-    return '💈 At Salon';
-  }, [appointment.location.type]);
+    return { icon: '💈', label: 'In-Salon' };
+  }, [appointment.locationType]);
 
   // Callbacks
   const handleCancel = useCallback(() => {
@@ -130,10 +152,21 @@ function AppointmentCardComponent({
     onViewDetails?.(appointment._id);
   }, [onViewDetails, appointment._id]);
 
-  // Determine which actions to show
+  const handleLeaveReview = useCallback(() => {
+    onLeaveReview?.(appointment);
+  }, [onLeaveReview, appointment]);
+
+  // Determine which actions to show based on status
   const canCancel = appointment.status === 'pending' || appointment.status === 'confirmed';
   const canReschedule = appointment.status === 'pending' || appointment.status === 'confirmed';
-  const canRebook = appointment.status === 'completed' || appointment.status === 'cancelled';
+  const canRebook =
+    appointment.status === 'completed' ||
+    appointment.status === 'cancelled' ||
+    appointment.status === 'no_show';
+  const canLeaveReview = appointment.status === 'completed' && !hasReview;
+
+  // For no_show, use custom styling since Badge doesn't have a maroon variant
+  const isNoShow = appointment.status === 'no_show';
 
   return (
     <Pressable onPress={handleViewDetails} disabled={isLoading} {...props}>
@@ -142,11 +175,17 @@ function AppointmentCardComponent({
         <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
           <View className="flex-row items-center gap-2">
             <Text className="text-base font-semibold text-gray-900">{appointment.serviceName}</Text>
-            <Badge variant={statusConfig.variant} size="sm">
-              {statusConfig.label}
-            </Badge>
+            {isNoShow ? (
+              <View className="rounded-full px-2 py-0.5 bg-red-200">
+                <Text className="text-xs font-medium text-red-900">{statusConfig.label}</Text>
+              </View>
+            ) : (
+              <Badge variant={statusConfig.variant} size="sm">
+                {statusConfig.label}
+              </Badge>
+            )}
           </View>
-          <Text className="text-lg font-bold text-gray-900">${appointment.price}</Text>
+          <Text className="text-lg font-bold text-gray-900">{formatPrice(appointment.price)}</Text>
         </View>
 
         {/* Barber info */}
@@ -158,7 +197,9 @@ function AppointmentCardComponent({
           />
           <View className="ml-3 flex-1">
             <Text className="text-base font-medium text-gray-900">{appointment.barberName}</Text>
-            <Text className="text-sm text-gray-500">{locationDisplay}</Text>
+            <Text className="text-sm text-gray-500">
+              {locationDisplay.icon} {locationDisplay.label}
+            </Text>
           </View>
         </View>
 
@@ -179,12 +220,15 @@ function AppointmentCardComponent({
             </View>
           </View>
 
+          {/* Relative time indicator */}
+          <Text className="text-xs text-gray-400 mb-2">{relativeTime}</Text>
+
           {/* Address if available */}
-          {appointment.location.address && (
+          {appointment.address && (
             <View className="flex-row items-start gap-2 mt-2">
               <Text className="text-lg">📍</Text>
               <Text className="text-sm text-gray-600 flex-1" numberOfLines={2}>
-                {appointment.location.address}
+                {appointment.address}
               </Text>
             </View>
           )}
@@ -225,7 +269,7 @@ function AppointmentCardComponent({
                 Reschedule
               </Button>
             )}
-            {canRebook && onRebook && (
+            {canRebook && onRebook && !canLeaveReview && (
               <Button
                 variant="primary"
                 size="sm"
@@ -234,6 +278,17 @@ function AppointmentCardComponent({
                 fullWidth
               >
                 Book Again
+              </Button>
+            )}
+            {canLeaveReview && onLeaveReview && (
+              <Button
+                variant="primary"
+                size="sm"
+                onPress={handleLeaveReview}
+                disabled={isLoading}
+                fullWidth
+              >
+                Leave Review
               </Button>
             )}
           </View>

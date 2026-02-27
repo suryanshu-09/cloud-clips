@@ -1,139 +1,101 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { ScrollView, Text, View, Pressable, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Card, Badge } from '@/components/ui';
 
-type AppointmentStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+import { SkeletonCard, EmptyState } from '@/components/ui';
+import { AppointmentCard } from '@/components/booking';
+import { useAppointments } from '@/features/bookings/hooks/useAppointments';
+import type { IAppointmentWithDetails } from '@/features/bookings/types';
+
 type FilterType = 'all' | 'today' | 'upcoming' | 'pending';
 
-interface IAppointment {
-  id: string;
-  clientName: string;
-  service: string;
-  date: string;
-  time: string;
-  duration: number;
-  price: number;
-  status: AppointmentStatus;
-  location: string;
-}
+const FILTER_LABELS: Record<FilterType, string> = {
+  all: 'All',
+  today: 'Today',
+  upcoming: 'Upcoming',
+  pending: 'Pending',
+};
 
-// Mock data - replace with real data from API
-const MOCK_APPOINTMENTS: IAppointment[] = [
-  {
-    id: '1',
-    clientName: 'John Doe',
-    service: 'Premium Haircut',
-    date: '2025-12-01',
-    time: '10:00 AM',
-    duration: 45,
-    price: 45,
-    status: 'pending',
-    location: 'Home Service',
-  },
-  {
-    id: '2',
-    clientName: 'Sarah Smith',
-    service: 'Beard Trim',
-    date: '2025-12-01',
-    time: '2:00 PM',
-    duration: 30,
-    price: 25,
-    status: 'confirmed',
-    location: 'Salon',
-  },
-  {
-    id: '3',
-    clientName: 'Mike Johnson',
-    service: 'Haircut & Styling',
-    date: '2025-12-02',
-    time: '11:00 AM',
-    duration: 60,
-    price: 60,
-    status: 'confirmed',
-    location: 'Home Service',
-  },
-  {
-    id: '4',
-    clientName: 'Emily Davis',
-    service: 'Kids Haircut',
-    date: '2025-12-02',
-    time: '3:30 PM',
-    duration: 30,
-    price: 30,
-    status: 'confirmed',
-    location: 'Salon',
-  },
-];
+/**
+ * Returns start and end timestamps for today (local time).
+ */
+function getTodayRange(): { start: number; end: number } {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
+  return { start, end };
+}
 
 export default function BarberAppointmentsListScreen() {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterType>('all');
 
-  const getStatusBadgeVariant = (status: AppointmentStatus) => {
-    switch (status) {
+  // Fetch all appointments (no server-side status filter so we can do client-side filtering across tabs)
+  const { appointments, isLoading } = useAppointments();
+
+  const filteredAppointments = useMemo(() => {
+    if (!appointments.length) return [];
+
+    switch (filter) {
+      case 'all':
+        return appointments;
+
+      case 'today': {
+        const { start, end } = getTodayRange();
+        return appointments.filter((apt) => apt.scheduledFor >= start && apt.scheduledFor < end);
+      }
+
+      case 'upcoming': {
+        const now = Date.now();
+        return appointments.filter(
+          (apt) =>
+            apt.scheduledFor > now && (apt.status === 'pending' || apt.status === 'confirmed')
+        );
+      }
+
       case 'pending':
-        return 'warning';
-      case 'confirmed':
-        return 'info';
-      case 'in_progress':
-        return 'default';
-      case 'completed':
-        return 'success';
-      case 'cancelled':
-        return 'danger';
+        return appointments.filter((apt) => apt.status === 'pending');
+
       default:
-        return 'default';
+        return appointments;
     }
-  };
+  }, [appointments, filter]);
 
-  const getStatusLabel = (status: AppointmentStatus) => {
-    return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
-  };
+  const handleViewDetails = useCallback(
+    (id: string) => {
+      router.push(`/(barber)/appointments/${id}`);
+    },
+    [router]
+  );
 
-  const filteredAppointments = MOCK_APPOINTMENTS.filter((apt) => {
-    if (filter === 'all') return true;
-    if (filter === 'today') return apt.date === '2025-12-01';
-    if (filter === 'upcoming') return apt.date >= '2025-12-01' && apt.status === 'confirmed';
-    if (filter === 'pending') return apt.status === 'pending';
-    return true;
-  });
+  const renderAppointmentCard = useCallback(
+    ({ item }: { item: IAppointmentWithDetails }) => (
+      <View className="mb-3">
+        <AppointmentCard appointment={item} onViewDetails={handleViewDetails} showActions={false} />
+      </View>
+    ),
+    [handleViewDetails]
+  );
 
-  const renderAppointmentCard = ({ item }: { item: IAppointment }) => (
-    <Pressable onPress={() => router.push(`/(barber)/appointments/${item.id}`)}>
-      <Card className="mb-3 p-4">
-        <View className="flex-row items-start justify-between mb-2">
-          <View className="flex-1">
-            <Text className="text-lg font-bold text-gray-900 mb-1">{item.clientName}</Text>
-            <Text className="text-sm text-gray-600 mb-2">{item.service}</Text>
-          </View>
-          <Badge variant={getStatusBadgeVariant(item.status)} size="sm">
-            {getStatusLabel(item.status)}
-          </Badge>
-        </View>
+  const keyExtractor = useCallback((item: IAppointmentWithDetails) => item._id, []);
 
-        <View className="space-y-2">
-          <View className="flex-row items-center gap-2">
-            <Text className="text-base">📅</Text>
-            <Text className="text-sm text-gray-700">{item.date}</Text>
-            <Text className="text-gray-400">•</Text>
-            <Text className="text-sm text-gray-700">{item.time}</Text>
-            <Text className="text-gray-400">•</Text>
-            <Text className="text-sm text-gray-700">{item.duration} min</Text>
-          </View>
+  const renderEmptyState = useCallback(() => {
+    const filterLabel = filter !== 'all' ? ` ${FILTER_LABELS[filter].toLowerCase()}` : '';
+    return (
+      <EmptyState
+        icon="📅"
+        title="No Appointments"
+        description={`You don't have any${filterLabel} appointments at the moment.`}
+      />
+    );
+  }, [filter]);
 
-          <View className="flex-row items-center gap-2">
-            <Text className="text-base">📍</Text>
-            <Text className="text-sm text-gray-700">{item.location}</Text>
-          </View>
-
-          <View className="flex-row items-center justify-between mt-2 pt-2 border-t border-gray-200">
-            <Text className="text-base font-bold text-gray-900">${item.price}</Text>
-            <Text className="text-sm text-blue-600 font-medium">View Details →</Text>
-          </View>
-        </View>
-      </Card>
-    </Pressable>
+  const renderLoadingSkeleton = () => (
+    <View className="p-6 gap-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <SkeletonCard key={index} />
+      ))}
+    </View>
   );
 
   return (
@@ -161,7 +123,7 @@ export default function BarberAppointmentsListScreen() {
                     filter === type ? 'text-white' : 'text-gray-700'
                   }`}
                 >
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                  {FILTER_LABELS[type]}
                 </Text>
               </Pressable>
             ))}
@@ -169,22 +131,18 @@ export default function BarberAppointmentsListScreen() {
         </ScrollView>
       </View>
 
-      {/* Appointments List */}
-      <FlatList
-        data={filteredAppointments}
-        renderItem={renderAppointmentCard}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 24 }}
-        ListEmptyComponent={
-          <Card className="p-8 items-center">
-            <Text className="text-6xl mb-4">📅</Text>
-            <Text className="text-lg font-semibold text-gray-900 mb-2">No Appointments</Text>
-            <Text className="text-sm text-gray-600 text-center">
-              You don't have any {filter !== 'all' ? filter : ''} appointments at the moment.
-            </Text>
-          </Card>
-        }
-      />
+      {/* Content */}
+      {isLoading ? (
+        renderLoadingSkeleton()
+      ) : (
+        <FlatList
+          data={filteredAppointments}
+          renderItem={renderAppointmentCard}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={{ padding: 24, flexGrow: 1 }}
+          ListEmptyComponent={renderEmptyState}
+        />
+      )}
     </View>
   );
 }

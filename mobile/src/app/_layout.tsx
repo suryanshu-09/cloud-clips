@@ -13,17 +13,28 @@ import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { initSentry, errorTrackingService } from '@/services/errorTracking/sentry';
 import { offlineSyncService } from '@/services/offline/offlineSync';
 import { StripeProviderWrapper } from '@/services/stripe/provider';
+import { ConvexProviderWrapper } from '@/services/convex/provider';
 import { initializeStripe } from '@/features/payments/services/stripeService';
 import apiClient from '@/services/api/client';
 // Initialize i18n - must be imported before using translations
 import '@/services/i18n';
 import { i18nService } from '@/services/i18n';
+import { useNotificationSetup } from '@/features/notifications';
 
 /**
  * Inner component that uses hooks requiring providers
  */
 function AppContent() {
   const { isOffline, wasOffline, acknowledgeOnline } = useNetworkStatus();
+
+  // Initialize push notification handlers and token registration
+  const { isAvailable: notificationsAvailable } = useNotificationSetup();
+
+  useEffect(() => {
+    if (notificationsAvailable) {
+      console.log('[App] Push notifications initialized');
+    }
+  }, [notificationsAvailable]);
 
   // Sync TanStack Query's online status with our network status
   useEffect(() => {
@@ -134,13 +145,15 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <JotaiProvider>
-          <QueryClientProvider client={queryClient}>
-            <StripeProviderWrapper>
-              <AppContent />
-            </StripeProviderWrapper>
-          </QueryClientProvider>
-        </JotaiProvider>
+        <ConvexProviderWrapper>
+          <JotaiProvider>
+            <QueryClientProvider client={queryClient}>
+              <StripeProviderWrapper>
+                <AppContent />
+              </StripeProviderWrapper>
+            </QueryClientProvider>
+          </JotaiProvider>
+        </ConvexProviderWrapper>
       </SafeAreaProvider>
     </ErrorBoundary>
   );

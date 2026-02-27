@@ -30,9 +30,9 @@ export function Badge({ variant = 'default', size = 'md', children, ...props }: 
   };
 
   const sizeStyles = {
-    sm: 'px-3 py-2 min-h-[32px]',
-    md: 'px-4 py-3 min-h-[40px]',
-    lg: 'px-5 py-4 min-h-[48px]',
+    sm: 'px-2 py-0.5',
+    md: 'px-3 py-1.5 min-h-[28px]',
+    lg: 'px-4 py-2.5 min-h-[36px]',
   };
 
   const textSizeStyles = {

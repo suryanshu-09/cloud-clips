@@ -97,6 +97,29 @@ export interface IMediaFile {
 }
 
 // ============================================================================
+// Review Types
+// ============================================================================
+
+export type {
+  IReview,
+  IReviewSubmission,
+  IReviewPhoto,
+  IReviewPhotoUpload,
+  IReviewWithDetails,
+  IReviewValidationErrors,
+  IRatingDistribution,
+  IReviewSummary,
+  IReviewReport,
+  IReviewFilters,
+  IReviewQueryParams,
+  IPaginatedReviews,
+  IReviewResponse,
+  IReviewWithResponse,
+  ReviewStatus,
+  ReportReason,
+} from './reviews';
+
+// ============================================================================
 // Re-export commonly used types from stores for convenience
 // ============================================================================
 

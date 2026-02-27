@@ -1,11 +1,13 @@
 /**
  * useBooking Hook
- * Manages appointment booking creation and updates
+ * Manages appointment booking creation and status updates via Convex mutations.
  */
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { bookingService } from '../services/bookingService';
-import type { CreateAppointmentDTO, UpdateAppointmentDTO, Appointment } from '../types';
+import { useState, useCallback } from 'react';
+import { useMutation } from 'convex/react';
+import { ConvexError } from 'convex/values';
+import { api } from '@convex/_generated/api';
+import type { Id } from '@convex/_generated/dataModel';
 
 export const BOOKING_QUERY_KEYS = {
   appointments: ['appointments'] as const,
@@ -14,111 +16,167 @@ export const BOOKING_QUERY_KEYS = {
   barberAppointments: (barberId: string) => ['appointments', 'barber', barberId] as const,
 };
 
-interface UseBookingOptions {
-  onSuccess?: (appointment: Appointment) => void;
+interface IUseBookingOptions {
+  onSuccess?: () => void;
   onError?: (error: Error) => void;
 }
 
-export const useBooking = (options?: UseBookingOptions) => {
-  const queryClient = useQueryClient();
+export interface IBookAppointmentArgs {
+  barberId: Id<'users'>;
+  serviceId: string;
+  serviceName: string;
+  price: number;
+  duration: number;
+  scheduledFor: number;
+  locationType: 'in_salon' | 'in_home';
+  address?: string;
+  addressCoords?: { lat: number; lng: number };
+  specialRequests?: string;
+}
 
-  // Create appointment mutation
-  const createAppointment = useMutation({
-    mutationFn: (data: CreateAppointmentDTO) => bookingService.createAppointment(data),
-    onSuccess: (data) => {
-      // Invalidate appointments queries to refetch
-      queryClient.invalidateQueries({ queryKey: BOOKING_QUERY_KEYS.appointments });
-      queryClient.invalidateQueries({ queryKey: BOOKING_QUERY_KEYS.myAppointments });
-      options?.onSuccess?.(data);
-    },
-    onError: (error: Error) => {
-      console.error('Failed to create appointment:', error);
-      options?.onError?.(error);
-    },
-  });
+export interface IRescheduleAppointmentArgs {
+  appointmentId: Id<'appointments'>;
+  newScheduledFor: number;
+}
 
-  // Update appointment mutation
-  const updateAppointment = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateAppointmentDTO }) =>
-      bookingService.updateAppointment(id, data),
-    onSuccess: (data, variables) => {
-      // Update the specific appointment in the cache
-      queryClient.setQueryData(BOOKING_QUERY_KEYS.appointment(variables.id), data);
-      // Invalidate list queries
-      queryClient.invalidateQueries({ queryKey: BOOKING_QUERY_KEYS.appointments });
-      options?.onSuccess?.(data);
-    },
-    onError: (error: Error) => {
-      console.error('Failed to update appointment:', error);
-      options?.onError?.(error);
-    },
-  });
+export interface IUpdateAppointmentStatusArgs {
+  appointmentId: Id<'appointments'>;
+  status: 'confirmed' | 'in_progress' | 'completed' | 'no_show';
+}
 
-  // Cancel appointment mutation
-  const cancelAppointment = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
-      bookingService.cancelAppointment(id, reason),
-    onSuccess: (data, variables) => {
-      // Update cache
-      queryClient.setQueryData(BOOKING_QUERY_KEYS.appointment(variables.id), data);
-      // Invalidate list queries
-      queryClient.invalidateQueries({ queryKey: BOOKING_QUERY_KEYS.appointments });
-      options?.onSuccess?.(data);
-    },
-    onError: (error: Error) => {
-      console.error('Failed to cancel appointment:', error);
-      options?.onError?.(error);
-    },
-  });
+export const useBooking = (options?: IUseBookingOptions) => {
+  // Loading states for consumers that need them
+  const [isBooking, setIsBooking] = useState(false);
+  const [isCanceling, setIsCanceling] = useState(false);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  // Confirm appointment mutation (barber only)
-  const confirmAppointment = useMutation({
-    mutationFn: (id: string) => bookingService.confirmAppointment(id),
-    onSuccess: (data, id) => {
-      queryClient.setQueryData(BOOKING_QUERY_KEYS.appointment(id), data);
-      queryClient.invalidateQueries({ queryKey: BOOKING_QUERY_KEYS.appointments });
-      options?.onSuccess?.(data);
-    },
-    onError: (error: Error) => {
-      console.error('Failed to confirm appointment:', error);
-      options?.onError?.(error);
-    },
-  });
+  // Convex mutations — Convex automatically invalidates related queries
+  const bookAppointmentMutation = useMutation(api.appointments.mutations.bookAppointment);
+  const cancelAppointmentMutation = useMutation(api.appointments.mutations.cancelAppointment);
+  const rescheduleAppointmentMutation = useMutation(
+    api.appointments.mutations.rescheduleAppointment
+  );
+  const updateStatusMutation = useMutation(api.appointments.mutations.updateAppointmentStatus);
 
-  // Complete appointment mutation (barber only)
-  const completeAppointment = useMutation({
-    mutationFn: (id: string) => bookingService.completeAppointment(id),
-    onSuccess: (data, id) => {
-      queryClient.setQueryData(BOOKING_QUERY_KEYS.appointment(id), data);
-      queryClient.invalidateQueries({ queryKey: BOOKING_QUERY_KEYS.appointments });
-      options?.onSuccess?.(data);
+  // Wrapped helpers that handle callbacks, loading states, and error normalization
+
+  const createAppointment = useCallback(
+    async (data: IBookAppointmentArgs) => {
+      setIsBooking(true);
+      try {
+        const result = await bookAppointmentMutation(data);
+        options?.onSuccess?.();
+        return result;
+      } catch (error) {
+        const normalized = normalizeError(error);
+        console.error('Failed to create appointment:', normalized);
+        options?.onError?.(normalized);
+        throw normalized;
+      } finally {
+        setIsBooking(false);
+      }
     },
-    onError: (error: Error) => {
-      console.error('Failed to complete appointment:', error);
-      options?.onError?.(error);
+    [bookAppointmentMutation, options]
+  );
+
+  const cancelAppointment = useCallback(
+    async (appointmentId: Id<'appointments'>, reason?: string) => {
+      setIsCanceling(true);
+      try {
+        const result = await cancelAppointmentMutation({ appointmentId, reason });
+        options?.onSuccess?.();
+        return result;
+      } catch (error) {
+        const normalized = normalizeError(error);
+        console.error('Failed to cancel appointment:', normalized);
+        options?.onError?.(normalized);
+        throw normalized;
+      } finally {
+        setIsCanceling(false);
+      }
     },
-  });
+    [cancelAppointmentMutation, options]
+  );
+
+  const rescheduleAppointment = useCallback(
+    async (args: IRescheduleAppointmentArgs) => {
+      setIsRescheduling(true);
+      try {
+        const result = await rescheduleAppointmentMutation({
+          appointmentId: args.appointmentId,
+          newScheduledFor: args.newScheduledFor,
+        });
+        options?.onSuccess?.();
+        return result;
+      } catch (error) {
+        const normalized = normalizeError(error);
+        console.error('Failed to reschedule appointment:', normalized);
+        options?.onError?.(normalized);
+        throw normalized;
+      } finally {
+        setIsRescheduling(false);
+      }
+    },
+    [rescheduleAppointmentMutation, options]
+  );
+
+  const updateStatus = useCallback(
+    async (args: IUpdateAppointmentStatusArgs) => {
+      setIsUpdatingStatus(true);
+      try {
+        const result = await updateStatusMutation(args);
+        options?.onSuccess?.();
+        return result;
+      } catch (error) {
+        const normalized = normalizeError(error);
+        console.error('Failed to update appointment status:', normalized);
+        options?.onError?.(normalized);
+        throw normalized;
+      } finally {
+        setIsUpdatingStatus(false);
+      }
+    },
+    [updateStatusMutation, options]
+  );
+
+  const confirmAppointment = useCallback(
+    async (appointmentId: Id<'appointments'>) => {
+      return updateStatus({ appointmentId, status: 'confirmed' });
+    },
+    [updateStatus]
+  );
+
+  const completeAppointment = useCallback(
+    async (appointmentId: Id<'appointments'>) => {
+      return updateStatus({ appointmentId, status: 'completed' });
+    },
+    [updateStatus]
+  );
 
   return {
-    // Mutations
+    // Mutation functions
     createAppointment,
-    updateAppointment,
     cancelAppointment,
+    rescheduleAppointment,
     confirmAppointment,
     completeAppointment,
-
+    updateStatus,
     // Loading states
-    isCreating: createAppointment.isPending,
-    isUpdating: updateAppointment.isPending,
-    isCanceling: cancelAppointment.isPending,
-    isConfirming: confirmAppointment.isPending,
-    isCompleting: completeAppointment.isPending,
-
-    // Error states
-    createError: createAppointment.error,
-    updateError: updateAppointment.error,
-    cancelError: cancelAppointment.error,
-    confirmError: confirmAppointment.error,
-    completeError: completeAppointment.error,
+    isBooking,
+    isCanceling,
+    isRescheduling,
+    isUpdatingStatus,
   };
 };
+
+/** Turn Convex errors into plain Error instances */
+function normalizeError(error: unknown): Error {
+  if (error instanceof ConvexError) {
+    return new Error(String(error.data));
+  }
+  if (error instanceof Error) {
+    return error;
+  }
+  return new Error('An unexpected error occurred');
+}

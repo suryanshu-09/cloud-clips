@@ -9,6 +9,7 @@ export default function ChatLayout() {
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="[appointmentId]" />
+      <Stack.Screen name="[conversationId]" />
     </Stack>
   );
 }

@@ -1,4 +1,4 @@
-import { query } from "./_generated/server";
+import { query } from "../_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -105,13 +105,70 @@ export const getProductsByCategory = query({
   handler: async (ctx, args) => {
     let products = await ctx.db
       .query("products")
-      .withIndex("by_category", (q) =>
-        q.eq("category", args.category).eq("isActive", true)
-      )
+      .withIndex("by_category", (q) => q.eq("category", args.category))
+      .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
 
     const limit = args.limit || 20;
     return products.slice(0, limit);
+  },
+});
+
+// Search products
+export const searchProducts = query({
+  args: {
+    query: v.string(),
+    category: v.optional(v.string()),
+    minPrice: v.optional(v.number()),
+    maxPrice: v.optional(v.number()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const searchLower = args.query.toLowerCase();
+    
+    let products = await ctx.db
+      .query("products")
+      .withIndex("by_active", (q) => q.eq("isActive", true))
+      .collect();
+
+    products = products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(searchLower) ||
+        p.description?.toLowerCase().includes(searchLower) ||
+        p.category.toLowerCase().includes(searchLower) ||
+        p.tags?.some((t) => t.toLowerCase().includes(searchLower))
+    );
+
+    if (args.category) {
+      products = products.filter((p) => p.category === args.category);
+    }
+
+    if (args.minPrice !== undefined) {
+      products = products.filter((p) => p.price >= args.minPrice!);
+    }
+
+    if (args.maxPrice !== undefined) {
+      products = products.filter((p) => p.price <= args.maxPrice!);
+    }
+
+    const enrichedProducts = await Promise.all(
+      products.map(async (product) => {
+        const barberProfile = await ctx.db
+          .query("barberProfiles")
+          .withIndex("by_user", (q) => q.eq("userId", product.barberId))
+          .first();
+
+        return {
+          ...product,
+          barber: {
+            businessName: barberProfile?.businessName,
+          },
+        };
+      })
+    );
+
+    const limit = args.limit || 20;
+    return enrichedProducts.slice(0, limit);
   },
 });
 

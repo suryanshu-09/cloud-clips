@@ -67,8 +67,18 @@ export default function ProfileScreen() {
           />
           <MenuItem
             icon="receipt-outline"
+            title="Receipts"
+            onPress={() => router.push('/(client)/receipts')}
+          />
+          <MenuItem
+            icon="bag-outline"
             title="Order History"
             onPress={() => router.push('/(client)/profile/orders')}
+          />
+          <MenuItem
+            icon="wallet-outline"
+            title="My Coupons"
+            onPress={() => router.push('/(client)/profile/my-coupons' as any)}
           />
           <MenuItem
             icon="card-outline"

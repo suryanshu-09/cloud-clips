@@ -5,20 +5,23 @@
 
 // Hooks
 export {
+  useConnectAccount,
   useEarnings,
   useEarningsHistory,
   usePayouts,
-  useConnectStatus,
-  useCreateConnectAccount,
-  useOnboarding,
-  useDashboardLink,
   useEarningsDashboard,
   EARNINGS_QUERY_KEYS,
 } from './hooks/useEarnings';
 
 // Services
-export { earningsService } from './services/earningsService';
-export { mockEarningsService } from './services/mockEarningsService';
+export {
+  transformConnectAccountResponse,
+  transformCreateAccountResponse,
+  transformDashboardLinkResponse,
+  generateMockEarningsSummary,
+  generateMockEarningsHistory,
+  generateMockPayoutsResponse,
+} from './services/earningsService';
 
 // Types
 export * from './types';

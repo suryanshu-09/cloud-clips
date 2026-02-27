@@ -1,5 +1,6 @@
-import { mutation } from "./_generated/server";
+import { mutation, action } from "../_generated/server";
 import { v } from "convex/values";
+import { api } from "../_generated/api";
 
 /**
  * Message Mutations
@@ -74,6 +75,16 @@ export const sendMessage = mutation({
       unreadCounts,
       updatedAt: Date.now(),
     });
+
+    // Schedule push notification to recipient
+    if (otherParticipantId) {
+      await ctx.scheduler.runAfter(0, api.messages.sendPushNotification, {
+        recipientId: otherParticipantId,
+        senderName: user.name || "Someone",
+        messageContent: args.content,
+        conversationId: args.conversationId,
+      });
+    }
 
     return message;
   },
@@ -199,5 +210,127 @@ export const createConversation = mutation({
     }
 
     return await ctx.db.get(conversation);
+  },
+});
+
+/**
+ * Typing Status Mutations
+ */
+
+export const setTypingStatus = mutation({
+  args: {
+    conversationId: v.id("conversations"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await ctx.auth.getUserIdentity();
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .first();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const conversation = await ctx.db.get(args.conversationId);
+    if (!conversation) {
+      throw new Error("Conversation not found");
+    }
+
+    if (!conversation.participants.includes(user._id)) {
+      throw new Error("Not authorized");
+    }
+
+    const existingStatus = await ctx.db
+      .query("typingStatus")
+      .withIndex("by_conversation_user", (q) =>
+        q.eq("conversationId", args.conversationId).eq("userId", user._id)
+      )
+      .first();
+
+    if (existingStatus) {
+      await ctx.db.patch(existingStatus._id, {
+        isTyping: true,
+        updatedAt: Date.now(),
+      });
+      return existingStatus._id;
+    }
+
+    const typingStatus = await ctx.db.insert("typingStatus", {
+      conversationId: args.conversationId,
+      userId: user._id,
+      isTyping: true,
+      updatedAt: Date.now(),
+    });
+
+    return typingStatus;
+  },
+});
+
+export const clearTypingStatus = mutation({
+  args: {
+    conversationId: v.id("conversations"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await ctx.auth.getUserIdentity();
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .first();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const existingStatus = await ctx.db
+      .query("typingStatus")
+      .withIndex("by_conversation_user", (q) =>
+        q.eq("conversationId", args.conversationId).eq("userId", user._id)
+      )
+      .first();
+
+    if (existingStatus) {
+      await ctx.db.patch(existingStatus._id, {
+        isTyping: false,
+        updatedAt: Date.now(),
+      });
+      return { success: true };
+    }
+
+    return { success: true };
+  },
+});
+
+/**
+ * Send push notification for new message
+ * This is an action (not a mutation) because it makes external HTTP calls
+ */
+export const sendPushNotification = action({
+  args: {
+    recipientId: v.id("users"),
+    senderName: v.string(),
+    messageContent: v.string(),
+    conversationId: v.id("conversations"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.runAction(api.notifications.tokens.sendPushNotification, {
+      userId: args.recipientId,
+      title: `New message from ${args.senderName}`,
+      body: args.messageContent.length > 100 
+        ? `${args.messageContent.substring(0, 100)}...` 
+        : args.messageContent,
+      data: {
+        type: "new_message",
+        conversationId: args.conversationId.toString(),
+      },
+    });
   },
 });
