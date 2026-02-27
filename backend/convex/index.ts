@@ -46,3 +46,6 @@ export { STORAGE_CONFIG, buildStoragePath, isValidFileType, isValidFileSize, isF
 // Coupons
 export * from "./coupons/mutations";
 export * from "./coupons/queries";
+
+// Analytics (Admin)
+export * from "./analytics/queries";
