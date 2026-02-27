@@ -313,10 +313,10 @@ A phased approach to building the complete Cloud Clips application with Convex +
 - [ ] Popular services
 
 ### 10.4 Content Management
-- [ ] Featured barbers
-- [ ] System announcements
-- [ ] Product catalog admin
-- [ ] Support tickets
+- [x] Featured barbers
+- [x] System announcements
+- [x] Product catalog admin
+- [x] Support tickets
 
 ---
 
