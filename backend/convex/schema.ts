@@ -200,7 +200,9 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_scheduled", ["scheduledFor"])
     .index("by_barber_scheduled", ["barberId", "scheduledFor"])
-    .index("by_client_scheduled", ["clientId", "scheduledFor"]),
+    .index("by_client_scheduled", ["clientId", "scheduledFor"])
+    .index("by_client_status", ["clientId", "status"])
+    .index("by_barber_status", ["barberId", "status"]),
 
   // Reviews
   reviews: defineTable({
@@ -234,7 +236,8 @@ export default defineSchema({
     .index("by_client", ["clientId"])
     .index("by_appointment", ["appointmentId"])
     .index("by_rating", ["rating"])
-    .index("by_reported", ["isReported"]),
+    .index("by_reported", ["isReported"])
+    .index("by_barber_created", ["barberId", "createdAt"]),
 
   // Review Reports (for moderation)
   reviewReports: defineTable({
@@ -429,7 +432,8 @@ export default defineSchema({
     .index("by_category_id", ["categoryId"])
     .index("by_category", ["category"])
     .index("by_active", ["isActive"])
-    .index("by_price", ["price"]),
+    .index("by_price", ["price"])
+    .index("by_category_active", ["category", "isActive"]),
 
   // Orders
   orders: defineTable({
@@ -610,7 +614,8 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_read", ["userId", "isRead"])
-    .index("by_created", ["createdAt"]),
+    .index("by_created", ["createdAt"])
+    .index("by_user_created", ["userId", "createdAt"]),
 
   // Receipts
   receipts: defineTable({

@@ -17,6 +17,8 @@ export const getMyAppointments = query({
       v.literal("cancelled"),
       v.literal("no_show")
     )),
+    limit: v.optional(v.number()),
+    cursor: v.optional(v.number()), // timestamp cursor for keyset pagination
   },
   handler: async (ctx, args) => {
     const userId = await ctx.auth.getUserIdentity();
@@ -33,25 +35,35 @@ export const getMyAppointments = query({
       throw new ConvexError("User not found");
     }
 
+    const limit = args.limit ?? 50;
+
+    // Use the by_client_scheduled / by_barber_scheduled compound index for
+    // efficient keyset-paginated queries sorted by time (descending via order())
     let appointments;
     if (user.role === "barber") {
-      appointments = await ctx.db
+      const q = ctx.db
         .query("appointments")
-        .withIndex("by_barber", (q) => q.eq("barberId", user._id))
-        .collect();
+        .withIndex("by_barber_scheduled", (q) => q.eq("barberId", user._id))
+        .order("desc");
+      appointments = await q.take(limit + 1);
     } else {
-      appointments = await ctx.db
+      const q = ctx.db
         .query("appointments")
-        .withIndex("by_client", (q) => q.eq("clientId", user._id))
-        .collect();
+        .withIndex("by_client_scheduled", (q) => q.eq("clientId", user._id))
+        .order("desc");
+      appointments = await q.take(limit + 1);
     }
 
+    // Filter by status in application code (status is not in the compound index)
     if (args.status) {
       appointments = appointments.filter((a) => a.status === args.status);
     }
 
-    // Sort by scheduled time
-    return appointments.sort((a, b) => b.scheduledFor - a.scheduledFor);
+    const hasMore = appointments.length > limit;
+    return {
+      appointments: hasMore ? appointments.slice(0, limit) : appointments,
+      hasMore,
+    };
   },
 });
 

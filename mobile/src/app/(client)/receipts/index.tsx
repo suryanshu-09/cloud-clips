@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, memo } from 'react';
 import { FlatList, Text, View, ActivityIndicator, Pressable, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery as useConvexQuery } from 'convex/react';
@@ -82,7 +82,7 @@ interface IFilterChipProps {
   onPress: () => void;
 }
 
-function FilterChip({ label, isActive, onPress }: IFilterChipProps) {
+const FilterChip = memo(function FilterChip({ label, isActive, onPress }: IFilterChipProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -93,7 +93,7 @@ function FilterChip({ label, isActive, onPress }: IFilterChipProps) {
       </Text>
     </Pressable>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Receipt Card Component
@@ -103,7 +103,7 @@ interface IReceiptCardProps {
   onPress: () => void;
 }
 
-function ReceiptCard({ receipt, onPress }: IReceiptCardProps) {
+const ReceiptCard = memo(function ReceiptCard({ receipt, onPress }: IReceiptCardProps) {
   const statusConfig = getStatusConfig(receipt.status);
   const mainItem = receipt.items[0];
   const hasMoreItems = receipt.items.length > 1;
@@ -162,7 +162,7 @@ function ReceiptCard({ receipt, onPress }: IReceiptCardProps) {
       </Card>
     </Pressable>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Main Screen Component
@@ -185,12 +185,60 @@ export default function ReceiptsListScreen() {
     setTimeout(() => setRefreshing(false), 1000);
   }, []);
 
+  // Memoized filter data (static)
+  const filterData = useMemo(() => [
+    { key: 'all', label: 'All' },
+    { key: 'paid', label: 'Paid' },
+    { key: 'refunded', label: 'Refunded' },
+    { key: 'partially_refunded', label: 'Partial' },
+  ], []);
+
   // Navigate to receipt details
   const handleReceiptPress = useCallback(
     (receiptId: Id<'receipts'>) => {
       router.push(`/(client)/receipts/${receiptId}`);
     },
     [router]
+  );
+
+  // Memoized render functions
+  const renderFilterChip = useCallback(
+    ({ item }: { item: { key: string; label: string } }) => (
+      <FilterChip
+        label={item.label}
+        isActive={selectedFilter === item.key}
+        onPress={() => setSelectedFilter(item.key as ReceiptStatus | 'all')}
+      />
+    ),
+    [selectedFilter]
+  );
+
+  const renderReceiptItem = useCallback(
+    ({ item }: { item: IReceipt }) => (
+      <ReceiptCard receipt={item} onPress={() => handleReceiptPress(item._id)} />
+    ),
+    [handleReceiptPress]
+  );
+
+  const keyExtractorFilter = useCallback((item: { key: string }) => item.key, []);
+  const keyExtractorReceipt = useCallback((item: IReceipt) => item._id.toString(), []);
+
+  const refreshControl = useMemo(
+    () => <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />,
+    [refreshing, onRefresh]
+  );
+
+  const listEmptyComponent = useMemo(
+    () => (
+      <View className="items-center py-12">
+        <Ionicons name="document-text-outline" size={48} color="#D1D5DB" />
+        <Text className="text-gray-500 mt-4 text-center">No receipts found for this filter</Text>
+        <Pressable onPress={() => setSelectedFilter('all')} className="mt-4">
+          <Text className="text-indigo-600 font-medium">Clear Filters</Text>
+        </Pressable>
+      </View>
+    ),
+    []
   );
 
   // Loading state
@@ -231,20 +279,9 @@ export default function ReceiptsListScreen() {
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={[
-            { key: 'all', label: 'All' },
-            { key: 'paid', label: 'Paid' },
-            { key: 'refunded', label: 'Refunded' },
-            { key: 'partially_refunded', label: 'Partial' },
-          ]}
-          renderItem={({ item }) => (
-            <FilterChip
-              label={item.label}
-              isActive={selectedFilter === item.key}
-              onPress={() => setSelectedFilter(item.key as ReceiptStatus | 'all')}
-            />
-          )}
-          keyExtractor={(item) => item.key}
+          data={filterData}
+          renderItem={renderFilterChip}
+          keyExtractor={keyExtractorFilter}
         />
       </View>
 
@@ -252,24 +289,17 @@ export default function ReceiptsListScreen() {
       <FlatList
         className="flex-1 px-4 pt-4"
         data={receipts}
-        renderItem={({ item }) => (
-          <ReceiptCard receipt={item} onPress={() => handleReceiptPress(item._id)} />
-        )}
-        keyExtractor={(item) => item._id.toString()}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        renderItem={renderReceiptItem}
+        keyExtractor={keyExtractorReceipt}
+        refreshControl={refreshControl}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
-        ListEmptyComponent={
-          <View className="items-center py-12">
-            <Ionicons name="document-text-outline" size={48} color="#D1D5DB" />
-            <Text className="text-gray-500 mt-4 text-center">
-              No receipts found for this filter
-            </Text>
-            <Pressable onPress={() => setSelectedFilter('all')} className="mt-4">
-              <Text className="text-indigo-600 font-medium">Clear Filters</Text>
-            </Pressable>
-          </View>
-        }
+        ListEmptyComponent={listEmptyComponent}
+        removeClippedSubviews={true}
+        initialNumToRender={8}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        updateCellsBatchingPeriod={50}
       />
     </SafeView>
   );

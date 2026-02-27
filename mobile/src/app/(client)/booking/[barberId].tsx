@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Text, View, ScrollView, ActivityIndicator, Pressable, Image } from 'react-native';
+import { useState, useCallback, useMemo } from 'react';
+import { Text, View, ScrollView, ActivityIndicator, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Marker } from 'react-native-maps';
@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ImageZoomModal } from '@/components/ui/ImageZoomModal';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { MapView } from '@/components/map/MapView';
 import { ServiceList } from '@/components/barber/ServiceList';
 import { useBarberProfile } from '@/features/barbers';
@@ -59,11 +60,11 @@ export default function BarberProfileScreen() {
     );
   }
 
-  const handleBookNow = () => {
+  const handleBookNow = useCallback(() => {
     router.push(`/(client)/booking/form?barberId=${barberId}`);
-  };
+  }, [router, barberId]);
 
-  const getWorkingDays = () => {
+  const workingDays = useMemo(() => {
     if (!barber.workingHours) return 'Hours not available';
 
     const days = Object.entries(barber.workingHours)
@@ -71,12 +72,12 @@ export default function BarberProfileScreen() {
       .map(([day]) => day.charAt(0).toUpperCase() + day.slice(1, 3));
 
     return days.length > 0 ? days.join(', ') : 'Hours not available';
-  };
+  }, [barber.workingHours]);
 
-  const handleGalleryImagePress = (index: number) => {
+  const handleGalleryImagePress = useCallback((index: number) => {
     setSelectedGalleryIndex(index);
     setShowGalleryZoom(true);
-  };
+  }, []);
 
   return (
     <SafeView>
@@ -162,7 +163,7 @@ export default function BarberProfileScreen() {
             <View className="items-center flex-1 px-2">
               <Text className="text-2xl mb-2">📅</Text>
               <Text className="text-xs text-gray-600 text-center leading-5">
-                {getWorkingDays()}
+                {workingDays}
               </Text>
             </View>
 
@@ -249,10 +250,11 @@ export default function BarberProfileScreen() {
                   className="active:opacity-80"
                 >
                   <View className="w-32 h-32 rounded-lg overflow-hidden">
-                    <Image
-                      source={{ uri: item.url }}
-                      className="w-full h-full"
-                      resizeMode="cover"
+                    <OptimizedImage
+                      source={item.url}
+                      width={128}
+                      height={128}
+                      contentFit="cover"
                     />
                   </View>
                 </Pressable>

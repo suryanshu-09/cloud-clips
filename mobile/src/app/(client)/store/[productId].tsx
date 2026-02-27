@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Text, View, ScrollView, Image, Pressable, Dimensions } from 'react-native';
+import { useState, useCallback, useMemo } from 'react';
+import { Text, View, ScrollView, Pressable, Dimensions } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useProduct, useCart } from '@/features/products';
 import { SafeView } from '@/components/ui/SafeView';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ImageZoomModal } from '@/components/ui/ImageZoomModal';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 
 const { width } = Dimensions.get('window');
 
@@ -54,22 +55,22 @@ export default function ProductDetailsScreen() {
   const inCart = isInCart(product.id);
   const cartQuantity = getProductQuantity(product.id);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = useCallback(() => {
     addProduct(product, quantity);
     setQuantity(1);
-  };
+  }, [addProduct, product, quantity]);
 
-  const incrementQuantity = () => {
+  const incrementQuantity = useCallback(() => {
     if (quantity < product.stock) {
-      setQuantity(quantity + 1);
+      setQuantity((q) => q + 1);
     }
-  };
+  }, [quantity, product.stock]);
 
-  const decrementQuantity = () => {
+  const decrementQuantity = useCallback(() => {
     if (quantity > 1) {
-      setQuantity(quantity - 1);
+      setQuantity((q) => q - 1);
     }
-  };
+  }, [quantity]);
 
   return (
     <SafeView>
@@ -96,10 +97,11 @@ export default function ProductDetailsScreen() {
                     }}
                     className="active:opacity-90"
                   >
-                    <Image
-                      source={{ uri: image }}
-                      style={{ width, height: 400 }}
-                      resizeMode="cover"
+                    <OptimizedImage
+                      source={image}
+                      width={width}
+                      height={400}
+                      contentFit="cover"
                     />
                   </Pressable>
                 ))}

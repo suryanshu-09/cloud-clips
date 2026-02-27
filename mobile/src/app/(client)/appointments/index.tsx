@@ -11,7 +11,7 @@
  *   Cancelled tab  → cancelled
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, memo } from 'react';
 import { View, Text, FlatList, Pressable, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeView } from '@/components/ui/SafeView';
@@ -43,7 +43,7 @@ interface ITabButtonProps {
   appointmentsText: string;
 }
 
-function TabButton({
+const TabButton = memo(function TabButton({
   label,
   isActive,
   count,
@@ -66,9 +66,9 @@ function TabButton({
       </Text>
     </Pressable>
   );
-}
+});
 
-function AppointmentSkeleton() {
+const AppointmentSkeleton = memo(function AppointmentSkeleton() {
   return (
     <View className="px-4">
       {[1, 2, 3].map((i) => (
@@ -78,7 +78,7 @@ function AppointmentSkeleton() {
       ))}
     </View>
   );
-}
+});
 
 export default function AppointmentsListScreen() {
   const router = useRouter();
@@ -305,6 +305,11 @@ export default function AppointmentsListScreen() {
           keyExtractor={(item) => item._id}
           contentContainerStyle={{ paddingTop: 16, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          initialNumToRender={8}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          updateCellsBatchingPeriod={50}
         />
       )}
 

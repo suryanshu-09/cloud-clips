@@ -47,11 +47,13 @@ export const useAppointments = (options?: IUseAppointmentsOptions) => {
 
   const appointments = useMemo(() => {
     if (isDevMode) return mockAppointments;
-    return appointmentsData ?? [];
-  }, [appointmentsData, mockAppointments, isDevMode]);
+    // getMyAppointments now returns { appointments, hasMore } for pagination
+    return appointmentsData?.appointments ?? [];
+  }, [appointmentsData, mockAppointments]);
 
   return {
     appointments,
+    hasMore: appointmentsData?.hasMore ?? false,
     isLoading: isDevMode ? isLoadingMock : appointmentsData === undefined,
     isError: false,
     error: null,

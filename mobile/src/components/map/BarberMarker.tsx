@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { Marker, Callout } from 'react-native-maps';
-import { View, Text, Image, Pressable } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import type { IBarberProfile } from '@/features/barbers/types';
 
 interface IBarberMarkerProps {
@@ -51,17 +52,14 @@ function BarberMarkerComponent({
             shadowRadius: 4.65,
           }}
         >
-          {barber.profileImage ? (
-            <Image
-              source={{ uri: barber.profileImage }}
-              className="w-full h-full"
-              resizeMode="cover"
-            />
-          ) : (
-            <View className="w-full h-full bg-indigo-500 items-center justify-center">
-              <Text className="text-white text-xl font-bold">{avatarLetter}</Text>
-            </View>
-          )}
+          <OptimizedImage
+            source={barber.profileImage}
+            width={48}
+            height={48}
+            contentFit="cover"
+            fallbackText={avatarLetter}
+            showPlaceholder={false}
+          />
         </View>
 
         {/* Rating Badge - Positioned at bottom right of avatar */}

@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { ScrollView, Text, View, FlatList, Pressable, Alert, Image } from 'react-native';
+import { useState, useCallback } from 'react';
+import { ScrollView, Text, View, FlatList, Pressable, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Card, Button, Badge } from '@/components/ui';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 
 interface IProduct {
   id: string;
@@ -52,7 +53,7 @@ export default function BarberProductsListScreen() {
   const router = useRouter();
   const [products, setProducts] = useState(MOCK_PRODUCTS);
 
-  const handleDelete = (productId: string, productName: string) => {
+  const handleDelete = useCallback((productId: string, productName: string) => {
     Alert.alert('Delete Product', `Are you sure you want to delete "${productName}"?`, [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -60,28 +61,32 @@ export default function BarberProductsListScreen() {
         style: 'destructive',
         onPress: () => {
           // TODO: Implement API call
-          setProducts(products.filter((p) => p.id !== productId));
+          setProducts((prev) => prev.filter((p) => p.id !== productId));
           Alert.alert('Success', 'Product deleted successfully');
         },
       },
     ]);
-  };
+  }, []);
 
-  const handleToggleActive = (productId: string) => {
+  const handleToggleActive = useCallback((productId: string) => {
     // TODO: Implement API call
-    setProducts(products.map((p) => (p.id === productId ? { ...p, isActive: !p.isActive } : p)));
-  };
+    setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, isActive: !p.isActive } : p)));
+  }, []);
 
-  const renderProduct = ({ item }: { item: IProduct }) => (
+  const keyExtractor = useCallback((item: IProduct) => item.id, []);
+
+  const renderProduct = useCallback(({ item }: { item: IProduct }) => (
     <Card className="mb-3 p-4">
       <View className="flex-row gap-3">
         {/* Product Image */}
-        <View className="w-20 h-20 bg-gray-200 rounded-lg items-center justify-center">
-          {item.image ? (
-            <Image source={{ uri: item.image }} className="w-full h-full rounded-lg" />
-          ) : (
-            <Text className="text-2xl">📦</Text>
-          )}
+        <View className="w-20 h-20 rounded-lg overflow-hidden">
+          <OptimizedImage
+            source={item.image}
+            width={80}
+            height={80}
+            contentFit="cover"
+            fallbackIcon="📦"
+          />
         </View>
 
         {/* Product Info */}
@@ -135,7 +140,7 @@ export default function BarberProductsListScreen() {
         </View>
       </View>
     </Card>
-  );
+  ), [router, handleDelete, handleToggleActive]);
 
   return (
     <View className="flex-1 bg-gray-50">
@@ -175,8 +180,13 @@ export default function BarberProductsListScreen() {
       <FlatList
         data={products}
         renderItem={renderProduct}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         contentContainerStyle={{ padding: 24 }}
+        removeClippedSubviews={true}
+        initialNumToRender={8}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        updateCellsBatchingPeriod={50}
         ListEmptyComponent={
           <Card className="p-8 items-center">
             <Text className="text-6xl mb-4">📦</Text>

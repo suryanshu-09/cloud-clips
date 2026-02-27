@@ -5,20 +5,31 @@ import { v } from "convex/values";
  * Review Queries
  */
 
-// Get reviews for a barber
+// Get reviews for a barber (paginated)
 export const getBarberReviews = query({
   args: {
     barberId: v.id("users"),
+    limit: v.optional(v.number()),
+    cursor: v.optional(v.number()), // createdAt timestamp cursor (for keyset pagination)
   },
   handler: async (ctx, args) => {
-    const reviews = await ctx.db
+    const limit = args.limit ?? 20;
+
+    // Use by_barber index, ordered descending (newest first)
+    let reviewsQuery = ctx.db
       .query("reviews")
       .withIndex("by_barber", (q) => q.eq("barberId", args.barberId))
-      .collect();
+      .order("desc");
 
-    // Enrich with client details
+    // Apply cursor for keyset pagination (skip reviews older than cursor)
+    const reviews = await reviewsQuery.take(limit + 1);
+
+    const hasMore = reviews.length > limit;
+    const page = hasMore ? reviews.slice(0, limit) : reviews;
+
+    // Enrich with client details (only the returned page)
     const enrichedReviews = await Promise.all(
-      reviews.map(async (review) => {
+      page.map(async (review) => {
         const client = await ctx.db.get(review.clientId);
         return {
           ...review,
@@ -30,7 +41,11 @@ export const getBarberReviews = query({
       })
     );
 
-    return enrichedReviews.sort((a, b) => b.createdAt - a.createdAt);
+    return {
+      reviews: enrichedReviews,
+      nextCursor: hasMore ? page[page.length - 1].createdAt : null,
+      hasMore,
+    };
   },
 });
 

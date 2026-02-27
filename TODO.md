@@ -331,11 +331,11 @@ A phased approach to building the complete Cloud Clips application with Convex +
 - [ ] Haptic feedback
 
 ### 11.2 Performance
-- [ ] Image optimization
-- [ ] Lazy loading
-- [ ] Memoization audit
-- [ ] Bundle size analysis
-- [ ] Query optimization
+- [x] Image optimization
+- [x] Lazy loading
+- [x] Memoization audit
+- [x] Bundle size analysis
+- [x] Query optimization
 
 ### 11.3 Offline Support
 - [ ] Persistent cache (MMKV)

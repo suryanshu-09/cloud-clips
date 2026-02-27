@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, Image, Pressable, Animated, PanResponder } from 'react-native';
+import { View, Text, Pressable, Animated, PanResponder } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { IMessage, IAttachment } from '@/features/chat/types';
 import { Avatar } from '@/components/ui/Avatar';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 
 /**
  * MessageBubble Component
@@ -474,12 +475,15 @@ export const MessageBubble: React.FC<IMessageBubbleProps> = ({
                 onPress={() => onImagePress?.(attachment.url)}
                 className="relative"
               >
-                <Image
-                  source={{ uri: attachment.url }}
-                  className={`w-64 h-64 ${index === 0 ? '' : 'mt-1'} ${
-                    index === imageAttachments.length - 1 && !message.content ? '' : 'mb-1'
-                  }`}
-                  resizeMode="cover"
+                <OptimizedImage
+                  source={attachment.url}
+                  width={256}
+                  height={256}
+                  contentFit="cover"
+                  style={{
+                    marginTop: index === 0 ? 0 : 4,
+                    marginBottom: index === imageAttachments.length - 1 && !message.content ? 0 : 4,
+                  }}
                 />
                 {imageAttachments.length > 1 && (
                   <View className="absolute top-2 right-2 bg-black/50 px-2 py-1 rounded-full">

@@ -1,5 +1,7 @@
-import { View, Text, Image, Pressable } from 'react-native';
+import { memo } from 'react';
+import { View, Text, Pressable } from 'react-native';
 import { Card } from '@/components/ui/Card';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import type { ICartItem } from '@/store/atoms/cartAtom';
 
 interface ICartItemProps {
@@ -10,7 +12,7 @@ interface ICartItemProps {
   readOnly?: boolean;
 }
 
-export function CartItem({
+function CartItemComponent({
   item,
   onIncrement,
   onDecrement,
@@ -23,14 +25,14 @@ export function CartItem({
     <Card variant="outlined" padding="sm" className="mb-3">
       <View className="flex-row gap-3">
         {/* Product Image */}
-        <View className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden">
-          {item.image ? (
-            <Image source={{ uri: item.image }} className="w-full h-full" resizeMode="cover" />
-          ) : (
-            <View className="w-full h-full items-center justify-center">
-              <Text className="text-2xl">📦</Text>
-            </View>
-          )}
+        <View className="w-20 h-20 rounded-lg overflow-hidden">
+          <OptimizedImage
+            source={item.image}
+            width={80}
+            height={80}
+            contentFit="cover"
+            fallbackIcon="📦"
+          />
         </View>
 
         {/* Product Info */}
@@ -95,3 +97,5 @@ export function CartItem({
     </Card>
   );
 }
+
+export const CartItem = memo(CartItemComponent);

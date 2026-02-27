@@ -9,7 +9,12 @@ import RNMapView, { Region } from 'react-native-maps';
 import { MapView } from '@/components/map/MapView';
 import { BarberMarker } from '@/components/map/BarberMarker';
 import { SearchRadiusSelector } from '@/components/map/SearchRadiusSelector';
-import { FilterBottomSheet } from '@/components/map/FilterBottomSheet';
+import { createLazyComponent, preloadComponent } from '@/utils/performance';
+
+// Lazy-load FilterBottomSheet — it's a heavy bottom sheet only shown on demand
+const LazyFilterBottomSheet = createLazyComponent(
+  () => import('@/components/map/FilterBottomSheet').then((m) => ({ default: m.FilterBottomSheet }))
+);
 import { BarberList } from '@/components/barber/BarberList';
 import { SafeView } from '@/components/ui/SafeView';
 import { Badge } from '@/components/ui/Badge';
@@ -104,6 +109,13 @@ export default function DiscoverScreen() {
       );
     }
   }, [location]);
+
+  // Speculatively preload the filter sheet so it's ready when user taps the filter button
+  useEffect(() => {
+    preloadComponent(
+      () => import('@/components/map/FilterBottomSheet')
+    );
+  }, []);
 
   const toggleViewMode = useCallback(() => {
     const toValue = viewMode === 'map' ? 1 : 0;
@@ -348,8 +360,8 @@ export default function DiscoverScreen() {
         )}
       </View>
 
-      {/* Filter Bottom Sheet */}
-      <FilterBottomSheet
+      {/* Filter Bottom Sheet — lazy loaded since it's only shown on demand */}
+      <LazyFilterBottomSheet
         visible={showFilters}
         onClose={() => setShowFilters(false)}
         onApplyFilters={handleApplyFilters}
