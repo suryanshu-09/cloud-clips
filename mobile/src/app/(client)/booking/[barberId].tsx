@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Text, View, ScrollView, ActivityIndicator, Pressable, Image } from 'react-native';
+import { Text, View, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Marker } from 'react-native-maps';
@@ -251,8 +252,11 @@ export default function BarberProfileScreen() {
                   <View className="w-32 h-32 rounded-lg overflow-hidden">
                     <Image
                       source={{ uri: item.url }}
-                      className="w-full h-full"
-                      resizeMode="cover"
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      recyclingKey={item.url}
+                      transition={200}
                     />
                   </View>
                 </Pressable>

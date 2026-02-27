@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { View, Text, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useChatList } from '@/features/chat';
@@ -15,22 +15,52 @@ export default function ChatListScreen() {
 
   const { conversations, isLoading, refreshConversations, totalUnreadCount } = useChatList();
 
-  const handleConversationPress = (conversation: IConversation) => {
-    router.push(`/(client)/chat/${conversation._id || conversation.id}`);
-  };
+  const handleConversationPress = useCallback(
+    (conversation: IConversation) => {
+      router.push(`/(client)/chat/${conversation._id || conversation.id}`);
+    },
+    [router]
+  );
 
-  const renderConversation = ({ item }: { item: IConversation }) => {
-    return (
-      <View className="px-4 py-2">
-        <ConversationListItem
-          conversation={item}
-          currentUserId={currentUser?.id || ''}
-          userType={userRole || 'client'}
-          onPress={() => handleConversationPress(item)}
-        />
-      </View>
-    );
-  };
+  const keyExtractor = useCallback((item: IConversation) => item.id, []);
+
+  const renderConversation = useCallback(
+    ({ item }: { item: IConversation }) => {
+      return (
+        <View className="px-4 py-2">
+          <ConversationListItem
+            conversation={item}
+            currentUserId={currentUser?.id || ''}
+            userType={userRole || 'client'}
+            onPress={() => handleConversationPress(item)}
+          />
+        </View>
+      );
+    },
+    [currentUser?.id, userRole, handleConversationPress]
+  );
+
+  const refreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={false}
+        onRefresh={refreshConversations}
+        tintColor="#3B82F6"
+      />
+    ),
+    [refreshConversations]
+  );
+
+  const emptyComponent = useMemo(
+    () => (
+      <EmptyState
+        icon="💬"
+        title="No conversations yet"
+        description="Start chatting with your barbers after booking an appointment"
+      />
+    ),
+    []
+  );
 
   if (isLoading) {
     return (
@@ -60,24 +90,14 @@ export default function ChatListScreen() {
         <FlatList
           data={conversations}
           renderItem={renderConversation}
-          keyExtractor={(item) => item.id}
-          refreshControl={
-            <RefreshControl
-              refreshing={false}
-              onRefresh={refreshConversations}
-              tintColor="#3B82F6"
-            />
-          }
-          ListEmptyComponent={
-            <EmptyState
-              icon="💬"
-              title="No conversations yet"
-              description="Start chatting with your barbers after booking an appointment"
-            />
-          }
-          contentContainerStyle={{
-            flexGrow: 1,
-          }}
+          keyExtractor={keyExtractor}
+          refreshControl={refreshControl}
+          ListEmptyComponent={emptyComponent}
+          contentContainerStyle={{ flexGrow: 1 }}
+          removeClippedSubviews={true}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
         />
       </View>
     </SafeView>

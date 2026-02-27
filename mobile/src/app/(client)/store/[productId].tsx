@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Text, View, ScrollView, Image, Pressable, Dimensions } from 'react-native';
+import { Text, View, ScrollView, Pressable, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useProduct, useCart } from '@/features/products';
 import { SafeView } from '@/components/ui/SafeView';
@@ -99,7 +100,10 @@ export default function ProductDetailsScreen() {
                     <Image
                       source={{ uri: image }}
                       style={{ width, height: 400 }}
-                      resizeMode="cover"
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      recyclingKey={image}
+                      transition={200}
                     />
                   </Pressable>
                 ))}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Modal, View, Image, Pressable, ScrollView, Dimensions, StyleSheet } from 'react-native';
+import { Modal, View, Pressable, ScrollView, Dimensions, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 
 interface IImageZoomModalProps {
@@ -65,7 +66,14 @@ export function ImageZoomModal({
               style={{ width: SCREEN_WIDTH, height: SCREEN_HEIGHT }}
               className="items-center justify-center"
             >
-              <Image source={{ uri: url }} style={styles.image} resizeMode="contain" />
+              <Image
+                source={{ uri: url }}
+                style={styles.image}
+                contentFit="contain"
+                cachePolicy="memory-disk"
+                recyclingKey={url}
+                transition={150}
+              />
             </View>
           ))}
         </ScrollView>

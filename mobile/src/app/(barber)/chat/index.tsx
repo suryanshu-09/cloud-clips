@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { View, Text, FlatList, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useChatList } from '@/features/chat';
@@ -15,7 +15,7 @@ export default function ChatListScreen() {
 
   const { conversations, isLoading, refreshConversations, totalUnreadCount } = useChatList();
 
-  const formatTime = (timestamp: number): string => {
+  const formatTime = useCallback((timestamp: number): string => {
     const now = Date.now();
     const diff = now - timestamp;
     const minutes = Math.floor(diff / (1000 * 60));
@@ -36,13 +36,18 @@ export default function ChatListScreen() {
         day: 'numeric',
       });
     }
-  };
+  }, []);
 
-  const handleConversationPress = (conversation: IConversation) => {
-    router.push(`/(barber)/chat/${conversation._id || conversation.id}`);
-  };
+  const handleConversationPress = useCallback(
+    (conversation: IConversation) => {
+      router.push(`/(barber)/chat/${conversation._id || conversation.id}`);
+    },
+    [router]
+  );
 
-  const renderConversation = ({ item }: { item: IConversation }) => {
+  const keyExtractor = useCallback((item: IConversation) => item.id, []);
+
+  const renderConversation = useCallback(({ item }: { item: IConversation }) => {
     const participants = Array.isArray(item.participants)
       ? {
           clientName: item.clientName,
@@ -108,7 +113,29 @@ export default function ChatListScreen() {
         </View>
       </Pressable>
     );
-  };
+  }, [userRole, formatTime, handleConversationPress]);
+
+  const refreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={false}
+        onRefresh={refreshConversations}
+        tintColor="#3B82F6"
+      />
+    ),
+    [refreshConversations]
+  );
+
+  const emptyComponent = useMemo(
+    () => (
+      <EmptyState
+        icon="💬"
+        title="No conversations yet"
+        description="Start chatting with your clients when they book appointments"
+      />
+    ),
+    []
+  );
 
   if (isLoading) {
     return (
@@ -138,24 +165,14 @@ export default function ChatListScreen() {
         <FlatList
           data={conversations}
           renderItem={renderConversation}
-          keyExtractor={(item) => item.id}
-          refreshControl={
-            <RefreshControl
-              refreshing={false}
-              onRefresh={refreshConversations}
-              tintColor="#3B82F6"
-            />
-          }
-          ListEmptyComponent={
-            <EmptyState
-              icon="💬"
-              title="No conversations yet"
-              description="Start chatting with your clients when they book appointments"
-            />
-          }
-          contentContainerStyle={{
-            flexGrow: 1,
-          }}
+          keyExtractor={keyExtractor}
+          refreshControl={refreshControl}
+          ListEmptyComponent={emptyComponent}
+          contentContainerStyle={{ flexGrow: 1 }}
+          removeClippedSubviews={true}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
         />
       </View>
     </SafeView>

@@ -1,28 +1,43 @@
 import { QueryClient } from '@tanstack/react-query';
+import { PERFORMANCE_CONSTANTS } from '@/utils/performance';
 
-// Create a query client with default options
+const { QUERY_CACHE } = PERFORMANCE_CONSTANTS;
+
+/**
+ * TanStack Query client with performance-optimized defaults.
+ *
+ * Cache strategy:
+ *   - gcTime (garbage collection): how long unused data stays in memory cache
+ *   - staleTime: how long data is considered fresh before a background refetch
+ *
+ * Per-query overrides (use these staleTime values in individual hooks):
+ *   - Availability slots  → QUERY_CACHE.SHORT  (30s)   — changes frequently
+ *   - Nearby barbers      → QUERY_CACHE.MEDIUM (2min)  — changes on location
+ *   - Barber profiles     → QUERY_CACHE.LONG   (5min)  — stable data
+ *   - Products/categories → QUERY_CACHE.LONG   (5min)  — stable data
+ *   - Config/categories   → QUERY_CACHE.VERY_LONG (30min) — almost static
+ */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Cache data for 5 minutes by default
-      gcTime: 1000 * 60 * 5,
-      // Stale time of 1 minute
-      staleTime: 1000 * 60,
+      // Keep unused cached data in memory for 10 minutes (reduced re-fetches on navigation)
+      gcTime: QUERY_CACHE.LONG * 2,
+      // Consider data stale after 2 minutes by default
+      staleTime: QUERY_CACHE.MEDIUM,
       // Retry failed requests 2 times
       retry: 2,
-      // Retry delay increases exponentially
+      // Retry delay increases exponentially, capped at 30s
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      // Refetch on window focus
+      // Refetch when app comes back to foreground (important for real-time data)
       refetchOnWindowFocus: true,
-      // Don't refetch on reconnect by default (can be overridden per query)
-      refetchOnReconnect: false,
-      // Network mode
+      // Refetch on reconnect to recover missed updates while offline
+      refetchOnReconnect: true,
+      // Network mode: don't fire queries while offline, queue them
       networkMode: 'online',
     },
     mutations: {
-      // Retry mutations once
+      // Retry mutations once on transient failures
       retry: 1,
-      // Network mode for mutations
       networkMode: 'online',
     },
   },

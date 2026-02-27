@@ -18,7 +18,8 @@
     "env:check": "node -e \"require('fs').existsSync('.env') || (console.error('ERROR: .env file not found. Run: cp .env.example .env') || process.exit(1))\"",
     "predev": "npm run env:check",
     "clean": "rm -rf node_modules .expo dist",
-    "postinstall": "npm run setup:env"
+    "postinstall": "npm run setup:env",
+    "bundle:analyze": "react-native bundle --platform android --dev false --entry-file index.ts --bundle-output /tmp/cc-bundle.js --sourcemap-output /tmp/cc-bundle.map && npx source-map-explorer /tmp/cc-bundle.js /tmp/cc-bundle.map"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

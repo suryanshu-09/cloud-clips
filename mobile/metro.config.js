@@ -30,4 +30,18 @@ config.resolver.assetExts.push(
   'pdf'
 );
 
+// Bundle size analysis:
+// Run `bun bundle:analyze` (or `npx react-native bundle --platform android --dev false
+//   --entry-file index.ts --bundle-output /tmp/bundle.js --sourcemap-output /tmp/bundle.map`)
+// then open the map file with source-map-explorer:
+//   npx source-map-explorer /tmp/bundle.js /tmp/bundle.map
+//
+// Alternatively use the Metro built-in visualiser:
+//   EXPO_BUNDLE_VISUALIZE=1 npx expo export
+//
+// Key modules to watch for bundle bloat:
+//   - firebase (only messaging/auth needed - tree-shake aggressively)
+//   - @sentry/react-native (loads eagerly - consider async init)
+//   - expo-camera / expo-av (lazy load; only needed in AR/chat)
+
 module.exports = withNativeWind(config, { input: './global.css' });

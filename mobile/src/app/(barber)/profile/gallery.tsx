@@ -5,11 +5,11 @@ import {
   View,
   Pressable,
   Alert,
-  Image,
   Dimensions,
   ActivityIndicator,
   Modal,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useBarberPortfolio } from '@/features/barbers/hooks/useBarberProfile';
@@ -85,7 +85,14 @@ function ImageViewer({ visible, image, onClose, onDelete }: IImageViewerProps) {
           </Pressable>
         </View>
         <View className="flex-1 items-center justify-center">
-          <Image source={{ uri: image.url }} className="w-full h-96" resizeMode="contain" />
+          <Image
+            source={{ uri: image.url }}
+            style={{ width: '100%', height: 384 }}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+            recyclingKey={image.url}
+            transition={150}
+          />
         </View>
         <View className="absolute bottom-12 left-0 right-0 items-center">
           <View className="bg-black/50 px-4 py-2 rounded-full">
@@ -397,7 +404,10 @@ export default function GalleryScreen() {
                     <Image
                       source={{ uri: item.url }}
                       style={{ width: '100%', height: '100%' }}
-                      resizeMode="cover"
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      recyclingKey={item.url}
+                      transition={200}
                     />
                     <View className="absolute bottom-1 right-1 bg-black/60 px-2 py-1 rounded">
                       <Text className="text-white text-xs capitalize">{item.type}</Text>
