@@ -302,9 +302,9 @@ A phased approach to building the complete Cloud Clips application with Convex +
 - [ ] Role-based admin access
 
 ### 10.2 User Management
-- [ ] User list with search
-- [ ] Barber verification
-- [ ] User actions (ban, delete)
+- [x] User list with search
+- [x] Barber verification
+- [x] User actions (ban, delete)
 
 ### 10.3 Analytics
 - [ ] Booking statistics
