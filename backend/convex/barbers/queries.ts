@@ -588,3 +588,136 @@ function calculateDistance(
 function toRadians(degrees: number): number {
   return degrees * (Math.PI / 180);
 }
+
+/**
+ * Get aggregated dashboard stats for the authenticated barber.
+ * Returns appointment counts (today / upcoming / completed this week),
+ * weekly earnings broken down by day, and profile info (rating, review count,
+ * isAvailable toggle).
+ */
+export const getBarberDashboardStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return null;
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .first();
+
+    if (!user || user.role !== "barber") {
+      return null;
+    }
+
+    const profile = await ctx.db
+      .query("barberProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    if (!profile) {
+      return null;
+    }
+
+    // ── Date boundaries ─────────────────────────────────────────────────────
+    const now = Date.now();
+
+    // Start of today (UTC midnight)
+    const todayDate = new Date(now);
+    const startOfToday = Date.UTC(
+      todayDate.getUTCFullYear(),
+      todayDate.getUTCMonth(),
+      todayDate.getUTCDate()
+    );
+    const startOfTomorrow = startOfToday + 24 * 60 * 60 * 1000;
+
+    // Start of current week (UTC Monday)
+    const dayOfWeekUtc = todayDate.getUTCDay(); // 0=Sun
+    const daysFromMonday = (dayOfWeekUtc + 6) % 7;
+    const startOfWeek = startOfToday - daysFromMonday * 24 * 60 * 60 * 1000;
+    const startOfNextWeek = startOfWeek + 7 * 24 * 60 * 60 * 1000;
+
+    // ── Appointments ─────────────────────────────────────────────────────────
+    const allAppointments = await ctx.db
+      .query("appointments")
+      .withIndex("by_barber", (q) => q.eq("barberId", user._id))
+      .collect();
+
+    const todayAppointments = allAppointments.filter(
+      (a) =>
+        a.scheduledFor >= startOfToday &&
+        a.scheduledFor < startOfTomorrow &&
+        a.status !== "cancelled" &&
+        a.status !== "no_show"
+    );
+
+    const upcomingAppointments = allAppointments.filter(
+      (a) =>
+        a.scheduledFor > now &&
+        (a.status === "pending" || a.status === "confirmed")
+    );
+
+    const completedThisWeek = allAppointments.filter(
+      (a) =>
+        a.scheduledFor >= startOfWeek &&
+        a.scheduledFor < startOfNextWeek &&
+        a.status === "completed"
+    );
+
+    // ── Weekly earnings breakdown ─────────────────────────────────────────────
+    // Build a day-label → earnings map (Mon–Sun) from paid receipts this week.
+    const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+    const weeklyEarningsMap: Record<string, number> = {};
+    DAY_LABELS.forEach((d) => (weeklyEarningsMap[d] = 0));
+
+    const weekReceipts = await ctx.db
+      .query("receipts")
+      .withIndex("by_barber", (q) => q.eq("barberId", user._id))
+      .collect();
+
+    let weeklyTotal = 0;
+
+    for (const receipt of weekReceipts) {
+      const ts = receipt.paidAt ?? receipt.createdAt;
+      if (ts < startOfWeek || ts >= startOfNextWeek) continue;
+      if (receipt.status !== "paid" && receipt.status !== "partially_refunded") continue;
+
+      const d = new Date(ts);
+      // getUTCDay(): 0=Sun, 1=Mon … 6=Sat
+      const idx = (d.getUTCDay() + 6) % 7; // convert to 0=Mon … 6=Sun
+      const label = DAY_LABELS[idx];
+      const amount = receipt.total / 100; // stored in cents → dollars
+      weeklyEarningsMap[label] += amount;
+      weeklyTotal += amount;
+    }
+
+    const weeklyEarningsChart = DAY_LABELS.map((label) => ({
+      label,
+      value: Math.round(weeklyEarningsMap[label] * 100) / 100,
+    }));
+
+    return {
+      // Appointment counts
+      todayCount: todayAppointments.length,
+      upcomingCount: upcomingAppointments.length,
+      completedThisWeekCount: completedThisWeek.length,
+
+      // Today's appointment list (sorted by scheduledFor asc)
+      todayAppointments: todayAppointments
+        .sort((a, b) => a.scheduledFor - b.scheduledFor)
+        .slice(0, 5),
+
+      // Earnings
+      weeklyEarningsChart,
+      weeklyTotal: Math.round(weeklyTotal * 100) / 100,
+
+      // Profile info
+      isAvailable: profile.isAvailable,
+      averageRating: profile.averageRating ?? 0,
+      reviewCount: profile.reviewCount ?? 0,
+    };
+  },
+});
