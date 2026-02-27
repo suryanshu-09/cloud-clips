@@ -9,8 +9,13 @@ import RNMapView, { Region } from 'react-native-maps';
 import { MapView } from '@/components/map/MapView';
 import { BarberMarker } from '@/components/map/BarberMarker';
 import { SearchRadiusSelector } from '@/components/map/SearchRadiusSelector';
-import { FilterBottomSheet } from '@/components/map/FilterBottomSheet';
 import { BarberList } from '@/components/barber/BarberList';
+import { createLazyComponent, preloadComponent } from '@/utils/performance';
+
+// Lazy-load FilterBottomSheet — only needed when the user opens filters
+const FilterBottomSheet = createLazyComponent(
+  () => import('@/components/map/FilterBottomSheet').then((m) => ({ default: m.FilterBottomSheet }))
+);
 import { SafeView } from '@/components/ui/SafeView';
 import { Badge } from '@/components/ui/Badge';
 import { useNearbyBarbers, type IBarberProfile } from '@/features/barbers';
@@ -51,6 +56,13 @@ export default function DiscoverScreen() {
   const searchRadius = useAtomValue(searchRadiusAtom);
   const filters = useAtomValue(filterAtom);
   const activeFiltersCount = useAtomValue(activeFiltersCountAtom);
+
+  // Preload FilterBottomSheet as soon as the screen mounts
+  useEffect(() => {
+    preloadComponent(() =>
+      import('@/components/map/FilterBottomSheet').then((m) => ({ default: m.FilterBottomSheet }))
+    );
+  }, []);
 
   const userLocation = useMemo(
     () => ({

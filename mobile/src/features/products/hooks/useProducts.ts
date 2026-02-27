@@ -62,6 +62,8 @@ export const useProduct = (productId: string, options?: { enabled?: boolean }) =
     queryFn: () => fetchProductById(productId),
     enabled: options?.enabled !== false && !!productId,
     staleTime: 5 * 60 * 1000,
+    // Keep the product detail cached for 15 minutes since product data rarely changes
+    gcTime: 15 * 60 * 1000,
   });
 };
 

@@ -18,7 +18,10 @@
     "env:check": "node -e \"require('fs').existsSync('.env') || (console.error('ERROR: .env file not found. Run: cp .env.example .env') || process.exit(1))\"",
     "predev": "npm run env:check",
     "clean": "rm -rf node_modules .expo dist",
-    "postinstall": "npm run setup:env"
+    "postinstall": "npm run setup:env",
+    "bundle:android": "expo export --platform android --output-dir dist/android",
+    "bundle:ios": "expo export --platform ios --output-dir dist/ios",
+    "bundle:analyze": "npx react-native-bundle-visualizer --platform android --out dist/bundle-report.html && open dist/bundle-report.html"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

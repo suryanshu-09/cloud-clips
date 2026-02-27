@@ -4,18 +4,20 @@ import { QueryClient } from '@tanstack/react-query';
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Cache data for 5 minutes by default
-      gcTime: 1000 * 60 * 5,
-      // Stale time of 1 minute
+      // Keep inactive query data in cache for 10 minutes before garbage-collecting.
+      // This covers the longest staleTime used in the app (10 min for barber profiles)
+      // so navigating back never triggers a redundant network request.
+      gcTime: 1000 * 60 * 10,
+      // Stale time of 1 minute — individual queries override as needed
       staleTime: 1000 * 60,
       // Retry failed requests 2 times
       retry: 2,
       // Retry delay increases exponentially
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      // Refetch on window focus
+      // Refetch on window focus keeps data fresh when the user switches back
       refetchOnWindowFocus: true,
-      // Don't refetch on reconnect by default (can be overridden per query)
-      refetchOnReconnect: false,
+      // Refetch on reconnect — re-sync data after a network drop
+      refetchOnReconnect: true,
       // Network mode
       networkMode: 'online',
     },

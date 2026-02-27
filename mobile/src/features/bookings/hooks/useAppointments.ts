@@ -43,7 +43,9 @@ export const useAppointments = (options?: IUseAppointmentsOptions) => {
         setIsLoadingMock(false);
       });
     }
-  }, [isDevMode, enabled, status]);
+    // isDevMode is a module-level constant — excluded from deps intentionally
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, status]);
 
   const appointments = useMemo(() => {
     if (isDevMode) return mockAppointments;
@@ -90,7 +92,9 @@ export const useAppointment = (
           setIsLoadingMock(false);
         });
     }
-  }, [isDevMode, enabled, id]);
+    // isDevMode is a module-level constant — excluded from deps intentionally
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, id]);
 
   const appointment = useMemo(() => {
     if (isDevMode) return mockAppointment;

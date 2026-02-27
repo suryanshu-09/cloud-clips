@@ -22,8 +22,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  Image,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Camera, CameraType, CameraView } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { IHairstyle } from '../types';
@@ -172,7 +172,7 @@ export function ARTryOn({ styles, onSavePreview, onClose }: IARTryOnProps) {
   if (previewImage) {
     return (
       <View style={styles.container}>
-        <Image source={{ uri: previewImage }} style={styles.previewImage} />
+        <Image source={{ uri: previewImage }} style={styles.previewImage} contentFit="cover" />
 
         {/* Overlay indicator */}
         {selectedStyle && (
@@ -476,7 +476,6 @@ const styles = StyleSheet.create({
   previewImage: {
     flex: 1,
     width: SCREEN_WIDTH,
-    resizeMode: 'cover',
   },
   previewOverlay: {
     position: 'absolute',

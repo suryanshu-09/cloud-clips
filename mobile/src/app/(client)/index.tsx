@@ -1,11 +1,13 @@
-import { View, Text, ScrollView } from 'react-native';
+import { View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { SafeView } from '@/components/ui/SafeView';
 import { Header } from '@/components/ui/Header';
 import { BarberList } from '@/components/barber/BarberList';
 import { useNearbyBarbers, type IBarberProfile } from '@/features/barbers';
 import * as Location from 'expo-location';
+
+const DEFAULT_LOCATION = { latitude: 37.7749, longitude: -122.4194 };
 
 export default function ClientHomeScreen() {
   const router = useRouter();
@@ -14,18 +16,19 @@ export default function ClientHomeScreen() {
     longitude: number;
   } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          setLocationError('Permission to access location was denied');
-          // Use default location (San Francisco coordinates as fallback)
-          setLocation({
-            latitude: 37.7749,
-            longitude: -122.4194,
-          });
+          if (!cancelled) {
+            setLocationError('Permission to access location was denied');
+            setLocation(DEFAULT_LOCATION);
+          }
           return;
         }
 
@@ -34,19 +37,19 @@ export default function ClientHomeScreen() {
           timeInterval: 5000,
           distanceInterval: 100,
         });
-        setLocation({
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
-        });
+
+        if (!cancelled) {
+          setLocation({
+            latitude: currentLocation.coords.latitude,
+            longitude: currentLocation.coords.longitude,
+          });
+        }
       } catch (error) {
+        if (cancelled) return;
         console.error('Error getting location:', error);
-        // Use default location for emulator or when location services unavailable
         if (__DEV__) {
           console.log('[Dev Mode] Using default location (San Francisco)');
-          setLocation({
-            latitude: 37.7749,
-            longitude: -122.4194,
-          });
+          setLocation(DEFAULT_LOCATION);
           setLocationError(
             'Using default location (enable location services for accurate results)'
           );
@@ -55,16 +58,32 @@ export default function ClientHomeScreen() {
         }
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const { data, isLoading, isError, error, refetch } = useNearbyBarbers(
-    location || { latitude: 0, longitude: 0, radius: 10 },
+    location ?? { latitude: 0, longitude: 0, radius: 10 },
     { enabled: !!location }
   );
 
-  const handleBarberPress = (barber: IBarberProfile) => {
-    router.push(`/(client)/booking/${barber.id}`);
-  };
+  const handleBarberPress = useCallback(
+    (barber: IBarberProfile) => {
+      router.push(`/(client)/booking/${barber.id}`);
+    },
+    [router]
+  );
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetch]);
 
   return (
     <SafeView>
@@ -87,8 +106,8 @@ export default function ClientHomeScreen() {
           onBarberPress={handleBarberPress}
           onRetry={refetch}
           showDistance={true}
-          refreshing={isLoading}
-          onRefresh={refetch}
+          refreshing={isRefreshing}
+          onRefresh={handleRefresh}
         />
       </View>
     </SafeView>
