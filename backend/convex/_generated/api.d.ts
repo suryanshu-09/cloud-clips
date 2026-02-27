@@ -38,6 +38,8 @@ import type * as reviews_mutations from "../reviews/mutations.js";
 import type * as reviews_queries from "../reviews/queries.js";
 import type * as storage from "../storage.js";
 import type * as storage_actions from "../storage/actions.js";
+import type * as timeOff_mutations from "../timeOff/mutations.js";
+import type * as timeOff_queries from "../timeOff/queries.js";
 import type * as users_mutations from "../users/mutations.js";
 import type * as users_queries from "../users/queries.js";
 
@@ -78,6 +80,8 @@ declare const fullApi: ApiFromModules<{
   "reviews/queries": typeof reviews_queries;
   storage: typeof storage;
   "storage/actions": typeof storage_actions;
+  "timeOff/mutations": typeof timeOff_mutations;
+  "timeOff/queries": typeof timeOff_queries;
   "users/mutations": typeof users_mutations;
   "users/queries": typeof users_queries;
 }>;

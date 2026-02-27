@@ -681,6 +681,27 @@ export default defineSchema({
     .index("by_payment_intent", ["paymentIntentId"])
     .index("by_created", ["createdAt"]),
 
+  // Time-off blocks: specific date ranges when barber is unavailable
+  timeOffBlocks: defineTable({
+    barberId: v.id("users"),
+
+    // Block label / reason
+    reason: v.optional(v.string()),
+
+    // Date range (stored as "YYYY-MM-DD" strings, inclusive)
+    startDate: v.string(),
+    endDate: v.string(),
+
+    // Optional time range within a day; null means full day(s)
+    startTime: v.optional(v.string()), // "HH:mm"
+    endTime: v.optional(v.string()),   // "HH:mm"
+
+    // Timestamps
+    createdAt: v.number(),
+  })
+    .index("by_barber", ["barberId"])
+    .index("by_barber_start", ["barberId", "startDate"]),
+
   // Shipping addresses for orders
   addresses: defineTable({
     // Owner

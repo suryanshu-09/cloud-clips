@@ -275,10 +275,10 @@ A phased approach to building the complete Cloud Clips application with Convex +
 - [ ] Availability toggle
 
 ### 9.2 Schedule Management
-- [ ] Weekly calendar view
-- [ ] Working hours editor
-- [ ] Time-off blocking
-- [ ] Recurring availability
+- [x] Weekly calendar view
+- [x] Working hours editor
+- [x] Time-off blocking
+- [x] Recurring availability
 
 ### 9.3 Earnings
 - [ ] Earnings history
