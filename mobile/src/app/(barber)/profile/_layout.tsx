@@ -9,6 +9,9 @@ export default function BarberProfileLayout() {
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="edit" />
+      <Stack.Screen name="business" />
+      <Stack.Screen name="services" />
+      <Stack.Screen name="location" />
       <Stack.Screen name="gallery" />
     </Stack>
   );

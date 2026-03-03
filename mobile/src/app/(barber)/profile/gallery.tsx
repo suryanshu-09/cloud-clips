@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import {
   ScrollView,
   Text,
@@ -10,50 +10,32 @@ import {
   Modal,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useBarberPortfolio } from '@/features/barbers/hooks/useBarberProfile';
-import { barberService } from '@/features/barbers/services/barberService';
-import { Card, Button } from '@/components/ui';
-import {
-  mediaService,
-  pickImageFromCamera,
-  pickImageFromGallery,
-  pickMultipleImages,
-  showImagePickerOptions,
-  IUploadProgress,
-} from '@/services/media';
-import type { IGalleryItem } from '@/features/barbers/types';
+import { Ionicons } from '@expo/vector-icons';
+import { useMutation, useQuery } from 'convex/react';
+import * as ImagePicker from 'expo-image-picker';
+import { api } from '@/convex/_generated/api';
+import { SafeView } from '@/components/ui/SafeView';
+import { Header } from '@/components/ui/Header';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const IMAGE_SIZE = (SCREEN_WIDTH - 48 - 16) / 3; // 3 columns with gaps
+const IMAGE_SIZE = (SCREEN_WIDTH - 48 - 16) / 3;
 
-const GALLERY_CATEGORIES = [
-  { id: 'all', label: 'All' },
-  { id: 'after', label: 'Finished Cuts' },
-  { id: 'before_after', label: 'Before & After' },
-  { id: 'space', label: 'Workspace' },
-];
-
-// Mock gallery data for demo
-const MOCK_GALLERY: IGalleryItem[] = [
-  { url: 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=400', type: 'after' },
-  { url: 'https://images.unsplash.com/photo-1621605815971-fbc98d665033?w=400', type: 'after' },
-  { url: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=400', type: 'space' },
-  { url: 'https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=400', type: 'space' },
-  { url: 'https://images.unsplash.com/photo-1605497788044-5a32c7078486?w=400', type: 'after' },
-  { url: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400', type: 'after' },
-];
+interface IPortfolioItem {
+  storageId: string;
+  url: string | null;
+}
 
 interface IImageViewerProps {
   visible: boolean;
-  image: IGalleryItem | null;
+  imageUrl: string | null;
   onClose: () => void;
   onDelete: () => void;
 }
 
-function ImageViewer({ visible, image, onClose, onDelete }: IImageViewerProps) {
-  if (!image) return null;
+function ImageViewer({ visible, imageUrl, onClose, onDelete }: IImageViewerProps) {
+  if (!imageUrl) return null;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -63,11 +45,11 @@ function ImageViewer({ visible, image, onClose, onDelete }: IImageViewerProps) {
             onPress={onClose}
             className="w-10 h-10 rounded-full bg-black/50 items-center justify-center"
           >
-            <Text className="text-white text-xl">X</Text>
+            <Ionicons name="close" size={22} color="#ffffff" />
           </Pressable>
           <Pressable
             onPress={() => {
-              Alert.alert('Delete Image', 'Are you sure you want to delete this image?', [
+              Alert.alert('Delete Image', 'Remove this image from your portfolio?', [
                 { text: 'Cancel', style: 'cancel' },
                 {
                   text: 'Delete',
@@ -81,23 +63,11 @@ function ImageViewer({ visible, image, onClose, onDelete }: IImageViewerProps) {
             }}
             className="w-10 h-10 rounded-full bg-red-500/80 items-center justify-center"
           >
-            <Text className="text-white text-sm">Del</Text>
+            <Ionicons name="trash-outline" size={18} color="#ffffff" />
           </Pressable>
         </View>
         <View className="flex-1 items-center justify-center">
-          <Image
-            source={{ uri: image.url }}
-            style={{ width: '100%', height: 384 }}
-            contentFit="contain"
-            transition={150}
-            cachePolicy="memory-disk"
-            recyclingKey={image.url}
-          />
-        </View>
-        <View className="absolute bottom-12 left-0 right-0 items-center">
-          <View className="bg-black/50 px-4 py-2 rounded-full">
-            <Text className="text-white capitalize">{image.type}</Text>
-          </View>
+          <Image source={{ uri: imageUrl }} className="w-full h-96" resizeMode="contain" />
         </View>
       </View>
     </Modal>
@@ -105,400 +75,244 @@ function ImageViewer({ visible, image, onClose, onDelete }: IImageViewerProps) {
 }
 
 export default function GalleryScreen() {
-  const { currentUser } = useAuth();
-  const queryClient = useQueryClient();
+  const portfolioItems = useQuery(api.barbers.queries.getBarberPortfolioImages) as
+    | IPortfolioItem[]
+    | undefined;
 
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedImage, setSelectedImage] = useState<IGalleryItem | null>(null);
+  const generateUploadUrl = useMutation(api.barbers.mutations.generatePortfolioUploadUrl);
+  const addImage = useMutation(api.barbers.mutations.addPortfolioImage);
+  const removeImage = useMutation(api.barbers.mutations.removePortfolioImage);
+
+  const [selectedItem, setSelectedItem] = useState<IPortfolioItem | null>(null);
   const [showViewer, setShowViewer] = useState(false);
-  const [localGallery, setLocalGallery] = useState<IGalleryItem[]>(MOCK_GALLERY);
-  const [uploadProgress, setUploadProgress] = useState<number>(0);
-  const [showTypeSelector, setShowTypeSelector] = useState(false);
-  const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Fetch portfolio data
-  const { data: portfolioData, isLoading } = useBarberPortfolio(currentUser?.id || '');
+  const items = portfolioItems ?? [];
 
-  // Use fetched data if available, otherwise use local state
-  const galleryItems = portfolioData?.gallery || localGallery;
+  const pickAndUpload = async (useCamera: boolean) => {
+    try {
+      let result: ImagePicker.ImagePickerResult;
 
-  // Filter gallery by category
-  const filteredGallery =
-    selectedCategory === 'all'
-      ? galleryItems
-      : galleryItems.filter((item: IGalleryItem) => item.type === selectedCategory);
-
-  // Handle upload progress
-  const handleUploadProgress = useCallback((progress: IUploadProgress) => {
-    setUploadProgress(progress.progress);
-  }, []);
-
-  // Upload image mutation
-  const uploadMutation = useMutation({
-    mutationFn: async ({ uri, imageType }: { uri: string; imageType: string }) => {
-      return mediaService.uploadGalleryImage(uri, imageType, {
-        onProgress: handleUploadProgress,
-      });
-    },
-    onSuccess: (data) => {
-      // Add new image to local gallery
-      const newImage: IGalleryItem = {
-        url: data.url,
-        type: data.type as IGalleryItem['type'],
-      };
-      setLocalGallery((prev) => [newImage, ...prev]);
-
-      // Invalidate portfolio query
-      queryClient.invalidateQueries({ queryKey: ['barber', currentUser?.id, 'portfolio'] });
-
-      setUploadProgress(0);
-      Alert.alert('Success', 'Image uploaded successfully!');
-    },
-    onError: (error: Error) => {
-      setUploadProgress(0);
-      Alert.alert('Error', error.message || 'Failed to upload image');
-    },
-  });
-
-  // Batch upload mutation
-  const batchUploadMutation = useMutation({
-    mutationFn: async (uris: string[]) => {
-      return mediaService.uploadGalleryBatch(uris, {
-        onProgress: handleUploadProgress,
-      });
-    },
-    onSuccess: (data) => {
-      // Add new images to local gallery
-      const newImages: IGalleryItem[] = data.uploaded.map((item) => ({
-        url: item.url,
-        type: 'after' as const,
-      }));
-      setLocalGallery((prev) => [...newImages, ...prev]);
-
-      // Invalidate portfolio query
-      queryClient.invalidateQueries({ queryKey: ['barber', currentUser?.id, 'portfolio'] });
-
-      setUploadProgress(0);
-
-      if (data.failed.length > 0) {
-        Alert.alert(
-          'Partial Upload',
-          `${data.uploaded.length} images uploaded. ${data.failed.length} failed.`
-        );
+      if (useCamera) {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert('Permission Required', 'Camera access is needed to take photos.');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          allowsEditing: true,
+          aspect: [4, 5],
+          quality: 0.85,
+        });
       } else {
-        Alert.alert('Success', `${data.uploaded.length} images uploaded successfully!`);
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert('Permission Required', 'Photo library access is needed to select images.');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          allowsEditing: true,
+          aspect: [4, 5],
+          quality: 0.85,
+          allowsMultipleSelection: false,
+        });
       }
-    },
-    onError: (error: Error) => {
+
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+      const asset = result.assets[0];
+      await uploadImage(asset.uri, asset.mimeType || 'image/jpeg');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to pick image.');
+    }
+  };
+
+  const uploadImage = async (uri: string, mimeType: string) => {
+    try {
+      setIsUploading(true);
+      setUploadProgress(10);
+
+      const uploadUrl = await generateUploadUrl();
+      setUploadProgress(30);
+
+      const fetchResponse = await fetch(uri);
+      const blob = await fetchResponse.blob();
+      setUploadProgress(50);
+
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': mimeType },
+        body: blob,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed with status ${uploadResponse.status}`);
+      }
+
+      setUploadProgress(80);
+      const { storageId } = (await uploadResponse.json()) as { storageId: string };
+
+      await addImage({ imageUrl: storageId });
+      setUploadProgress(100);
+
+      Alert.alert('Uploaded', 'Photo added to your portfolio!');
+    } catch (err: any) {
+      Alert.alert('Upload Error', err.message || 'Failed to upload image.');
+    } finally {
+      setIsUploading(false);
       setUploadProgress(0);
-      Alert.alert('Error', error.message || 'Failed to upload images');
-    },
-  });
-
-  // Handle camera press
-  const handleCameraPress = async () => {
-    try {
-      const image = await pickImageFromCamera({
-        allowsEditing: true,
-        aspect: [4, 5],
-        quality: 0.9,
-      });
-      if (image) {
-        setPendingImageUri(image.uri);
-        setShowTypeSelector(true);
-      }
-    } catch (error) {
-      console.error('Camera error:', error);
-      Alert.alert('Error', 'Failed to access camera');
-    }
-  };
-
-  // Handle gallery press
-  const handleGalleryPress = async () => {
-    try {
-      const image = await pickImageFromGallery({
-        allowsEditing: true,
-        aspect: [4, 5],
-        quality: 0.9,
-      });
-      if (image) {
-        setPendingImageUri(image.uri);
-        setShowTypeSelector(true);
-      }
-    } catch (error) {
-      console.error('Gallery error:', error);
-      Alert.alert('Error', 'Failed to access photo library');
-    }
-  };
-
-  // Handle multiple images
-  const handleMultipleImagesPress = async () => {
-    try {
-      const images = await pickMultipleImages({
-        quality: 0.9,
-        selectionLimit: 10,
-      });
-      if (images.length > 0) {
-        const uris = images.map((img) => img.uri);
-        batchUploadMutation.mutate(uris);
-      }
-    } catch (error) {
-      console.error('Multiple images error:', error);
-      Alert.alert('Error', 'Failed to select images');
-    }
-  };
-
-  // Handle type selection and upload
-  const handleTypeSelect = (imageType: string) => {
-    setShowTypeSelector(false);
-    if (pendingImageUri) {
-      uploadMutation.mutate({ uri: pendingImageUri, imageType });
-      setPendingImageUri(null);
     }
   };
 
   const handleAddPhoto = () => {
-    Alert.alert('Add Photo', 'Choose how to add photos', [
-      {
-        text: 'Camera',
-        onPress: handleCameraPress,
-      },
-      {
-        text: 'Single Photo',
-        onPress: handleGalleryPress,
-      },
-      {
-        text: 'Multiple Photos',
-        onPress: handleMultipleImagesPress,
-      },
+    Alert.alert('Add Photo', 'Choose source', [
+      { text: 'Camera', onPress: () => pickAndUpload(true) },
+      { text: 'Photo Library', onPress: () => pickAndUpload(false) },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
 
-  const handleDeleteImage = () => {
-    if (selectedImage) {
-      // Delete from server
-      mediaService.deleteImage(selectedImage.url).catch((error) => {
-        console.error('Failed to delete from server:', error);
-      });
-
-      // Remove from local state
-      setLocalGallery((prev) => prev.filter((img) => img.url !== selectedImage.url));
-      Alert.alert('Deleted', 'Image has been removed from your portfolio');
+  const handleDeleteImage = async (storageId: string) => {
+    try {
+      await removeImage({ imageUrl: storageId });
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to remove image.');
     }
   };
 
-  const handleImagePress = (image: IGalleryItem) => {
-    setSelectedImage(image);
-    setShowViewer(true);
-  };
-
-  const isUploadingAny = uploadMutation.isPending || batchUploadMutation.isPending;
-
-  if (isLoading) {
+  if (portfolioItems === undefined) {
     return (
-      <View className="flex-1 bg-white items-center justify-center">
-        <ActivityIndicator size="large" color="#3b82f6" />
-      </View>
+      <SafeView>
+        <Header title="Portfolio Gallery" showBack />
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#6366f1" />
+        </View>
+      </SafeView>
     );
   }
 
   return (
-    <View className="flex-1 bg-gray-50">
-      {/* Header */}
-      <View className="bg-white p-6 border-b border-gray-200">
-        <View className="flex-row justify-between items-start">
-          <View className="flex-1">
-            <Text className="text-3xl font-bold text-gray-900 mb-2">Portfolio Gallery</Text>
-            <Text className="text-gray-600">Showcase your best work to attract clients</Text>
+    <SafeView>
+      <Header title="Portfolio Gallery" showBack />
+
+      <ScrollView className="flex-1 bg-gray-50">
+        <View className="bg-white px-4 py-4 border-b border-gray-100">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1 mr-3">
+              <Text className="text-gray-600 text-sm">
+                Showcase your best work. Clients see these photos on your profile.
+              </Text>
+            </View>
+            <Button
+              variant="primary"
+              size="sm"
+              onPress={handleAddPhoto}
+              disabled={isUploading}
+              loading={isUploading}
+            >
+              + Add
+            </Button>
           </View>
-          <Button variant="primary" size="sm" onPress={handleAddPhoto} disabled={isUploadingAny}>
-            {isUploadingAny ? 'Uploading...' : '+ Add'}
-          </Button>
+
+          {isUploading && uploadProgress > 0 && (
+            <View className="mt-3">
+              <View className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <View
+                  className="h-full bg-indigo-500 rounded-full"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </View>
+              <Text className="text-xs text-gray-500 text-center mt-1">
+                Uploading... {Math.round(uploadProgress)}%
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Upload Progress */}
-        {isUploadingAny && uploadProgress > 0 && (
-          <View className="mt-4">
-            <View className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <View
-                className="h-full bg-blue-500 rounded-full"
-                style={{ width: `${uploadProgress}%` }}
-              />
-            </View>
-            <Text className="text-xs text-gray-500 text-center mt-1">
-              Uploading... {Math.round(uploadProgress)}%
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Category Filters */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        className="bg-white border-b border-gray-200"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
-      >
-        {GALLERY_CATEGORIES.map((category) => (
-          <Pressable
-            key={category.id}
-            onPress={() => setSelectedCategory(category.id)}
-            className={`px-4 py-2 rounded-full mr-2 ${
-              selectedCategory === category.id ? 'bg-blue-500' : 'bg-gray-100'
-            }`}
-          >
-            <Text
-              className={`text-sm font-medium ${
-                selectedCategory === category.id ? 'text-white' : 'text-gray-700'
-              }`}
-            >
-              {category.label}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      <ScrollView className="flex-1">
-        <View className="p-6">
-          {filteredGallery.length === 0 ? (
-            <Card className="p-8 items-center">
-              <Text className="text-5xl mb-4">{'📷'}</Text>
-              <Text className="text-lg font-semibold text-gray-900 mb-2">No Photos Yet</Text>
-              <Text className="text-gray-500 text-center mb-4">
-                {selectedCategory === 'all'
-                  ? 'Start building your portfolio by adding photos of your work'
-                  : `No photos in the "${GALLERY_CATEGORIES.find((c) => c.id === selectedCategory)?.label}" category`}
-              </Text>
-              {selectedCategory === 'all' && (
-                <Button onPress={handleAddPhoto}>Add Your First Photo</Button>
-              )}
+        <View className="p-4">
+          {items.length === 0 ? (
+            <Card variant="outlined" padding="lg">
+              <View className="items-center py-10">
+                <Ionicons name="images-outline" size={48} color="#d1d5db" />
+                <Text className="text-lg font-bold text-gray-900 mt-4 mb-2">No Photos Yet</Text>
+                <Text className="text-gray-500 text-center mb-6 px-4">
+                  Add photos of your haircuts and workspace to attract more clients.
+                </Text>
+                <Button onPress={handleAddPhoto} disabled={isUploading}>
+                  Add Your First Photo
+                </Button>
+              </View>
             </Card>
           ) : (
             <>
-              {/* Stats */}
-              <View className="flex-row mb-4">
-                <View className="flex-1 bg-white rounded-lg p-3 mr-2">
-                  <Text className="text-2xl font-bold text-gray-900">{galleryItems.length}</Text>
-                  <Text className="text-sm text-gray-500">Total Photos</Text>
+              <View className="flex-row mb-4 gap-3">
+                <View className="flex-1 bg-white rounded-xl p-3 border border-gray-100">
+                  <Text className="text-2xl font-bold text-gray-900">{items.length}</Text>
+                  <Text className="text-xs text-gray-500">Portfolio Photos</Text>
                 </View>
-                <View className="flex-1 bg-white rounded-lg p-3 ml-2">
-                  <Text className="text-2xl font-bold text-gray-900">{filteredGallery.length}</Text>
-                  <Text className="text-sm text-gray-500">Showing</Text>
+                <View className="flex-1 bg-indigo-50 rounded-xl p-3 border border-indigo-100 justify-center">
+                  <Ionicons name="eye-outline" size={20} color="#6366f1" />
+                  <Text className="text-xs text-indigo-600 mt-1 font-medium">
+                    Visible to clients
+                  </Text>
                 </View>
               </View>
 
-              {/* Gallery Grid */}
               <View className="flex-row flex-wrap" style={{ marginHorizontal: -4 }}>
-                {filteredGallery.map((item: IGalleryItem, index: number) => (
+                {items.map((item, index) => (
                   <Pressable
-                    key={`${item.url}-${index}`}
-                    onPress={() => handleImagePress(item)}
-                    style={{
-                      width: IMAGE_SIZE,
-                      height: IMAGE_SIZE,
-                      margin: 4,
+                    key={`${item.storageId}-${index}`}
+                    onPress={() => {
+                      setSelectedItem(item);
+                      setShowViewer(true);
                     }}
-                    className="rounded-lg overflow-hidden"
+                    style={{ width: IMAGE_SIZE, height: IMAGE_SIZE, margin: 4 }}
+                    className="rounded-xl overflow-hidden bg-gray-100"
                   >
-                    <Image
-                      source={{ uri: item.url }}
-                      style={{ width: '100%', height: '100%' }}
-                      contentFit="cover"
-                      transition={150}
-                      cachePolicy="memory-disk"
-                      recyclingKey={item.url}
-                    />
-                    <View className="absolute bottom-1 right-1 bg-black/60 px-2 py-1 rounded">
-                      <Text className="text-white text-xs capitalize">{item.type}</Text>
-                    </View>
+                    {item.url ? (
+                      <Image
+                        source={{ uri: item.url }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View className="flex-1 items-center justify-center">
+                        <Ionicons name="image-outline" size={24} color="#9ca3af" />
+                      </View>
+                    )}
                   </Pressable>
                 ))}
               </View>
 
-              {/* Tips Card */}
-              <Card className="p-4 mt-6 bg-blue-50 border-blue-200">
-                <Text className="text-base font-semibold text-blue-900 mb-2">Portfolio Tips</Text>
-                <View className="space-y-2">
-                  <Text className="text-sm text-blue-800">- Use high-quality, well-lit photos</Text>
-                  <Text className="text-sm text-blue-800">- Show variety in your work styles</Text>
-                  <Text className="text-sm text-blue-800">- Include before & after shots</Text>
-                  <Text className="text-sm text-blue-800">
-                    - Keep your portfolio updated regularly
+              <View className="bg-indigo-50 rounded-xl p-4 mt-4 flex-row">
+                <Ionicons name="bulb-outline" size={20} color="#6366f1" />
+                <View className="ml-3 flex-1">
+                  <Text className="text-sm font-semibold text-indigo-900 mb-1">Portfolio Tips</Text>
+                  <Text className="text-xs text-indigo-700 leading-4">
+                    Use well-lit photos, show variety in styles, and include before &amp; after
+                    shots for best results.
                   </Text>
                 </View>
-              </Card>
+              </View>
             </>
           )}
         </View>
       </ScrollView>
 
-      {/* Image Viewer Modal */}
       <ImageViewer
         visible={showViewer}
-        image={selectedImage}
+        imageUrl={selectedItem?.url ?? null}
         onClose={() => {
           setShowViewer(false);
-          setSelectedImage(null);
+          setSelectedItem(null);
         }}
-        onDelete={handleDeleteImage}
+        onDelete={() => {
+          if (selectedItem) {
+            handleDeleteImage(selectedItem.storageId);
+          }
+        }}
       />
-
-      {/* Image Type Selector Modal */}
-      <Modal
-        visible={showTypeSelector}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
-          setShowTypeSelector(false);
-          setPendingImageUri(null);
-        }}
-      >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-3xl p-6">
-            <Text className="text-xl font-bold text-gray-900 mb-4">Select Image Type</Text>
-            <Text className="text-gray-600 mb-6">
-              Choose a category for this image to help organize your portfolio
-            </Text>
-
-            <View className="space-y-3">
-              <Pressable
-                onPress={() => handleTypeSelect('after')}
-                className="bg-blue-50 border border-blue-200 rounded-xl p-4"
-              >
-                <Text className="text-lg font-semibold text-blue-900">Finished Cuts</Text>
-                <Text className="text-sm text-blue-700">Show off your completed haircuts</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => handleTypeSelect('before_after')}
-                className="bg-purple-50 border border-purple-200 rounded-xl p-4"
-              >
-                <Text className="text-lg font-semibold text-purple-900">Before & After</Text>
-                <Text className="text-sm text-purple-700">Transformation photos</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => handleTypeSelect('space')}
-                className="bg-green-50 border border-green-200 rounded-xl p-4"
-              >
-                <Text className="text-lg font-semibold text-green-900">Workspace</Text>
-                <Text className="text-sm text-green-700">Your shop or setup</Text>
-              </Pressable>
-            </View>
-
-            <Pressable
-              onPress={() => {
-                setShowTypeSelector(false);
-                setPendingImageUri(null);
-              }}
-              className="mt-6 py-4"
-            >
-              <Text className="text-center text-gray-500 font-medium">Cancel</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-    </View>
+    </SafeView>
   );
 }

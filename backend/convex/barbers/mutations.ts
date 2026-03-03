@@ -212,6 +212,134 @@ export const updateStripeAccount = mutation({
   },
 });
 
+// Update portfolio images
+export const updatePortfolioImages = mutation({
+  args: {
+    portfolioImages: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await ctx.auth.getUserIdentity();
+    if (!userId) {
+      throw new ConvexError("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .first();
+
+    if (!user) {
+      throw new ConvexError("User not found");
+    }
+
+    if (user.role !== "barber") {
+      throw new ConvexError("Access denied: Only barbers can update portfolio images");
+    }
+
+    const profile = await ctx.db
+      .query("barberProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    if (!profile) {
+      throw new ConvexError("Barber profile not found");
+    }
+
+    await ctx.db.patch(profile._id, {
+      portfolioImages: args.portfolioImages,
+      updatedAt: Date.now(),
+    });
+
+    return await ctx.db.get(profile._id);
+  },
+});
+
+// Add a single portfolio image
+export const addPortfolioImage = mutation({
+  args: {
+    imageUrl: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await ctx.auth.getUserIdentity();
+    if (!userId) {
+      throw new ConvexError("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .first();
+
+    if (!user) {
+      throw new ConvexError("User not found");
+    }
+
+    if (user.role !== "barber") {
+      throw new ConvexError("Access denied: Only barbers can update portfolio images");
+    }
+
+    const profile = await ctx.db
+      .query("barberProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    if (!profile) {
+      throw new ConvexError("Barber profile not found");
+    }
+
+    const currentImages = profile.portfolioImages || [];
+    await ctx.db.patch(profile._id, {
+      portfolioImages: [...currentImages, args.imageUrl],
+      updatedAt: Date.now(),
+    });
+
+    return await ctx.db.get(profile._id);
+  },
+});
+
+// Remove a portfolio image
+export const removePortfolioImage = mutation({
+  args: {
+    imageUrl: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await ctx.auth.getUserIdentity();
+    if (!userId) {
+      throw new ConvexError("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .first();
+
+    if (!user) {
+      throw new ConvexError("User not found");
+    }
+
+    if (user.role !== "barber") {
+      throw new ConvexError("Access denied: Only barbers can update portfolio images");
+    }
+
+    const profile = await ctx.db
+      .query("barberProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    if (!profile) {
+      throw new ConvexError("Barber profile not found");
+    }
+
+    const currentImages = profile.portfolioImages || [];
+    await ctx.db.patch(profile._id, {
+      portfolioImages: currentImages.filter((img) => img !== args.imageUrl),
+      updatedAt: Date.now(),
+    });
+
+    return await ctx.db.get(profile._id);
+  },
+});
+
 // Update working hours
 export const updateWorkingHours = mutation({
   args: {
@@ -257,5 +385,31 @@ export const updateWorkingHours = mutation({
     });
 
     return await ctx.db.get(profile._id);
+  },
+});
+
+// Generate a short-lived upload URL for portfolio images (Convex native storage)
+export const generatePortfolioUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await ctx.auth.getUserIdentity();
+    if (!userId) {
+      throw new ConvexError("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .first();
+
+    if (!user) {
+      throw new ConvexError("User not found");
+    }
+
+    if (user.role !== "barber") {
+      throw new ConvexError("Access denied: Only barbers can upload portfolio images");
+    }
+
+    return await ctx.storage.generateUploadUrl();
   },
 });

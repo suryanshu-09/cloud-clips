@@ -2,6 +2,52 @@ import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 
 /**
+ * Get the current barber's portfolio images with resolved URLs
+ * StorageIds stored in portfolioImages are resolved to serving URLs
+ */
+export const getBarberPortfolioImages = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .first();
+
+    if (!user || user.role !== "barber") return [];
+
+    const profile = await ctx.db
+      .query("barberProfiles")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+
+    if (!profile || !profile.portfolioImages || profile.portfolioImages.length === 0) {
+      return [];
+    }
+
+    // Resolve each storageId to a serving URL
+    const resolved = await Promise.all(
+      profile.portfolioImages.map(async (storageId) => {
+        try {
+          // If it looks like a URL already (from old data), return as-is
+          if (storageId.startsWith("http")) {
+            return { storageId, url: storageId };
+          }
+          const url = await ctx.storage.getUrl(storageId as any);
+          return { storageId, url };
+        } catch {
+          return { storageId, url: null };
+        }
+      })
+    );
+
+    return resolved.filter((item) => item.url !== null);
+  },
+});
+
+/**
  * Barber Queries
  * 
  * Queries for fetching barber data with proper authentication and role checks
