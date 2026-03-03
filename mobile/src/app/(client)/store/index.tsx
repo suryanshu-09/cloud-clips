@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, ScrollView, Pressable, Text } from 'react-native';
+import { useState, useCallback, useMemo } from 'react';
+import { View, Pressable, Text } from 'react-native';
 import { router } from 'expo-router';
 import {
   useInfiniteProducts,
@@ -10,6 +10,7 @@ import {
 import { ProductGrid, CategoryFilter, ProductRecommendations } from '@/components/product';
 import { Input } from '@/components/ui/Input';
 import { SafeView } from '@/components/ui/SafeView';
+import type { IProduct } from '@/features/products';
 
 const categories = [
   { value: '', label: 'All', icon: '🏪' },
@@ -35,33 +36,93 @@ export default function ProductCatalogScreen() {
   // Featured products for recommendations
   const { data: featuredData, isLoading: isFeaturedLoading } = useFeaturedProducts();
 
-  // Flatten pages into single array
-  const products = data?.pages.flatMap((page) => page.products) ?? [];
-  const featuredProducts = featuredData?.products ?? [];
+  // Flatten pages into single array — memoized to avoid unnecessary re-allocations
+  const products = useMemo(
+    () => data?.pages.flatMap((page) => page.products) ?? [],
+    [data?.pages]
+  );
+  const featuredProducts = useMemo(() => featuredData?.products ?? [], [featuredData?.products]);
 
-  const handleProductPress = (productId: string) => {
-    router.push(`/(client)/store/${productId}`);
-  };
+  const handleProductPress = useCallback((product: IProduct) => {
+    router.push(`/(client)/store/${product.id}`);
+  }, []);
 
-  const handleAddToCart = (product: any) => {
-    addProduct(product, 1);
-  };
+  const handleAddToCart = useCallback(
+    (product: IProduct) => {
+      addProduct(product, 1);
+    },
+    [addProduct]
+  );
 
-  const handleLoadMore = () => {
+  const handleLoadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
     }
-  };
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const handleCartPress = useCallback(() => {
+    router.push('/(client)/store/cart');
+  }, []);
+
+  const handleViewAll = useCallback(() => {
+    setSelectedCategory('');
+  }, []);
+
+  // Section title for the current category filter
+  const sectionTitle = useMemo(
+    () =>
+      selectedCategory
+        ? (categories.find((c) => c.value === selectedCategory)?.label ?? 'Products')
+        : 'All Products',
+    [selectedCategory]
+  );
+
+  /**
+   * ListHeaderComponent for the ProductGrid FlatList.
+   * Using this instead of a wrapping ScrollView avoids the
+   * nested scrollable anti-pattern, which blocks FlatList's
+   * own scroll-event optimizations.
+   */
+  const ListHeader = useMemo(
+    () => (
+      <View>
+        {/* Product Recommendations */}
+        <ProductRecommendations
+          products={featuredProducts}
+          title="Recommended for You"
+          isLoading={isFeaturedLoading}
+          showViewAll={true}
+          onViewAllPress={handleViewAll}
+        />
+
+        {/* Section Title */}
+        <View className="px-4 mb-3">
+          <Text className="text-lg font-bold text-gray-900">{sectionTitle}</Text>
+        </View>
+      </View>
+    ),
+    [featuredProducts, isFeaturedLoading, handleViewAll, sectionTitle]
+  );
+
+  const ListFooter = useMemo(
+    () =>
+      isFetchingNextPage ? (
+        <View className="py-4 items-center">
+          <Text className="text-gray-500">Loading more...</Text>
+        </View>
+      ) : null,
+    [isFetchingNextPage]
+  );
 
   return (
     <SafeView>
-      {/* Header */}
+      {/* Fixed Header — search & cart */}
       <View className="px-4 py-3 bg-white border-b border-gray-200">
         <View className="flex-row items-center justify-between mb-3">
           <Text className="text-2xl font-bold text-gray-900">Store</Text>
 
           {/* Cart Button */}
-          <Pressable onPress={() => router.push('/(client)/store/cart')} className="relative">
+          <Pressable onPress={handleCartPress} className="relative">
             <View className="bg-blue-500 rounded-full p-2 px-4">
               <Text className="text-white font-semibold">Cart</Text>
             </View>
@@ -82,7 +143,7 @@ export default function ProductCatalogScreen() {
         />
       </View>
 
-      {/* Category Filter */}
+      {/* Fixed Category Filter */}
       <CategoryFilter
         categories={categories}
         selectedCategory={selectedCategory}
@@ -90,44 +151,22 @@ export default function ProductCatalogScreen() {
         className="bg-white border-b border-gray-200"
       />
 
-      {/* Main Content */}
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* Product Recommendations */}
-        <ProductRecommendations
-          products={featuredProducts}
-          title="Recommended for You"
-          isLoading={isFeaturedLoading}
-          showViewAll={true}
-          onViewAllPress={() => setSelectedCategory('')}
-        />
-
-        {/* Section Title */}
-        <View className="px-4 mb-3">
-          <Text className="text-lg font-bold text-gray-900">
-            {selectedCategory
-              ? categories.find((c) => c.value === selectedCategory)?.label
-              : 'All Products'}
-          </Text>
-        </View>
-
-        {/* Products Grid */}
-        <ProductGrid
-          products={products}
-          isLoading={isLoading}
-          onProductPress={(product) => handleProductPress(product.id)}
-          onAddToCart={handleAddToCart}
-          numColumns={2}
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={
-            isFetchingNextPage ? (
-              <View className="py-4 items-center">
-                <Text className="text-gray-500">Loading more...</Text>
-              </View>
-            ) : null
-          }
-        />
-      </ScrollView>
+      {/*
+       * ProductGrid is a FlatList — it owns the scroll.
+       * We pass recommendations + title as ListHeaderComponent
+       * to avoid wrapping a FlatList inside a ScrollView.
+       */}
+      <ProductGrid
+        products={products}
+        isLoading={isLoading}
+        onProductPress={handleProductPress}
+        onAddToCart={handleAddToCart}
+        numColumns={2}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        ListHeaderComponent={ListHeader}
+        ListFooterComponent={ListFooter}
+      />
     </SafeView>
   );
 }

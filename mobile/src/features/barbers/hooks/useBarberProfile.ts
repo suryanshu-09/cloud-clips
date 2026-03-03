@@ -14,6 +14,7 @@ export function useBarberProfile(
     queryFn: () => barberService.getBarberById(barberId),
     enabled: !!barberId,
     staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 20 * 60 * 1000, // Keep in cache 20 minutes — profiles are stable data
     ...options,
   });
 }
