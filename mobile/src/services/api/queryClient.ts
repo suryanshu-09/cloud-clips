@@ -1,30 +1,43 @@
 import { QueryClient } from '@tanstack/react-query';
+import { PERFORMANCE_CONSTANTS } from '@/utils/performance';
 
-// Create a query client with default options
+const { QUERY_CACHE } = PERFORMANCE_CONSTANTS;
+
+/**
+ * TanStack Query client with performance-optimized defaults.
+ *
+ * Cache strategy:
+ *   - gcTime (garbage collection): how long unused data stays in memory cache
+ *   - staleTime: how long data is considered fresh before a background refetch
+ *
+ * Per-query overrides (use these staleTime values in individual hooks):
+ *   - Availability slots  → QUERY_CACHE.SHORT  (30s)   — changes frequently
+ *   - Nearby barbers      → QUERY_CACHE.MEDIUM (2min)  — changes on location
+ *   - Barber profiles     → QUERY_CACHE.LONG   (5min)  — stable data
+ *   - Products/categories → QUERY_CACHE.LONG   (5min)  — stable data
+ *   - Config/categories   → QUERY_CACHE.VERY_LONG (30min) — almost static
+ */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Keep inactive query data in cache for 10 minutes before garbage-collecting.
-      // This covers the longest staleTime used in the app (10 min for barber profiles)
-      // so navigating back never triggers a redundant network request.
-      gcTime: 1000 * 60 * 10,
-      // Stale time of 1 minute — individual queries override as needed
-      staleTime: 1000 * 60,
+      // Keep unused cached data in memory for 10 minutes (reduced re-fetches on navigation)
+      gcTime: QUERY_CACHE.LONG * 2,
+      // Consider data stale after 2 minutes by default
+      staleTime: QUERY_CACHE.MEDIUM,
       // Retry failed requests 2 times
       retry: 2,
-      // Retry delay increases exponentially
+      // Retry delay increases exponentially, capped at 30s
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      // Refetch on window focus keeps data fresh when the user switches back
+      // Refetch when app comes back to foreground (important for real-time data)
       refetchOnWindowFocus: true,
-      // Refetch on reconnect — re-sync data after a network drop
+      // Refetch on reconnect to recover missed updates while offline
       refetchOnReconnect: true,
-      // Network mode
+      // Network mode: don't fire queries while offline, queue them
       networkMode: 'online',
     },
     mutations: {
-      // Retry mutations once
+      // Retry mutations once on transient failures
       retry: 1,
-      // Network mode for mutations
       networkMode: 'online',
     },
   },

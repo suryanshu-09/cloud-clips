@@ -194,6 +194,8 @@ export default function AppointmentsListScreen() {
     router.push('/search');
   }, [router]);
 
+  const keyExtractor = useCallback((item: IAppointmentWithDetails) => item._id, []);
+
   // Render appointment item
   const renderAppointment = useCallback(
     ({ item }: { item: IAppointmentWithDetails }) => (
@@ -302,9 +304,13 @@ export default function AppointmentsListScreen() {
         <FlatList
           data={filteredAppointments}
           renderItem={renderAppointment}
-          keyExtractor={(item) => item._id}
+          keyExtractor={keyExtractor}
           contentContainerStyle={{ paddingTop: 16, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={5}
         />
       )}
 

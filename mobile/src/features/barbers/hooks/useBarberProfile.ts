@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { barberService } from '../services/barberService';
 import type { IBarberProfile, IBarberAvailability, IBarberUpdateData } from '../types';
+import { PERFORMANCE_CONSTANTS } from '@/utils/performance';
+
+const { QUERY_CACHE } = PERFORMANCE_CONSTANTS;
 
 /**
  * Hook to fetch a single barber profile by ID
@@ -13,8 +16,7 @@ export function useBarberProfile(
     queryKey: ['barber', barberId],
     queryFn: () => barberService.getBarberById(barberId),
     enabled: !!barberId,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 20 * 60 * 1000, // Keep in cache 20 minutes — profiles are stable data
+    staleTime: QUERY_CACHE.LONG, // 5 minutes - profiles are stable
     ...options,
   });
 }
@@ -31,7 +33,7 @@ export function useBarberAvailability(
     queryKey: ['barber', barberId, 'availability', date],
     queryFn: () => barberService.getBarberAvailability(barberId, date),
     enabled: !!barberId && !!date,
-    staleTime: 1 * 60 * 1000, // 1 minute for availability
+    staleTime: QUERY_CACHE.SHORT, // 30s - availability changes frequently
     ...options,
   });
 }
@@ -47,7 +49,7 @@ export function useBarberReviews(
     queryKey: ['barber', barberId, 'reviews'],
     queryFn: () => barberService.getBarberReviews(barberId),
     enabled: !!barberId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: QUERY_CACHE.LONG, // 5 minutes - reviews don't change often
     ...options,
   });
 }
@@ -63,7 +65,7 @@ export function useBarberPortfolio(
     queryKey: ['barber', barberId, 'portfolio'],
     queryFn: () => barberService.getBarberPortfolio(barberId),
     enabled: !!barberId,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: QUERY_CACHE.LONG, // 5 minutes - portfolio images are stable
     ...options,
   });
 }

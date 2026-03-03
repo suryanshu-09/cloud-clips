@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, memo } from 'react';
 import { View, Text, FlatList, RefreshControl, ActivityIndicator, Pressable } from 'react-native';
 import { Card } from '@/components/ui';
 import { useEarningsHistory } from '@/features/earnings';
@@ -32,7 +32,7 @@ const formatTime = (dateString: string): string => {
 };
 
 // Earning item component
-function EarningItemCard({ item }: { item: IEarningItem }) {
+const EarningItemCard = memo(function EarningItemCard({ item }: { item: IEarningItem }) {
   const [expanded, setExpanded] = useState(false);
 
   const getTypeIcon = () => {
@@ -106,7 +106,7 @@ function EarningItemCard({ item }: { item: IEarningItem }) {
       </Card>
     </Pressable>
   );
-}
+});
 
 export default function EarningsHistoryScreen() {
   const [page, setPage] = useState(1);
@@ -146,16 +146,18 @@ export default function EarningsHistoryScreen() {
     return <EarningItemCard item={item} />;
   }, []);
 
-  const renderFooter = () => {
+  const keyExtractor = useCallback((item: IEarningItem) => item.id, []);
+
+  const renderFooter = useMemo(() => {
     if (!isFetchingMore) return null;
     return (
       <View className="py-4">
         <ActivityIndicator size="small" color="#3B82F6" />
       </View>
     );
-  };
+  }, [isFetchingMore]);
 
-  const renderEmpty = () => {
+  const renderEmpty = useMemo(() => {
     if (isLoading) return null;
     return (
       <View className="flex-1 items-center justify-center py-20">
@@ -166,7 +168,7 @@ export default function EarningsHistoryScreen() {
         </Text>
       </View>
     );
-  };
+  }, [isLoading]);
 
   if (isLoading && !history) {
     return (
@@ -191,13 +193,17 @@ export default function EarningsHistoryScreen() {
       <FlatList
         data={history?.earnings || []}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         contentContainerStyle={{ padding: 16, flexGrow: 1 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
         ListEmptyComponent={renderEmpty}
+        removeClippedSubviews={true}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
       />
     </View>
   );

@@ -20,6 +20,7 @@ import apiClient from '@/services/api/client';
 import '@/services/i18n';
 import { i18nService } from '@/services/i18n';
 import { useNotificationSetup } from '@/features/notifications';
+import { preloadHeavyScreens } from '@/utils/performance';
 
 /**
  * Inner component that uses hooks requiring providers
@@ -138,6 +139,9 @@ export default function RootLayout() {
     if (I18nManager.isRTL !== isRTL) {
       I18nManager.forceRTL(isRTL);
     }
+
+    // Preload heavy screen modules after initial render to improve navigation responsiveness
+    preloadHeavyScreens();
 
     // eslint-disable-next-line no-console
     console.log('[RootLayout] Mounted successfully with i18n and performance monitoring');

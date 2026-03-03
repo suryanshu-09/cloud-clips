@@ -6,6 +6,9 @@
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { fetchProducts, fetchProductById, fetchProductsByBarber } from '../services/productService';
 import type { IProductListParams, IProduct } from '../types';
+import { PERFORMANCE_CONSTANTS } from '@/utils/performance';
+
+const { QUERY_CACHE } = PERFORMANCE_CONSTANTS;
 
 export const PRODUCT_QUERY_KEYS = {
   products: ['products'] as const,
@@ -27,7 +30,7 @@ export const useProducts = (options?: UseProductsOptions) => {
     queryKey: PRODUCT_QUERY_KEYS.productList(options?.params),
     queryFn: () => fetchProducts(options?.params),
     enabled: options?.enabled !== false,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: QUERY_CACHE.LONG, // 5 minutes - product listings are stable
   });
 };
 
@@ -49,7 +52,7 @@ export const useInfiniteProducts = (params?: IProductListParams) => {
       return undefined;
     },
     initialPageParam: 1,
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE.LONG, // 5 minutes
   });
 };
 
@@ -61,9 +64,7 @@ export const useProduct = (productId: string, options?: { enabled?: boolean }) =
     queryKey: PRODUCT_QUERY_KEYS.product(productId),
     queryFn: () => fetchProductById(productId),
     enabled: options?.enabled !== false && !!productId,
-    staleTime: 5 * 60 * 1000,
-    // Keep the product detail cached for 15 minutes since product data rarely changes
-    gcTime: 15 * 60 * 1000,
+    staleTime: QUERY_CACHE.LONG, // 5 minutes - product details are stable
   });
 };
 
@@ -75,7 +76,7 @@ export const useBarberProducts = (barberId: string, options?: { enabled?: boolea
     queryKey: PRODUCT_QUERY_KEYS.barberProducts(barberId),
     queryFn: () => fetchProductsByBarber(barberId),
     enabled: options?.enabled !== false && !!barberId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: QUERY_CACHE.LONG, // 5 minutes
   });
 };
 

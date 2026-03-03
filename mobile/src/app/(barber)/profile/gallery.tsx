@@ -10,14 +10,20 @@ import {
   Modal,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery } from 'convex/react';
-import * as ImagePicker from 'expo-image-picker';
-import { api } from '@/convex/_generated/api';
-import { SafeView } from '@/components/ui/SafeView';
-import { Header } from '@/components/ui/Header';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useBarberPortfolio } from '@/features/barbers/hooks/useBarberProfile';
+import { barberService } from '@/features/barbers/services/barberService';
+import { Card, Button } from '@/components/ui';
+import {
+  mediaService,
+  pickImageFromCamera,
+  pickImageFromGallery,
+  pickMultipleImages,
+  showImagePickerOptions,
+  IUploadProgress,
+} from '@/services/media';
+import type { IGalleryItem } from '@/features/barbers/types';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const IMAGE_SIZE = (SCREEN_WIDTH - 48 - 16) / 3;
@@ -67,7 +73,19 @@ function ImageViewer({ visible, imageUrl, onClose, onDelete }: IImageViewerProps
           </Pressable>
         </View>
         <View className="flex-1 items-center justify-center">
-          <Image source={{ uri: imageUrl }} className="w-full h-96" resizeMode="contain" />
+          <Image
+            source={{ uri: image.url }}
+            style={{ width: '100%', height: 384 }}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+            recyclingKey={image.url}
+            transition={150}
+          />
+        </View>
+        <View className="absolute bottom-12 left-0 right-0 items-center">
+          <View className="bg-black/50 px-4 py-2 rounded-full">
+            <Text className="text-white capitalize">{image.type}</Text>
+          </View>
         </View>
       </View>
     </Modal>
@@ -270,17 +288,17 @@ export default function GalleryScreen() {
                     style={{ width: IMAGE_SIZE, height: IMAGE_SIZE, margin: 4 }}
                     className="rounded-xl overflow-hidden bg-gray-100"
                   >
-                    {item.url ? (
-                      <Image
-                        source={{ uri: item.url }}
-                        style={{ width: '100%', height: '100%' }}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View className="flex-1 items-center justify-center">
-                        <Ionicons name="image-outline" size={24} color="#9ca3af" />
-                      </View>
-                    )}
+                    <Image
+                      source={{ uri: item.url }}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      recyclingKey={item.url}
+                      transition={200}
+                    />
+                    <View className="absolute bottom-1 right-1 bg-black/60 px-2 py-1 rounded">
+                      <Text className="text-white text-xs capitalize">{item.type}</Text>
+                    </View>
                   </Pressable>
                 ))}
               </View>
