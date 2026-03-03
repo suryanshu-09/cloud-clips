@@ -8,6 +8,7 @@ export * from "./users/mutations";
 // Barbers
 export * from "./barbers/queries";
 export * from "./barbers/mutations";
+export * from "./barbers/dashboard";
 
 // Appointments
 export * from "./appointments/queries";
