@@ -10,6 +10,7 @@
 
 import type * as addresses_mutations from '../addresses/mutations.js';
 import type * as addresses_queries from '../addresses/queries.js';
+import type * as earnings_queries from '../earnings/queries.js';
 import type * as appointments_mutations from '../appointments/mutations.js';
 import type * as appointments_queries from '../appointments/queries.js';
 import type * as auth from '../auth.js';
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   'addresses/mutations': typeof addresses_mutations;
   'addresses/queries': typeof addresses_queries;
   'appointments/mutations': typeof appointments_mutations;
+  'earnings/queries': typeof earnings_queries;
   'appointments/queries': typeof appointments_queries;
   auth: typeof auth;
   'auth/index': typeof auth_index;

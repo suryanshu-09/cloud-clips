@@ -18,6 +18,7 @@ export {
   transformConnectAccountResponse,
   transformCreateAccountResponse,
   transformDashboardLinkResponse,
+  // Mock generators kept for testing/fallback
   generateMockEarningsSummary,
   generateMockEarningsHistory,
   generateMockPayoutsResponse,
