@@ -19,6 +19,8 @@ import { v } from "convex/values";
  * - coupons: Promotion codes
  * - notifications: User notifications
  * - receipts: Payment receipts
+ * - announcements: Admin-created system-wide announcements
+ * - supportTickets: User-submitted support requests (admin management)
  */
 
 export default defineSchema({
@@ -116,6 +118,11 @@ export default defineSchema({
     
     // Verification status
     isVerified: v.boolean(),
+    
+    // Featured status (set by admin for homepage promotion)
+    isFeatured: v.optional(v.boolean()),
+    featuredAt: v.optional(v.number()),
+    featuredUntil: v.optional(v.number()), // optional expiry timestamp
     
     // Stripe Connect account ID
     stripeAccountId: v.optional(v.string()),
@@ -705,4 +712,146 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_default", ["userId", "isDefault"]),
+
+  // System announcements (created by admins, broadcast to users)
+  announcements: defineTable({
+    // Creator
+    createdBy: v.id("users"), // must be admin
+
+    // Content
+    title: v.string(),
+    body: v.string(),
+
+    // Target audience
+    targetAudience: v.union(
+      v.literal("all"),
+      v.literal("clients"),
+      v.literal("barbers")
+    ),
+
+    // Display type
+    displayType: v.union(
+      v.literal("banner"),    // shown as in-app banner
+      v.literal("modal"),     // shown as modal popup
+      v.literal("push")       // sent as push notification only
+    ),
+
+    // Priority
+    priority: v.union(
+      v.literal("low"),
+      v.literal("normal"),
+      v.literal("high"),
+      v.literal("urgent")
+    ),
+
+    // Scheduling
+    publishAt: v.number(),           // when to publish
+    expiresAt: v.optional(v.number()), // optional expiry
+
+    // Status
+    isActive: v.boolean(),
+    isDraft: v.boolean(),
+
+    // Deep link / CTA
+    ctaLabel: v.optional(v.string()),
+    ctaUrl: v.optional(v.string()),
+
+    // Image
+    imageUrl: v.optional(v.string()),
+
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_active", ["isActive"])
+    .index("by_audience", ["targetAudience"])
+    .index("by_draft", ["isDraft"])
+    .index("by_publish", ["publishAt"])
+    .index("by_created_by", ["createdBy"]),
+
+  // Support tickets (submitted by users, managed by admin)
+  supportTickets: defineTable({
+    // Submitter
+    userId: v.id("users"),
+
+    // Ticket details
+    subject: v.string(),
+    description: v.string(),
+
+    // Category
+    category: v.union(
+      v.literal("billing"),
+      v.literal("booking"),
+      v.literal("account"),
+      v.literal("technical"),
+      v.literal("barber"),
+      v.literal("other")
+    ),
+
+    // Priority (set by admin)
+    priority: v.union(
+      v.literal("low"),
+      v.literal("normal"),
+      v.literal("high"),
+      v.literal("urgent")
+    ),
+
+    // Status lifecycle
+    status: v.union(
+      v.literal("open"),
+      v.literal("in_progress"),
+      v.literal("waiting_on_user"),
+      v.literal("resolved"),
+      v.literal("closed")
+    ),
+
+    // Assignment
+    assignedTo: v.optional(v.id("users")), // admin user
+
+    // Linked records (for context)
+    relatedAppointmentId: v.optional(v.id("appointments")),
+    relatedOrderId: v.optional(v.id("orders")),
+
+    // Attachments (screenshot URLs)
+    attachments: v.optional(v.array(v.string())),
+
+    // Internal admin notes
+    adminNotes: v.optional(v.string()),
+
+    // Resolution
+    resolution: v.optional(v.string()),
+    resolvedAt: v.optional(v.number()),
+    resolvedBy: v.optional(v.id("users")),
+
+    // Timestamps
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_category", ["category"])
+    .index("by_priority", ["priority"])
+    .index("by_assigned", ["assignedTo"])
+    .index("by_created", ["createdAt"]),
+
+  // Support ticket messages (threaded replies)
+  supportTicketMessages: defineTable({
+    ticketId: v.id("supportTickets"),
+    senderId: v.id("users"),
+
+    // Content
+    message: v.string(),
+
+    // Whether this is an internal admin note (not visible to user)
+    isInternal: v.boolean(),
+
+    // Attachments
+    attachments: v.optional(v.array(v.string())),
+
+    // Timestamps
+    createdAt: v.number(),
+  })
+    .index("by_ticket", ["ticketId"])
+    .index("by_sender", ["senderId"])
+    .index("by_ticket_created", ["ticketId", "createdAt"]),
 });
