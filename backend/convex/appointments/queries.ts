@@ -2,6 +2,11 @@ import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import { fromTimestamp, getDateRange, toUTCTimestamp, formatTime } from "../lib/timezone";
 
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
 /**
  * Appointment Queries
  */
@@ -134,12 +139,27 @@ export const checkAvailability = query({
       )
       .collect();
 
+    // Load time-off blocks that overlap this date
+    const timeOffBlocks = await ctx.db
+      .query("timeOffBlocks")
+      .withIndex("by_barber", (q) => q.eq("barberId", args.barberId))
+      .collect();
+
+    const dayBlocks = timeOffBlocks.filter(
+      (b) => dateStr >= b.startDate && dateStr <= b.endDate
+    );
+
+    // If any full-day block covers this date, return no availability
+    const hasFullDayBlock = dayBlocks.some((b) => !b.startTime || !b.endTime);
+    if (hasFullDayBlock) return [];
+
     // Generate available time slots using UTC-based date string
     const slots = generateTimeSlots(
       workingHours.startTime,
       workingHours.endTime,
       existingAppointments,
-      dateStr
+      dateStr,
+      dayBlocks as Array<{ startTime: string; endTime: string }>
     );
 
     return slots;
@@ -151,7 +171,8 @@ function generateTimeSlots(
   startTime: string,
   endTime: string,
   bookedAppointments: Array<{ scheduledFor: number; endTime: number }>,
-  dateStr: string
+  dateStr: string,
+  partialDayBlocks: Array<{ startTime: string; endTime: string }> = []
 ): string[] {
   const slots: string[] = [];
 
@@ -172,8 +193,17 @@ function generateTimeSlots(
       return apt.scheduledFor < slotEndMs && apt.endTime > currentMs;
     });
 
-    if (!isBooked) {
-      slots.push(formatTime(currentMs));
+    // Check if this slot falls within a partial-day time-off block
+    const slotTimeStr = formatTime(currentMs);
+    const slotMinutes = timeToMinutes(slotTimeStr);
+    const isBlocked = partialDayBlocks.some((block) => {
+      const blockStart = timeToMinutes(block.startTime);
+      const blockEnd = timeToMinutes(block.endTime);
+      return slotMinutes >= blockStart && slotMinutes < blockEnd;
+    });
+
+    if (!isBooked && !isBlocked) {
+      slots.push(slotTimeStr);
     }
 
     currentMs += slotDurationMs;
