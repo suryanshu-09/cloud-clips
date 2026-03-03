@@ -60,3 +60,6 @@ export * from "./receipts/mutations";
 
 // Earnings
 export * from "./earnings/queries";
+
+// Analytics (Admin)
+export * from "./analytics/queries";

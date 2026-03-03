@@ -94,6 +94,7 @@ function AppContent() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(client)" />
         <Stack.Screen name="(barber)" />
+        <Stack.Screen name="(admin)" />
       </Stack>
       <StatusBar style="auto" />
     </View>
