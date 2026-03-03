@@ -10,6 +10,8 @@
 
 import type * as addresses_mutations from "../addresses/mutations.js";
 import type * as addresses_queries from "../addresses/queries.js";
+import type * as admin_mutations from "../admin/mutations.js";
+import type * as admin_queries from "../admin/queries.js";
 import type * as appointments_mutations from "../appointments/mutations.js";
 import type * as appointments_queries from "../appointments/queries.js";
 import type * as auth from "../auth.js";
@@ -50,6 +52,8 @@ import type {
 declare const fullApi: ApiFromModules<{
   "addresses/mutations": typeof addresses_mutations;
   "addresses/queries": typeof addresses_queries;
+  "admin/mutations": typeof admin_mutations;
+  "admin/queries": typeof admin_queries;
   "appointments/mutations": typeof appointments_mutations;
   "appointments/queries": typeof appointments_queries;
   auth: typeof auth;
