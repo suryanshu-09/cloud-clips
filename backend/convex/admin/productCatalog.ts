@@ -1,5 +1,7 @@
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
+import type { Doc } from "../_generated/dataModel";
+import { requireAdmin } from "./auth";
 
 /**
  * Admin: Product Catalog Management
@@ -7,23 +9,6 @@ import { v } from "convex/values";
  * Admins can view all products (including inactive), manage product categories,
  * moderate listings (approve, suspend), and perform bulk operations.
  */
-
-// Helper: verify caller is admin
-async function requireAdmin(ctx: { auth: { getUserIdentity: () => Promise<{ email: string } | null> }; db: any }) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new Error("Not authenticated");
-
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_email", (q: any) => q.eq("email", identity.email))
-    .first();
-
-  if (!user || user.role !== "admin") {
-    throw new Error("Not authorized: admin access required");
-  }
-
-  return user;
-}
 
 // ─────────────────────────────────────────────
 // Product Queries (Admin)
@@ -75,7 +60,7 @@ export const adminGetAllProducts = query({
 
     // Enrich with barber info
     return Promise.all(
-      paginated.map(async (product: any) => {
+      paginated.map(async (product: Doc<"products">) => {
         const barberProfile = await ctx.db
           .query("barberProfiles")
           .withIndex("by_user", (q: any) => q.eq("userId", product.barberId))

@@ -1,5 +1,7 @@
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
+import type { Doc } from "../_generated/dataModel";
+import { requireAdmin, requireAuthUser } from "./auth";
 
 /**
  * Admin: Support Tickets
@@ -8,37 +10,6 @@ import { v } from "convex/values";
  * respond (with public or internal-only messages), and resolve tickets.
  * A threaded message system (supportTicketMessages) tracks conversation history.
  */
-
-// Helper: verify caller is admin
-async function requireAdmin(ctx: { auth: { getUserIdentity: () => Promise<{ email: string } | null> }; db: any }) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new Error("Not authenticated");
-
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_email", (q: any) => q.eq("email", identity.email))
-    .first();
-
-  if (!user || user.role !== "admin") {
-    throw new Error("Not authorized: admin access required");
-  }
-
-  return user;
-}
-
-// Helper: get authenticated user (any role)
-async function requireAuth(ctx: { auth: { getUserIdentity: () => Promise<{ email: string } | null> }; db: any }) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new Error("Not authenticated");
-
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_email", (q: any) => q.eq("email", identity.email))
-    .first();
-
-  if (!user) throw new Error("User not found");
-  return user;
-}
 
 // ─────────────────────────────────────────────
 // Queries
@@ -116,7 +87,7 @@ export const adminGetAllTickets = query({
 
     // Enrich with user info
     return Promise.all(
-      paginated.map(async (ticket: any) => {
+      paginated.map(async (ticket: Doc<"supportTickets">) => {
         const user = await ctx.db.get(ticket.userId);
         const assignee = ticket.assignedTo
           ? await ctx.db.get(ticket.assignedTo)
@@ -161,7 +132,7 @@ export const adminGetTicketById = query({
 
     // Enrich messages with sender info
     const enrichedMessages = await Promise.all(
-      messages.map(async (msg: any) => {
+      messages.map(async (msg: Doc<"supportTicketMessages">) => {
         const sender = await ctx.db.get(msg.senderId);
         return {
           ...msg,
@@ -239,7 +210,7 @@ export const getMyTickets = query({
     ),
   },
   handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
+    const user = await requireAuthUser(ctx);
 
     let tickets = await ctx.db
       .query("supportTickets")
@@ -260,7 +231,7 @@ export const getMyTickets = query({
 export const getMyTicketById = query({
   args: { ticketId: v.id("supportTickets") },
   handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
+    const user = await requireAuthUser(ctx);
 
     const ticket = await ctx.db.get(args.ticketId);
     if (!ticket) return null;
@@ -277,7 +248,7 @@ export const getMyTicketById = query({
     const publicMessages = messages.filter((m: any) => !m.isInternal);
 
     const enrichedMessages = await Promise.all(
-      publicMessages.map(async (msg: any) => {
+      publicMessages.map(async (msg: Doc<"supportTicketMessages">) => {
         const sender = await ctx.db.get(msg.senderId);
         const isAdmin = sender?.role === "admin";
         return {
@@ -321,7 +292,7 @@ export const submitSupportTicket = mutation({
     relatedOrderId: v.optional(v.id("orders")),
   },
   handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
+    const user = await requireAuthUser(ctx);
 
     const now = Date.now();
     const ticketId = await ctx.db.insert("supportTickets", {
@@ -352,7 +323,7 @@ export const replyToTicket = mutation({
     attachments: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
+    const user = await requireAuthUser(ctx);
 
     const ticket = await ctx.db.get(args.ticketId);
     if (!ticket) throw new Error("Ticket not found");
@@ -509,7 +480,7 @@ export const closeMyTicket = mutation({
     ticketId: v.id("supportTickets"),
   },
   handler: async (ctx, args) => {
-    const user = await requireAuth(ctx);
+    const user = await requireAuthUser(ctx);
 
     const ticket = await ctx.db.get(args.ticketId);
     if (!ticket) throw new Error("Ticket not found");

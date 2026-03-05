@@ -1,5 +1,6 @@
 import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import type { Doc } from "../_generated/dataModel";
 
 /**
  * Admin Queries - User Management
@@ -215,7 +216,7 @@ export const listPendingVerifications = query({
 
     // Attach user info
     const results = await Promise.all(
-      page.map(async (profile: any) => {
+      page.map(async (profile: Doc<"barberProfiles">) => {
         const user = await ctx.db.get(profile.userId);
         return {
           profileId: profile._id,

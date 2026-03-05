@@ -28,7 +28,8 @@ export * from "./products/mutations";
 
 // Orders
 export * from "./orders/queries";
-export * from "./orders/mutations";
+export { createOrder, updateOrderStatus, cancelOrder } from "./orders/mutations";
+export { updatePaymentStatus as updateOrderPaymentStatus } from "./orders/mutations";
 
 // Addresses
 export * from "./addresses/queries";
@@ -38,7 +39,8 @@ export * from "./addresses/mutations";
 export * from "./payments/actions";
 
 // Notifications
-export * from "./notifications/tokens";
+export { registerPushToken, unregisterPushToken, updateUserPushTokens } from "./notifications/tokens";
+export { sendPushNotification as sendTokenPushNotification } from "./notifications/tokens";
 
 // Storage
 export * from "./storage/actions";
@@ -51,3 +53,7 @@ export * from "./coupons/queries";
 // Admin
 export * from "./admin/queries";
 export * from "./admin/mutations";
+export * from "./admin/featuredBarbers";
+export * from "./admin/announcements";
+export * from "./admin/supportTickets";
+export * from "./admin/productCatalog";

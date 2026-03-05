@@ -1,5 +1,7 @@
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
+import type { Doc } from "../_generated/dataModel";
+import { requireAdmin } from "./auth";
 
 /**
  * Admin: Featured Barbers
@@ -7,23 +9,6 @@ import { v } from "convex/values";
  * Allows admins to mark barbers as "featured" for homepage/discovery promotion.
  * Featured status can have an optional expiry date.
  */
-
-// Helper: verify caller is admin
-async function requireAdmin(ctx: { auth: { getUserIdentity: () => Promise<{ email: string } | null> }; db: any }) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new Error("Not authenticated");
-
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_email", (q: any) => q.eq("email", identity.email))
-    .first();
-
-  if (!user || user.role !== "admin") {
-    throw new Error("Not authorized: admin access required");
-  }
-
-  return user;
-}
 
 // ─────────────────────────────────────────────
 // Queries
@@ -41,7 +26,7 @@ export const getFeaturedBarbers = query({
       .query("barberProfiles")
       .collect();
 
-    const featured = profiles.filter((p: any) => {
+    const featured = profiles.filter((p: Doc<"barberProfiles">) => {
       if (!p.isFeatured) return false;
       // Exclude expired featured slots
       if (p.featuredUntil && p.featuredUntil < now) return false;
@@ -50,7 +35,7 @@ export const getFeaturedBarbers = query({
 
     // Enrich with user info
     return Promise.all(
-      featured.map(async (profile: any) => {
+      featured.map(async (profile: Doc<"barberProfiles">) => {
         const user = await ctx.db.get(profile.userId);
         return {
           ...profile,
@@ -75,10 +60,10 @@ export const getAllFeaturedBarbers = query({
       .query("barberProfiles")
       .collect();
 
-    const featured = profiles.filter((p: any) => p.isFeatured);
+    const featured = profiles.filter((p: Doc<"barberProfiles">) => p.isFeatured);
 
     return Promise.all(
-      featured.map(async (profile: any) => {
+      featured.map(async (profile: Doc<"barberProfiles">) => {
         const user = await ctx.db.get(profile.userId);
         return {
           ...profile,
@@ -88,6 +73,41 @@ export const getAllFeaturedBarbers = query({
           isExpired: profile.featuredUntil
             ? profile.featuredUntil < Date.now()
             : false,
+        };
+      })
+    );
+  },
+});
+
+/**
+ * Get all verified barbers (for admin to feature).
+ * Returns barbers that are verified, optionally excluding already featured ones.
+ */
+export const getVerifiedBarbers = query({
+  args: {
+    excludeFeatured: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+
+    const profiles = await ctx.db
+      .query("barberProfiles")
+      .collect();
+
+    let filtered = profiles.filter((p: Doc<"barberProfiles">) => p.isVerified);
+    
+    if (args.excludeFeatured) {
+      filtered = filtered.filter((p: Doc<"barberProfiles">) => !p.isFeatured);
+    }
+
+    return Promise.all(
+      filtered.map(async (profile: Doc<"barberProfiles">) => {
+        const user = await ctx.db.get(profile.userId);
+        return {
+          ...profile,
+          user: user
+            ? { name: user.name, email: user.email, avatar: user.avatar }
+            : null,
         };
       })
     );

@@ -1,5 +1,7 @@
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
+import type { Doc } from "../_generated/dataModel";
+import { getAuthUserOrNull, requireAdmin } from "./auth";
 
 /**
  * Admin: System Announcements
@@ -8,23 +10,6 @@ import { v } from "convex/values";
  * or barbers only. Announcements can be banners, modals, or push notifications.
  * They support scheduling (publishAt) and optional expiry (expiresAt).
  */
-
-// Helper: verify caller is admin
-async function requireAdmin(ctx: { auth: { getUserIdentity: () => Promise<{ email: string } | null> }; db: any }) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) throw new Error("Not authenticated");
-
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_email", (q: any) => q.eq("email", identity.email))
-    .first();
-
-  if (!user || user.role !== "admin") {
-    throw new Error("Not authorized: admin access required");
-  }
-
-  return user;
-}
 
 // ─────────────────────────────────────────────
 // Queries
@@ -81,7 +66,7 @@ export const getAllAnnouncements = query({
 
     // Enrich with creator info
     return Promise.all(
-      paginated.map(async (a: any) => {
+      paginated.map(async (a: Doc<"announcements">) => {
         const creator = await ctx.db.get(a.createdBy);
         return {
           ...a,
@@ -101,13 +86,7 @@ export const getAllAnnouncements = query({
 export const getActiveAnnouncementsForUser = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q: any) => q.eq("email", identity.email))
-      .first();
+    const user = await getAuthUserOrNull(ctx);
 
     if (!user) return [];
 
