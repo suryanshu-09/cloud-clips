@@ -5,6 +5,7 @@ import { ProductCard } from './ProductCard';
 import { useCart } from '@/features/products';
 import type { IProduct } from '@/features/products';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { triggerSelectionHaptic } from '@/services/haptics';
 
 interface IProductRecommendationsProps extends Omit<
   FlatListProps<IProduct>,
@@ -90,7 +91,12 @@ export function ProductRecommendations({
       <View className="px-4 mb-3 flex-row items-center justify-between">
         <Text className="text-lg font-bold text-gray-900">{title}</Text>
         {showViewAll && (
-          <Pressable onPress={onViewAllPress}>
+          <Pressable
+            onPress={() => {
+              triggerSelectionHaptic();
+              onViewAllPress?.();
+            }}
+          >
             <Text className="text-blue-500 font-semibold text-sm">View All</Text>
           </Pressable>
         )}

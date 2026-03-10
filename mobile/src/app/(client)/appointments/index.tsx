@@ -17,13 +17,13 @@ import { useRouter } from 'expo-router';
 import { SafeView } from '@/components/ui/SafeView';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { SkeletonCard } from '@/components/ui/Skeleton';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
-import { AppointmentCard } from '@/components/booking/AppointmentCard';
+import { AppointmentCard, AppointmentCardSkeleton } from '@/components/booking/AppointmentCard';
 import { useAppointments } from '@/features/bookings/hooks/useAppointments';
 import { useBooking } from '@/features/bookings/hooks/useBooking';
 import { useTranslation } from '@/services/i18n/useTranslation';
+import { triggerSelectionHaptic } from '@/services/haptics';
 import type { IAppointmentWithDetails, AppointmentStatus } from '@/features/bookings/types';
 import type { Id } from '@convex/_generated/dataModel';
 
@@ -73,7 +73,7 @@ function AppointmentSkeleton() {
     <View className="px-4">
       {[1, 2, 3].map((i) => (
         <View key={i} className="mb-4">
-          <SkeletonCard />
+          <AppointmentCardSkeleton />
         </View>
       ))}
     </View>
@@ -191,6 +191,7 @@ export default function AppointmentsListScreen() {
   );
 
   const handleBookNew = useCallback(() => {
+    triggerSelectionHaptic();
     router.push('/search');
   }, [router]);
 
@@ -262,7 +263,10 @@ export default function AppointmentsListScreen() {
           label={t('appointments.tabs.upcoming')}
           isActive={activeTab === 'upcoming'}
           count={appointmentCounts.upcoming}
-          onPress={() => setActiveTab('upcoming')}
+          onPress={() => {
+            triggerSelectionHaptic();
+            setActiveTab('upcoming');
+          }}
           appointmentText="appointment"
           appointmentsText="appointments"
         />
@@ -270,7 +274,10 @@ export default function AppointmentsListScreen() {
           label={t('appointments.tabs.past')}
           isActive={activeTab === 'past'}
           count={appointmentCounts.past}
-          onPress={() => setActiveTab('past')}
+          onPress={() => {
+            triggerSelectionHaptic();
+            setActiveTab('past');
+          }}
           appointmentText="appointment"
           appointmentsText="appointments"
         />
@@ -278,7 +285,10 @@ export default function AppointmentsListScreen() {
           label={t('appointments.tabs.cancelled')}
           isActive={activeTab === 'cancelled'}
           count={appointmentCounts.cancelled}
-          onPress={() => setActiveTab('cancelled')}
+          onPress={() => {
+            triggerSelectionHaptic();
+            setActiveTab('cancelled');
+          }}
           appointmentText="appointment"
           appointmentsText="appointments"
         />

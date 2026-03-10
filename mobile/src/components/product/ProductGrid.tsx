@@ -1,8 +1,8 @@
 import { useCallback, useMemo } from 'react';
 import { View, FlatList, type FlatListProps, type ListRenderItemInfo } from 'react-native';
 import { ProductCard } from './ProductCard';
+import { ProductCardSkeleton } from './ProductCard';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Skeleton } from '@/components/ui/Skeleton';
 import type { IProduct } from '@/features/products';
 
 // Estimated item height for getItemLayout optimization (for 2 columns)
@@ -73,21 +73,21 @@ export function ProductGrid({
 
   if (isLoading) {
     return (
-      <View className="flex-1 p-4">
-        <View className="flex-row gap-4 mb-4">
-          <View className="flex-1">
-            <Skeleton height={250} className="rounded-lg" />
+      <View className="flex-1 p-2">
+        <View className="flex-row">
+          <View className="flex-1 p-2">
+            <ProductCardSkeleton />
           </View>
-          <View className="flex-1">
-            <Skeleton height={250} className="rounded-lg" />
+          <View className="flex-1 p-2">
+            <ProductCardSkeleton />
           </View>
         </View>
-        <View className="flex-row gap-4">
-          <View className="flex-1">
-            <Skeleton height={250} className="rounded-lg" />
+        <View className="flex-row">
+          <View className="flex-1 p-2">
+            <ProductCardSkeleton />
           </View>
-          <View className="flex-1">
-            <Skeleton height={250} className="rounded-lg" />
+          <View className="flex-1 p-2">
+            <ProductCardSkeleton />
           </View>
         </View>
       </View>

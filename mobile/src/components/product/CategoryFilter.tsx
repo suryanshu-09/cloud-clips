@@ -1,5 +1,6 @@
 import { ScrollView, Pressable, type ScrollViewProps } from 'react-native';
 import { Badge } from '@/components/ui/Badge';
+import { triggerSelectionHaptic } from '@/services/haptics';
 
 export interface ICategoryFilterItem {
   value: string;
@@ -29,7 +30,10 @@ export function CategoryFilter({
       {categories.map((category) => (
         <Pressable
           key={category.value}
-          onPress={() => onCategorySelect(category.value)}
+          onPress={() => {
+            triggerSelectionHaptic();
+            onCategorySelect(category.value);
+          }}
           className="flex-row items-center"
         >
           <Badge variant={selectedCategory === category.value ? 'primary' : 'secondary'} size="md">

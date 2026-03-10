@@ -3,7 +3,9 @@ import { View, Text, Pressable, type PressableProps } from 'react-native';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { RatingStars } from '@/components/shared/RatingStars';
+import { triggerSelectionHaptic } from '@/services/haptics';
 import type { IBarberProfile } from '@/features/barbers';
 
 interface IBarberCardProps extends Omit<PressableProps, 'children'> {
@@ -24,6 +26,7 @@ function BarberCardComponent({
   barber,
   showDistance = false,
   distance,
+  onPress,
   ...props
 }: IBarberCardProps) {
   // Memoize distance formatting
@@ -43,7 +46,13 @@ function BarberCardComponent({
   }, [barber.services]);
 
   return (
-    <Pressable {...props}>
+    <Pressable
+      {...props}
+      onPress={(event) => {
+        triggerSelectionHaptic();
+        onPress?.(event);
+      }}
+    >
       <Card variant="elevated" padding="none" className="overflow-hidden">
         <View className="flex-row">
           {/* Avatar Section */}
@@ -144,3 +153,22 @@ function BarberCardComponent({
 }
 
 export const BarberCard = memo(BarberCardComponent);
+
+export function BarberCardSkeleton() {
+  return (
+    <Card variant="elevated" padding="none" className="overflow-hidden">
+      <View className="flex-row p-4 gap-4">
+        <Skeleton width={64} height={64} variant="circular" />
+        <View className="flex-1 gap-2">
+          <Skeleton height={20} width="65%" variant="text" />
+          <Skeleton height={14} width="90%" variant="text" />
+          <Skeleton height={14} width="75%" variant="text" />
+          <View className="flex-row gap-2 mt-1">
+            <Skeleton height={18} width={64} />
+            <Skeleton height={18} width={72} />
+          </View>
+        </View>
+      </View>
+    </Card>
+  );
+}

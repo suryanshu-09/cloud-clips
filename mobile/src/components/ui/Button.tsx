@@ -1,5 +1,6 @@
 import { Pressable, Text, ActivityIndicator, type PressableProps } from 'react-native';
 import { forwardRef } from 'react';
+import { triggerSelectionHaptic } from '@/services/haptics';
 
 interface IButtonProps extends PressableProps {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
@@ -19,6 +20,7 @@ export const Button = forwardRef<typeof Pressable, IButtonProps>(
       disabled = false,
       children,
       fullWidth = false,
+      onPress,
       ...props
     },
     ref
@@ -58,12 +60,18 @@ export const Button = forwardRef<typeof Pressable, IButtonProps>(
     const disabledStyles = 'opacity-50';
     const widthStyles = fullWidth ? 'w-full' : '';
 
+    const handlePress: PressableProps['onPress'] = (event) => {
+      triggerSelectionHaptic();
+      onPress?.(event);
+    };
+
     return (
       <Pressable
         {...props}
         // @ts-ignore
         ref={ref}
         disabled={isDisabled}
+        onPress={handlePress}
         className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${
           isDisabled ? disabledStyles : ''
         } ${widthStyles}`}

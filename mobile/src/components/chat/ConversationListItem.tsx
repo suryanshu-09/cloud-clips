@@ -3,6 +3,8 @@ import { View, Text, Pressable, type PressableProps } from 'react-native';
 import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { triggerSelectionHaptic } from '@/services/haptics';
 import type { IConversation } from '@/features/chat';
 
 interface IConversationListItemProps extends Omit<PressableProps, 'children'> {
@@ -129,7 +131,13 @@ function ConversationListItemComponent({
   const hasUnread = unreadCount > 0;
 
   return (
-    <Pressable onPress={onPress} {...props}>
+    <Pressable
+      onPress={() => {
+        triggerSelectionHaptic();
+        onPress?.();
+      }}
+      {...props}
+    >
       <Card
         variant="default"
         padding="md"
@@ -185,3 +193,18 @@ function ConversationListItemComponent({
 export const ConversationListItem = memo(ConversationListItemComponent);
 
 export default ConversationListItem;
+
+export function ConversationListItemSkeleton() {
+  return (
+    <Card variant="default" padding="md" className="flex-row items-center">
+      <Skeleton width={48} height={48} variant="circular" />
+      <View className="flex-1 ml-3 gap-2">
+        <View className="flex-row items-center justify-between">
+          <Skeleton height={14} width="45%" variant="text" />
+          <Skeleton height={12} width={52} variant="text" />
+        </View>
+        <Skeleton height={12} width="80%" variant="text" />
+      </View>
+    </Card>
+  );
+}

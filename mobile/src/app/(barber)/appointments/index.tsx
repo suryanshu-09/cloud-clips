@@ -2,9 +2,10 @@ import { useState, useMemo, useCallback } from 'react';
 import { ScrollView, Text, View, Pressable, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { SkeletonCard, EmptyState } from '@/components/ui';
-import { AppointmentCard } from '@/components/booking';
+import { EmptyState } from '@/components/ui';
+import { AppointmentCard, AppointmentCardSkeleton } from '@/components/booking';
 import { useAppointments } from '@/features/bookings/hooks/useAppointments';
+import { triggerSelectionHaptic } from '@/services/haptics';
 import type { IAppointmentWithDetails } from '@/features/bookings/types';
 
 type FilterType = 'all' | 'today' | 'upcoming' | 'pending';
@@ -93,7 +94,7 @@ export default function BarberAppointmentsListScreen() {
   const renderLoadingSkeleton = () => (
     <View className="p-6 gap-4">
       {Array.from({ length: 4 }).map((_, index) => (
-        <SkeletonCard key={index} />
+        <AppointmentCardSkeleton key={index} />
       ))}
     </View>
   );
@@ -113,7 +114,10 @@ export default function BarberAppointmentsListScreen() {
             {(['all', 'today', 'upcoming', 'pending'] as FilterType[]).map((type) => (
               <Pressable
                 key={type}
-                onPress={() => setFilter(type)}
+                onPress={() => {
+                  triggerSelectionHaptic();
+                  setFilter(type);
+                }}
                 className={`px-4 py-2 rounded-full ${
                   filter === type ? 'bg-blue-500' : 'bg-gray-100'
                 }`}

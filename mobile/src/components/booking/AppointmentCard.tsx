@@ -11,6 +11,8 @@ import { Card } from '@/components/ui/Card';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { triggerSelectionHaptic } from '@/services/haptics';
 import type { IAppointmentWithDetails, AppointmentStatus } from '@/features/bookings/types';
 
 interface IAppointmentCardProps extends Omit<PressableProps, 'children'> {
@@ -149,6 +151,7 @@ function AppointmentCardComponent({
   }, [onRebook, appointment]);
 
   const handleViewDetails = useCallback(() => {
+    triggerSelectionHaptic();
     onViewDetails?.(appointment._id);
   }, [onViewDetails, appointment._id]);
 
@@ -299,3 +302,25 @@ function AppointmentCardComponent({
 }
 
 export const AppointmentCard = memo(AppointmentCardComponent);
+
+export function AppointmentCardSkeleton() {
+  return (
+    <Card variant="elevated" padding="none" className="overflow-hidden">
+      <View className="px-4 pt-4 pb-2 flex-row items-center justify-between">
+        <Skeleton height={16} width="45%" variant="text" />
+        <Skeleton height={20} width={72} variant="text" />
+      </View>
+      <View className="px-4 py-3 border-b border-gray-100 flex-row items-center gap-3">
+        <Skeleton width={40} height={40} variant="circular" />
+        <View className="flex-1 gap-2">
+          <Skeleton height={14} width="55%" variant="text" />
+          <Skeleton height={12} width="35%" variant="text" />
+        </View>
+      </View>
+      <View className="px-4 py-3 gap-2">
+        <Skeleton height={12} width="95%" variant="text" />
+        <Skeleton height={12} width="80%" variant="text" />
+      </View>
+    </Card>
+  );
+}

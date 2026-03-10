@@ -2,7 +2,9 @@ import { memo, useMemo, useCallback } from 'react';
 import { View, Text, Pressable, type PressableProps } from 'react-native';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
+import { triggerSelectionHaptic } from '@/services/haptics';
 import type { IProduct } from '@/features/products';
 
 interface IProductCardProps extends Omit<PressableProps, 'children'> {
@@ -24,6 +26,7 @@ function ProductCardComponent({
   product,
   showBarberName = true,
   onAddToCart,
+  onPress,
   ...props
 }: IProductCardProps) {
   // Memoize stock status
@@ -52,6 +55,7 @@ function ProductCardComponent({
   const handleAddToCart = useCallback(
     (e: { stopPropagation: () => void }) => {
       e.stopPropagation();
+      triggerSelectionHaptic();
       onAddToCart?.();
     },
     [onAddToCart]
@@ -60,7 +64,14 @@ function ProductCardComponent({
   const { isOutOfStock, isLowStock } = stockStatus;
 
   return (
-    <Pressable {...props} disabled={isOutOfStock}>
+    <Pressable
+      {...props}
+      disabled={isOutOfStock}
+      onPress={(event) => {
+        triggerSelectionHaptic();
+        onPress?.(event);
+      }}
+    >
       <Card variant="elevated" padding="none" className="overflow-hidden">
         {/* Product Image */}
         <View className="relative w-full aspect-square bg-gray-100">
@@ -153,3 +164,20 @@ function ProductCardComponent({
 }
 
 export const ProductCard = memo(ProductCardComponent);
+
+export function ProductCardSkeleton() {
+  return (
+    <Card variant="elevated" padding="none" className="overflow-hidden">
+      <Skeleton height={170} className="w-full" />
+      <View className="p-3 gap-2">
+        <Skeleton height={12} width="45%" variant="text" />
+        <Skeleton height={16} width="85%" variant="text" />
+        <Skeleton height={14} width="70%" variant="text" />
+        <View className="flex-row items-center justify-between mt-1">
+          <Skeleton height={18} width={72} variant="text" />
+          <Skeleton height={14} width={56} variant="text" />
+        </View>
+      </View>
+    </Card>
+  );
+}

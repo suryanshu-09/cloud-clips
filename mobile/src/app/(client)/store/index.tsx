@@ -10,6 +10,7 @@ import {
 import { ProductGrid, CategoryFilter, ProductRecommendations } from '@/components/product';
 import { Input } from '@/components/ui/Input';
 import { SafeView } from '@/components/ui/SafeView';
+import { triggerSelectionHaptic } from '@/services/haptics';
 import type { IProduct } from '@/features/products';
 
 const categories = [
@@ -37,10 +38,7 @@ export default function ProductCatalogScreen() {
   const { data: featuredData, isLoading: isFeaturedLoading } = useFeaturedProducts();
 
   // Flatten pages into single array — memoized to avoid unnecessary re-allocations
-  const products = useMemo(
-    () => data?.pages.flatMap((page) => page.products) ?? [],
-    [data?.pages]
-  );
+  const products = useMemo(() => data?.pages.flatMap((page) => page.products) ?? [], [data?.pages]);
   const featuredProducts = useMemo(() => featuredData?.products ?? [], [featuredData?.products]);
 
   const handleProductPress = useCallback((product: IProduct) => {
@@ -61,6 +59,7 @@ export default function ProductCatalogScreen() {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const handleCartPress = useCallback(() => {
+    triggerSelectionHaptic();
     router.push('/(client)/store/cart');
   }, []);
 

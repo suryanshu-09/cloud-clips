@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo } from 'react';
-import { View, Text, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useChatList } from '@/features/chat';
 import { IConversation } from '@/features/chat/types';
 import { ConversationListItem } from '@/components/chat';
+import { ConversationListItemSkeleton } from '@/components/chat';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SafeView } from '@/components/ui/SafeView';
@@ -42,11 +43,7 @@ export default function ChatListScreen() {
 
   const refreshControl = useMemo(
     () => (
-      <RefreshControl
-        refreshing={false}
-        onRefresh={refreshConversations}
-        tintColor="#3B82F6"
-      />
+      <RefreshControl refreshing={false} onRefresh={refreshConversations} tintColor="#3B82F6" />
     ),
     [refreshConversations]
   );
@@ -65,8 +62,10 @@ export default function ChatListScreen() {
   if (isLoading) {
     return (
       <SafeView>
-        <View className="flex-1 items-center justify-center bg-gray-50">
-          <ActivityIndicator size="large" color="#3B82F6" />
+        <View className="px-4 py-3 gap-3 bg-gray-50 flex-1">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <ConversationListItemSkeleton key={index} />
+          ))}
         </View>
       </SafeView>
     );

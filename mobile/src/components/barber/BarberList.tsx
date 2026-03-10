@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
-import { View, FlatList, Text, ActivityIndicator, type ListRenderItemInfo } from 'react-native';
+import { View, FlatList, type ListRenderItemInfo } from 'react-native';
 import { BarberCard } from './BarberCard';
+import { BarberCardSkeleton } from './BarberCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import type { IBarberProfile } from '@/features/barbers';
@@ -80,22 +81,16 @@ export function BarberList({
   // Memoized footer component
   const renderFooter = useMemo(() => {
     if (ListFooterComponent) return ListFooterComponent;
-    if (isLoading) {
-      return (
-        <View className="py-4 items-center">
-          <ActivityIndicator size="small" color="#0066CC" />
-        </View>
-      );
-    }
     return null;
-  }, [ListFooterComponent, isLoading]);
+  }, [ListFooterComponent]);
 
   // Loading state
   if (isLoading && barbers.length === 0) {
     return (
-      <View className="flex-1 items-center justify-center p-6">
-        <ActivityIndicator size="large" color="#0066CC" />
-        <Text className="text-gray-600 mt-4">Finding barbers near you...</Text>
+      <View className="p-4 gap-3">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <BarberCardSkeleton key={index} />
+        ))}
       </View>
     );
   }
