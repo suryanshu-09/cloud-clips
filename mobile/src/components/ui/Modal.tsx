@@ -35,7 +35,14 @@ export function Modal({
   const containerStyles = size === 'full' ? 'w-full h-full' : `${sizeStyles[size]} w-11/12`;
 
   return (
-    <RNModal visible={visible} transparent animationType="fade" onRequestClose={onClose} {...props}>
+    <RNModal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      accessibilityViewIsModal
+      {...props}
+    >
       <Pressable onPress={onClose} className="flex-1 bg-black/50 items-center justify-center p-4">
         <Pressable onPress={(e) => e.stopPropagation()}>
           <View className={`${containerStyles} bg-white rounded-2xl overflow-hidden`}>
@@ -43,7 +50,12 @@ export function Modal({
               <View className="flex-row items-center justify-between px-6 py-4 border-b border-gray-200">
                 {title && <Text className="text-xl font-bold text-gray-900">{title}</Text>}
                 {showCloseButton && (
-                  <Pressable onPress={onClose} className="ml-auto p-2 -mr-2">
+                  <Pressable
+                    onPress={onClose}
+                    className="ml-auto p-2 -mr-2"
+                    accessibilityLabel="Close modal"
+                    accessibilityRole="button"
+                  >
                     <Text className="text-2xl text-gray-500">×</Text>
                   </Pressable>
                 )}

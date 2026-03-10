@@ -1,5 +1,6 @@
 import { View, Animated, type ViewProps } from 'react-native';
 import { useEffect, useRef } from 'react';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 interface ISkeletonProps extends ViewProps {
   width?: number | string;
@@ -14,8 +15,14 @@ export function Skeleton({
   ...props
 }: ISkeletonProps) {
   const animatedValue = useRef(new Animated.Value(0)).current;
+  const isReducedMotionEnabled = useReducedMotion();
 
   useEffect(() => {
+    if (isReducedMotionEnabled) {
+      animatedValue.setValue(0.5);
+      return;
+    }
+
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(animatedValue, {
@@ -33,7 +40,7 @@ export function Skeleton({
     animation.start();
 
     return () => animation.stop();
-  }, [animatedValue]);
+  }, [animatedValue, isReducedMotionEnabled]);
 
   const opacity = animatedValue.interpolate({
     inputRange: [0, 1],

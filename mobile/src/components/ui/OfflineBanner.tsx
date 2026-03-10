@@ -1,6 +1,7 @@
 import { View, Text, Animated, Pressable } from 'react-native';
 import { useEffect, useRef } from 'react';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 interface IOfflineBannerProps {
   onRetry?: () => void;
@@ -11,12 +12,19 @@ interface IOfflineBannerProps {
  * Shows a retry button and connection status
  */
 export function OfflineBanner({ onRetry }: IOfflineBannerProps) {
-  const { isOffline, wasOffline, isConnected, acknowledgeOnline } = useNetworkStatus();
+  const { isOffline, wasOffline, acknowledgeOnline } = useNetworkStatus();
+  const isReducedMotionEnabled = useReducedMotion();
   const slideAnim = useRef(new Animated.Value(-50)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (isOffline) {
+      if (isReducedMotionEnabled) {
+        slideAnim.setValue(0);
+        opacityAnim.setValue(1);
+        return;
+      }
+
       // Slide down animation
       Animated.parallel([
         Animated.timing(slideAnim, {
@@ -31,6 +39,13 @@ export function OfflineBanner({ onRetry }: IOfflineBannerProps) {
         }),
       ]).start();
     } else if (wasOffline) {
+      if (isReducedMotionEnabled) {
+        slideAnim.setValue(-50);
+        opacityAnim.setValue(0);
+        acknowledgeOnline();
+        return;
+      }
+
       // Show "back online" briefly then hide
       setTimeout(() => {
         Animated.parallel([
@@ -53,7 +68,7 @@ export function OfflineBanner({ onRetry }: IOfflineBannerProps) {
       slideAnim.setValue(-50);
       opacityAnim.setValue(0);
     }
-  }, [isOffline, wasOffline, slideAnim, opacityAnim, acknowledgeOnline]);
+  }, [isOffline, wasOffline, slideAnim, opacityAnim, acknowledgeOnline, isReducedMotionEnabled]);
 
   // Don't render if not offline and never was offline
   if (!isOffline && !wasOffline) {
@@ -80,7 +95,12 @@ export function OfflineBanner({ onRetry }: IOfflineBannerProps) {
           </Text>
         </View>
         {isOffline && onRetry && (
-          <Pressable onPress={onRetry} className="bg-white/20 px-3 py-1 rounded-full">
+          <Pressable
+            onPress={onRetry}
+            className="bg-white/20 px-3 py-1 rounded-full"
+            accessibilityLabel="Retry network connection"
+            accessibilityRole="button"
+          >
             <Text className="text-white font-medium">Retry</Text>
           </Pressable>
         )}

@@ -71,6 +71,8 @@ function ProductCardComponent({
         triggerSelectionHaptic();
         onPress?.(event);
       }}
+      accessibilityLabel={`View product ${product.name}`}
+      accessibilityRole="button"
     >
       <Card variant="elevated" padding="none" className="overflow-hidden">
         {/* Product Image */}
@@ -119,32 +121,44 @@ function ProductCardComponent({
         <View className="p-3">
           {/* Category */}
           {categoryDisplay && (
-            <Text className="text-xs text-gray-500 uppercase mb-1">{categoryDisplay}</Text>
+            <Text allowFontScaling className="text-xs text-gray-600 uppercase mb-1">
+              {categoryDisplay}
+            </Text>
           )}
 
           {/* Product Name */}
-          <Text className="text-sm font-semibold text-gray-900 mb-1" numberOfLines={2}>
+          <Text
+            allowFontScaling
+            className="text-sm font-semibold text-gray-900 mb-1"
+            numberOfLines={2}
+          >
             {product.name}
           </Text>
 
           {/* Description */}
           {product.description && (
-            <Text className="text-xs text-gray-600 mb-2" numberOfLines={2}>
+            <Text allowFontScaling className="text-xs text-gray-600 mb-2" numberOfLines={2}>
               {product.description}
             </Text>
           )}
 
           {/* Barber Name */}
           {showBarberName && product.barberName && (
-            <Text className="text-xs text-gray-500 mb-2">Sold by {product.barberName}</Text>
+            <Text allowFontScaling className="text-xs text-gray-600 mb-2">
+              Sold by {product.barberName}
+            </Text>
           )}
 
           {/* Price and Reviews */}
           <View className="flex-row items-center justify-between">
-            <Text className="text-lg font-bold text-gray-900">{formattedPrice}</Text>
+            <Text allowFontScaling className="text-lg font-bold text-gray-900">
+              {formattedPrice}
+            </Text>
 
             {product.totalReviews > 0 && (
-              <Text className="text-xs text-gray-500">({product.totalReviews} reviews)</Text>
+              <Text allowFontScaling className="text-xs text-gray-600">
+                ({product.totalReviews} reviews)
+              </Text>
             )}
           </View>
 
@@ -153,8 +167,12 @@ function ProductCardComponent({
             <Pressable
               onPress={handleAddToCart}
               className="mt-3 bg-blue-500 active:bg-blue-600 rounded-lg py-2 items-center"
+              accessibilityLabel={`Add ${product.name} to cart`}
+              accessibilityRole="button"
             >
-              <Text className="text-white font-semibold text-sm">Add to Cart</Text>
+              <Text allowFontScaling className="text-white font-semibold text-sm">
+                Add to Cart
+              </Text>
             </Pressable>
           )}
         </View>

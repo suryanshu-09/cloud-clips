@@ -5,8 +5,10 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as JotaiProvider } from 'jotai';
-import { QueryClientProvider, onlineManager } from '@tanstack/react-query';
+import { onlineManager } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient } from '@/services/api/queryClient';
+import { queryClientPersister } from '@/store/utils/storage';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { OfflineBanner } from '@/components/ui/OfflineBanner';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
@@ -152,11 +154,17 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ConvexProviderWrapper>
           <JotaiProvider>
-            <QueryClientProvider client={queryClient}>
+            <PersistQueryClientProvider
+              client={queryClient}
+              persistOptions={{
+                persister: queryClientPersister,
+                maxAge: 24 * 60 * 60 * 1000,
+              }}
+            >
               <StripeProviderWrapper>
                 <AppContent />
               </StripeProviderWrapper>
-            </QueryClientProvider>
+            </PersistQueryClientProvider>
           </JotaiProvider>
         </ConvexProviderWrapper>
       </SafeAreaProvider>

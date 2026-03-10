@@ -9,6 +9,7 @@
  */
 
 export { useNetworkStatus } from './useNetworkStatus';
+export { useReducedMotion } from './useReducedMotion';
 export { useMapConfig } from './useMapConfig';
 export { useLocation } from './useLocation';
 export { useCurrentLocation } from './useCurrentLocation';

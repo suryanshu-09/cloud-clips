@@ -25,7 +25,11 @@ export const Input = forwardRef<TextInput, IInputProps>(
 
     return (
       <View className={containerStyles} testID="input-container">
-        {label && <Text className="text-sm font-medium text-gray-700 mb-2">{label}</Text>}
+        {label && (
+          <Text allowFontScaling className="text-sm font-medium text-gray-700 mb-2">
+            {label}
+          </Text>
+        )}
         <View className={inputWrapperStyles}>
           {leftIcon && <View className="mr-2">{leftIcon}</View>}
           <TextInput
@@ -42,11 +46,21 @@ export const Input = forwardRef<TextInput, IInputProps>(
             }}
             className="flex-1 py-3 text-base text-gray-900"
             placeholderTextColor="#9ca3af"
+            accessibilityLabel={label ?? props.placeholder ?? 'Input field'}
+            allowFontScaling
           />
           {rightIcon && <View className="ml-2">{rightIcon}</View>}
         </View>
-        {error && <Text className="text-sm text-red-500 mt-1">{error}</Text>}
-        {helperText && !error && <Text className="text-sm text-gray-500 mt-1">{helperText}</Text>}
+        {error && (
+          <Text allowFontScaling className="text-sm text-red-500 mt-1">
+            {error}
+          </Text>
+        )}
+        {helperText && !error && (
+          <Text allowFontScaling className="text-sm text-gray-600 mt-1">
+            {helperText}
+          </Text>
+        )}
       </View>
     );
   }

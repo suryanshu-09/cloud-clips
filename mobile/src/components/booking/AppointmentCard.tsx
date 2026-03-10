@@ -172,12 +172,20 @@ function AppointmentCardComponent({
   const isNoShow = appointment.status === 'no_show';
 
   return (
-    <Pressable onPress={handleViewDetails} disabled={isLoading} {...props}>
+    <Pressable
+      onPress={handleViewDetails}
+      disabled={isLoading}
+      accessibilityLabel={`View appointment details for ${appointment.serviceName}`}
+      accessibilityRole="button"
+      {...props}
+    >
       <Card variant="elevated" padding="none" className="overflow-hidden">
         {/* Header with status */}
         <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
           <View className="flex-row items-center gap-2">
-            <Text className="text-base font-semibold text-gray-900">{appointment.serviceName}</Text>
+            <Text allowFontScaling className="text-base font-semibold text-gray-900">
+              {appointment.serviceName}
+            </Text>
             {isNoShow ? (
               <View className="rounded-full px-2 py-0.5 bg-red-200">
                 <Text className="text-xs font-medium text-red-900">{statusConfig.label}</Text>
@@ -188,7 +196,9 @@ function AppointmentCardComponent({
               </Badge>
             )}
           </View>
-          <Text className="text-lg font-bold text-gray-900">{formatPrice(appointment.price)}</Text>
+          <Text allowFontScaling className="text-lg font-bold text-gray-900">
+            {formatPrice(appointment.price)}
+          </Text>
         </View>
 
         {/* Barber info */}
@@ -199,8 +209,10 @@ function AppointmentCardComponent({
             fallback={appointment.barberName?.charAt(0) || 'B'}
           />
           <View className="ml-3 flex-1">
-            <Text className="text-base font-medium text-gray-900">{appointment.barberName}</Text>
-            <Text className="text-sm text-gray-500">
+            <Text allowFontScaling className="text-base font-medium text-gray-900">
+              {appointment.barberName}
+            </Text>
+            <Text allowFontScaling className="text-sm text-gray-600">
               {locationDisplay.icon} {locationDisplay.label}
             </Text>
           </View>
@@ -211,26 +223,34 @@ function AppointmentCardComponent({
           <View className="flex-row items-center justify-between mb-2">
             <View className="flex-row items-center gap-2">
               <Text className="text-xl">📅</Text>
-              <Text className="text-sm text-gray-700">{formattedDate}</Text>
+              <Text allowFontScaling className="text-sm text-gray-700">
+                {formattedDate}
+              </Text>
             </View>
             <View className="flex-row items-center gap-2">
               <Text className="text-xl">⏰</Text>
-              <Text className="text-sm text-gray-700">{formattedTime}</Text>
+              <Text allowFontScaling className="text-sm text-gray-700">
+                {formattedTime}
+              </Text>
             </View>
             <View className="flex-row items-center gap-2">
               <Text className="text-xl">⏱️</Text>
-              <Text className="text-sm text-gray-700">{durationDisplay}</Text>
+              <Text allowFontScaling className="text-sm text-gray-700">
+                {durationDisplay}
+              </Text>
             </View>
           </View>
 
           {/* Relative time indicator */}
-          <Text className="text-xs text-gray-400 mb-2">{relativeTime}</Text>
+          <Text allowFontScaling className="text-xs text-gray-600 mb-2">
+            {relativeTime}
+          </Text>
 
           {/* Address if available */}
           {appointment.address && (
             <View className="flex-row items-start gap-2 mt-2">
               <Text className="text-lg">📍</Text>
-              <Text className="text-sm text-gray-600 flex-1" numberOfLines={2}>
+              <Text allowFontScaling className="text-sm text-gray-600 flex-1" numberOfLines={2}>
                 {appointment.address}
               </Text>
             </View>
@@ -239,8 +259,10 @@ function AppointmentCardComponent({
           {/* Special requests */}
           {appointment.specialRequests && (
             <View className="mt-2 bg-gray-50 p-2 rounded-lg">
-              <Text className="text-xs text-gray-500 mb-1">Special Requests:</Text>
-              <Text className="text-sm text-gray-700" numberOfLines={2}>
+              <Text allowFontScaling className="text-xs text-gray-600 mb-1">
+                Special Requests:
+              </Text>
+              <Text allowFontScaling className="text-sm text-gray-700" numberOfLines={2}>
                 {appointment.specialRequests}
               </Text>
             </View>

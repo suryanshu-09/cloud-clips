@@ -136,6 +136,8 @@ function ConversationListItemComponent({
         triggerSelectionHaptic();
         onPress?.();
       }}
+      accessibilityLabel={`Open conversation with ${otherParticipant.name || 'Unknown'}`}
+      accessibilityRole="button"
       {...props}
     >
       <Card
@@ -155,6 +157,7 @@ function ConversationListItemComponent({
           {/* Top Row: Name and Time */}
           <View className="flex-row items-center justify-between mb-1">
             <Text
+              allowFontScaling
               className={`text-base font-semibold flex-1 mr-2 ${
                 hasUnread ? 'text-gray-900' : 'text-gray-800'
               }`}
@@ -162,12 +165,15 @@ function ConversationListItemComponent({
             >
               {otherParticipant.name || 'Unknown'}
             </Text>
-            <Text className="text-xs text-gray-500">{formattedTime}</Text>
+            <Text allowFontScaling className="text-xs text-gray-600">
+              {formattedTime}
+            </Text>
           </View>
 
           {/* Bottom Row: Message Preview and Unread Badge */}
           <View className="flex-row items-center justify-between">
             <Text
+              allowFontScaling
               className={`text-sm flex-1 mr-2 ${
                 hasUnread ? 'text-gray-900 font-medium' : 'text-gray-600'
               }`}

@@ -49,9 +49,13 @@ export class ErrorBoundary extends Component<IErrorBoundaryProps, IErrorBoundary
 
       return (
         <View className="flex-1 items-center justify-center p-6 bg-white">
-          <Text className="text-6xl mb-4">⚠️</Text>
-          <Text className="text-xl font-bold text-gray-900 mb-2">Oops! Something went wrong</Text>
-          <Text className="text-base text-gray-600 text-center mb-6">
+          <Text allowFontScaling className="text-6xl mb-4">
+            ⚠️
+          </Text>
+          <Text allowFontScaling className="text-xl font-bold text-gray-900 mb-2">
+            Oops! Something went wrong
+          </Text>
+          <Text allowFontScaling className="text-base text-gray-600 text-center mb-6">
             {this.state.error?.message || 'An unexpected error occurred'}
           </Text>
           <Button onPress={this.handleReset} variant="primary">

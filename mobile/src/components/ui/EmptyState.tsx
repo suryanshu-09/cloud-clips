@@ -19,10 +19,16 @@ export function EmptyState({
 }: IEmptyStateProps) {
   return (
     <View {...props} className="flex-1 items-center justify-center p-8">
-      <Text className="text-6xl mb-4">{icon}</Text>
-      <Text className="text-xl font-bold text-gray-900 text-center mb-2">{title}</Text>
+      <Text allowFontScaling className="text-6xl mb-4">
+        {icon}
+      </Text>
+      <Text allowFontScaling className="text-xl font-bold text-gray-900 text-center mb-2">
+        {title}
+      </Text>
       {description && (
-        <Text className="text-base text-gray-600 text-center mb-6">{description}</Text>
+        <Text allowFontScaling className="text-base text-gray-600 text-center mb-6">
+          {description}
+        </Text>
       )}
       {actionLabel && onAction && (
         <Button onPress={onAction} variant="primary">

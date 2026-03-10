@@ -52,6 +52,8 @@ function BarberCardComponent({
         triggerSelectionHaptic();
         onPress?.(event);
       }}
+      accessibilityLabel={`View barber profile for ${barber.businessName || barber.name}`}
+      accessibilityRole="button"
     >
       <Card variant="elevated" padding="none" className="overflow-hidden">
         <View className="flex-row">
@@ -83,7 +85,7 @@ function BarberCardComponent({
 
               {/* Bio */}
               {barber.bio && (
-                <Text className="text-sm text-gray-600 mb-2" numberOfLines={2}>
+                <Text allowFontScaling className="text-sm text-gray-600 mb-2" numberOfLines={2}>
                   {barber.bio}
                 </Text>
               )}
@@ -123,13 +125,17 @@ function BarberCardComponent({
 
                 {/* Distance */}
                 {formattedDistance && (
-                  <Text className="text-xs text-gray-500">{formattedDistance}</Text>
+                  <Text allowFontScaling className="text-xs text-gray-600">
+                    {formattedDistance}
+                  </Text>
                 )}
               </View>
 
               {/* Price */}
               {lowestPrice && (
-                <Text className="text-sm font-bold text-gray-900">From ${lowestPrice}</Text>
+                <Text allowFontScaling className="text-sm font-bold text-gray-900">
+                  From ${lowestPrice}
+                </Text>
               )}
             </View>
           </View>
