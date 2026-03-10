@@ -1,4 +1,4 @@
-import '@testing-library/react-native/extend-expect';
+import '@testing-library/jest-native/extend-expect';
 
 // Mock MMKV storage
 jest.mock('react-native-mmkv', () => ({
