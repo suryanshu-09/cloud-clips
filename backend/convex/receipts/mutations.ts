@@ -1,6 +1,6 @@
 import { mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
-import { api } from "convex/api";
+import { requireIdentityEmail } from "../lib/authIdentity";
 
 /**
  * Receipt Mutations
@@ -37,7 +37,7 @@ export const generateReceipt = mutation({
     // Verify authorization (must be the client or barber)
     const currentUser = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!currentUser) {
@@ -65,7 +65,6 @@ export const generateReceipt = mutation({
         paymentIntentId: args.paymentIntentId,
         paymentMethod: args.paymentMethod,
         paidAt: Date.now(),
-        updatedAt: Date.now(),
       });
       return existingReceipt._id;
     }
@@ -84,8 +83,7 @@ export const generateReceipt = mutation({
 
     // Calculate totals
     const subtotal = appointment.price;
-    const discount = appointment.discountAmount || 0;
-    const total = appointment.finalPrice || subtotal - discount;
+    const total = subtotal;
 
     // Create receipt
     const receipt = await ctx.db.insert("receipts", {
@@ -105,7 +103,6 @@ export const generateReceipt = mutation({
         },
       ],
       subtotal,
-      discount: discount > 0 ? discount : undefined,
       total,
       paymentMethod: args.paymentMethod,
       paymentIntentId: args.paymentIntentId,
@@ -150,7 +147,7 @@ export const generateOrderReceipt = mutation({
     // Verify authorization
     const currentUser = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!currentUser || order.clientId !== currentUser._id) {
@@ -230,7 +227,7 @@ export const updateReceiptRefundStatus = mutation({
     // Verify authorization
     const currentUser = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!currentUser) {
@@ -274,7 +271,7 @@ async function generateReceiptNumber(ctx: any): Promise<string> {
   
   const todayReceipts = await ctx.db
     .query("receipts")
-    .withIndex("by_created", (q) => 
+    .withIndex("by_created", (q: any) => 
       q.gte("createdAt", today.getTime()).lt("createdAt", tomorrow.getTime())
     )
     .collect();

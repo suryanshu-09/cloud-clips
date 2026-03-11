@@ -31,7 +31,7 @@ export const bookAppointment = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -120,7 +120,7 @@ export const cancelAppointment = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -170,7 +170,7 @@ export const updateAppointmentStatus = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user || user.role !== "barber") {
@@ -217,7 +217,7 @@ export const updatePaymentStatus = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -259,7 +259,7 @@ export const rescheduleAppointment = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -353,7 +353,7 @@ export const scheduleAppointmentReminder = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {

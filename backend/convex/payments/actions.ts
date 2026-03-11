@@ -1,6 +1,7 @@
 import { action } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import { api } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
 import Stripe from "stripe";
 
 /**
@@ -16,6 +17,40 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2023-10-16",
 });
 
+type TConnectUser = {
+  _id: Id<"users">;
+  role: string;
+  email: string;
+};
+
+type TBarberStripeProfile = {
+  stripeAccountId?: string;
+} | null;
+
+type TBarberPayout = {
+  id: string;
+  amount: number;
+  currency: string;
+  status: "paid" | "pending" | "in_transit" | "canceled" | "failed";
+  arrivalDate: string;
+  createdAt: string;
+  method: Stripe.Payout["method"];
+  type: Stripe.Payout["type"];
+  description: string | null;
+  failureCode?: string;
+  failureMessage?: string;
+  bankAccount?: {
+    last4?: string;
+    bankName?: string;
+  };
+};
+
+type TBarberPayoutsResult = {
+  payouts: TBarberPayout[];
+  hasMore: boolean;
+  nextCursor: string | null;
+};
+
 /**
  * Create a payment intent for an appointment
  * Uses Stripe Connect to transfer funds directly to the barber
@@ -27,12 +62,12 @@ export const createPaymentIntent = action({
     captureMethod: v.optional(v.union(v.literal("automatic"), v.literal("manual"))),
   },
   handler: async (ctx, args) => {
-    const userId = ctx.userId;
-    if (!userId) {
+    const user = await ctx.runQuery(api.users.queries.getCurrentUser);
+    if (!user) {
       throw new ConvexError("Not authenticated");
     }
 
-    const appointment = await ctx.runQuery(api.appointments.getAppointmentById, {
+    const appointment = await ctx.runQuery(api.appointments.queries.getAppointmentById, {
       appointmentId: args.appointmentId,
     });
 
@@ -41,12 +76,11 @@ export const createPaymentIntent = action({
     }
 
     // Verify the user is the client for this appointment
-    const user = await ctx.runQuery(api.users.getCurrentUser);
     if (!user || appointment.clientId !== user._id) {
       throw new ConvexError("Not authorized to create payment for this appointment");
     }
 
-    const barberProfile = await ctx.runQuery(api.barbers.getBarberProfileByUserId, {
+    const barberProfile = await ctx.runQuery(api.barbers.queries.getBarberProfileByUserId, {
       userId: appointment.barberId,
     });
 
@@ -84,7 +118,7 @@ export const createPaymentIntent = action({
     });
 
     // Update appointment with payment intent ID
-    await ctx.runMutation(api.appointments.updatePaymentStatus, {
+    await ctx.runMutation(api.appointments.mutations.updatePaymentStatus, {
       appointmentId: args.appointmentId,
       paymentStatus: "pending",
       paymentIntentId: paymentIntent.id,
@@ -109,23 +143,24 @@ export const createOrderPaymentIntent = action({
     captureMethod: v.optional(v.union(v.literal("automatic"), v.literal("manual"))),
   },
   handler: async (ctx, args) => {
-    const userId = ctx.userId;
-    if (!userId) {
+    const user = await ctx.runQuery(api.users.queries.getCurrentUser);
+    if (!user) {
       throw new ConvexError("Not authenticated");
     }
 
-    const order = await ctx.db.get(args.orderId);
+    const order = await ctx.runQuery(api.orders.queries.getOrderById, {
+      orderId: args.orderId,
+    });
     if (!order) {
       throw new ConvexError("Order not found");
     }
 
     // Verify the user is the client for this order
-    const user = await ctx.runQuery(api.users.getCurrentUser);
     if (!user || order.clientId !== user._id) {
       throw new ConvexError("Not authorized to create payment for this order");
     }
 
-    const barberProfile = await ctx.runQuery(api.barbers.getBarberProfileByUserId, {
+    const barberProfile = await ctx.runQuery(api.barbers.queries.getBarberProfileByUserId, {
       userId: order.barberId,
     });
 
@@ -180,13 +215,8 @@ export const capturePayment = action({
     amountToCapture: v.optional(v.number()), // Optional: for partial captures
   },
   handler: async (ctx, args) => {
-    const userId = ctx.userId;
-    if (!userId) {
-      throw new ConvexError("Not authenticated");
-    }
-
     // Get current user to check if they're a barber
-    const user = await ctx.runQuery(api.users.getCurrentUser);
+    const user = await ctx.runQuery(api.users.queries.getCurrentUser);
     if (!user) {
       throw new ConvexError("User not found");
     }
@@ -228,7 +258,7 @@ export const capturePayment = action({
 
       // Update the corresponding record based on type
       if (metadata.type === "appointment" && metadata.appointmentId) {
-        await ctx.runMutation(api.appointments.updatePaymentStatus, {
+        await ctx.runMutation(api.appointments.mutations.updatePaymentStatus, {
           appointmentId: metadata.appointmentId as any,
           paymentStatus: "paid",
           paymentIntentId: capturedIntent.id,
@@ -257,12 +287,7 @@ export const refundPayment = action({
     reason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = ctx.userId;
-    if (!userId) {
-      throw new ConvexError("Not authenticated");
-    }
-
-    const user = await ctx.runQuery(api.users.getCurrentUser);
+    const user = await ctx.runQuery(api.users.queries.getCurrentUser);
     if (!user) {
       throw new ConvexError("User not found");
     }
@@ -312,7 +337,7 @@ export const refundPayment = action({
 
       // Update the corresponding record
       if (metadata.type === "appointment" && metadata.appointmentId) {
-        await ctx.runMutation(api.appointments.updatePaymentStatus, {
+        await ctx.runMutation(api.appointments.mutations.updatePaymentStatus, {
           appointmentId: metadata.appointmentId as any,
           paymentStatus: args.amount ? "partially_refunded" : "refunded",
           paymentIntentId: paymentIntent.id,
@@ -344,12 +369,7 @@ export const transferToBarber = action({
     metadata: v.optional(v.record(v.string(), v.string())),
   },
   handler: async (ctx, args) => {
-    const userId = ctx.userId;
-    if (!userId) {
-      throw new ConvexError("Not authenticated");
-    }
-
-    const user = await ctx.runQuery(api.users.getCurrentUser);
+    const user = await ctx.runQuery(api.users.queries.getCurrentUser);
     if (!user || (user.role !== "admin" && user.role !== "barber")) {
       throw new ConvexError("Not authorized to create transfers");
     }
@@ -359,7 +379,7 @@ export const transferToBarber = action({
       throw new ConvexError("Barbers can only create transfers to their own account");
     }
 
-    const barberProfile = await ctx.runQuery(api.barbers.getBarberProfileByUserId, {
+    const barberProfile = await ctx.runQuery(api.barbers.queries.getBarberProfileByUserId, {
       userId: args.barberId,
     });
 
@@ -438,8 +458,19 @@ export const handleStripeWebhook = action({
       case "payment_intent.succeeded": {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         const metadata = paymentIntent.metadata;
-        const charges = paymentIntent.charges?.data || [];
-        const charge = charges[0];
+        let charge: Stripe.Charge | null = null;
+
+        if (paymentIntent.latest_charge) {
+          if (typeof paymentIntent.latest_charge === "string") {
+            try {
+              charge = await stripe.charges.retrieve(paymentIntent.latest_charge);
+            } catch {
+              charge = null;
+            }
+          } else {
+            charge = paymentIntent.latest_charge;
+          }
+        }
 
         console.log(`Payment succeeded: ${paymentIntent.id}`);
 
@@ -448,13 +479,13 @@ export const handleStripeWebhook = action({
           ? {
               type: "card",
               brand: charge.payment_method_details.card.brand || "unknown",
-              last4: charge.payment_method_details.card.last4,
+              last4: charge.payment_method_details.card.last4 ?? undefined,
             }
           : undefined;
 
         // Update appointment or order payment status
         if (metadata.type === "appointment" && metadata.appointmentId) {
-          await ctx.runMutation(api.appointments.updatePaymentStatus, {
+          await ctx.runMutation(api.appointments.mutations.updatePaymentStatus, {
             appointmentId: metadata.appointmentId as any,
             paymentStatus: "paid",
             paymentIntentId: paymentIntent.id,
@@ -462,7 +493,7 @@ export const handleStripeWebhook = action({
 
           // Generate receipt for appointment payment
           try {
-            await ctx.runMutation(api.receipts.generateReceipt, {
+            await ctx.runMutation(api.receipts.mutations.generateReceipt, {
               appointmentId: metadata.appointmentId as any,
               paymentIntentId: paymentIntent.id,
               paymentMethod,
@@ -477,7 +508,7 @@ export const handleStripeWebhook = action({
         // Handle order payments
         if (metadata.type === "order" && metadata.orderId) {
           try {
-            await ctx.runMutation(api.receipts.generateOrderReceipt, {
+            await ctx.runMutation(api.receipts.mutations.generateOrderReceipt, {
               orderId: metadata.orderId as any,
               paymentIntentId: paymentIntent.id,
               paymentMethod,
@@ -498,7 +529,7 @@ export const handleStripeWebhook = action({
         console.log(`Payment failed: ${paymentIntent.id} - ${errorMessage}`);
 
         if (metadata.type === "appointment" && metadata.appointmentId) {
-          await ctx.runMutation(api.appointments.updatePaymentStatus, {
+          await ctx.runMutation(api.appointments.mutations.updatePaymentStatus, {
             appointmentId: metadata.appointmentId as any,
             paymentStatus: "failed",
             paymentIntentId: paymentIntent.id,
@@ -514,7 +545,7 @@ export const handleStripeWebhook = action({
         console.log(`Payment canceled: ${paymentIntent.id}`);
 
         if (metadata.type === "appointment" && metadata.appointmentId) {
-          await ctx.runMutation(api.appointments.updatePaymentStatus, {
+          await ctx.runMutation(api.appointments.mutations.updatePaymentStatus, {
             appointmentId: metadata.appointmentId as any,
             paymentStatus: "failed",
             paymentIntentId: paymentIntent.id,
@@ -678,21 +709,16 @@ export const createConnectAccount = action({
     country: v.optional(v.string()),
     businessType: v.optional(v.union(v.literal("individual"), v.literal("company"))),
   },
-  handler: async (ctx, args) => {
-    const userId = ctx.userId;
-    if (!userId) {
-      throw new ConvexError("Not authenticated");
-    }
-
-    const user = await ctx.runQuery(api.users.getCurrentUser);
+  handler: async (ctx, args): Promise<{ accountId: string; onboardingUrl: string; isExisting: boolean }> => {
+    const user: TConnectUser | null = await ctx.runQuery(api.users.queries.getCurrentUser) as TConnectUser | null;
     if (!user || user.role !== "barber") {
       throw new ConvexError("Not authorized: Only barbers can create Connect accounts");
     }
 
     // Check if barber already has a Stripe account
-    const barberProfile = await ctx.runQuery(api.barbers.getBarberProfileByUserId, {
+    const barberProfile: TBarberStripeProfile = await ctx.runQuery(api.barbers.queries.getBarberProfileByUserId, {
       userId: user._id,
-    });
+    }) as TBarberStripeProfile;
 
     if (barberProfile?.stripeAccountId) {
       // Return existing account onboarding link
@@ -734,7 +760,7 @@ export const createConnectAccount = action({
     });
 
     // Store the account ID in the barber's profile
-    await ctx.runMutation(api.barbers.updateStripeAccount, {
+    await ctx.runMutation(api.barbers.mutations.updateStripeAccount, {
       userId: user._id,
       stripeAccountId: account.id,
     });
@@ -760,27 +786,22 @@ export const createConnectAccount = action({
  */
 export const getConnectLoginLink = action({
   args: {},
-  handler: async (ctx) => {
-    const userId = ctx.userId;
-    if (!userId) {
-      throw new ConvexError("Not authenticated");
-    }
-
-    const user = await ctx.runQuery(api.users.getCurrentUser);
+  handler: async (ctx): Promise<{ url: string }> => {
+    const user: TConnectUser | null = await ctx.runQuery(api.users.queries.getCurrentUser) as TConnectUser | null;
     if (!user || user.role !== "barber") {
       throw new ConvexError("Not authorized");
     }
 
-    const barberProfile = await ctx.runQuery(api.barbers.getBarberProfileByUserId, {
+    const barberProfile: TBarberStripeProfile = await ctx.runQuery(api.barbers.queries.getBarberProfileByUserId, {
       userId: user._id,
-    });
+    }) as TBarberStripeProfile;
 
     if (!barberProfile?.stripeAccountId) {
       throw new ConvexError("No Stripe account found");
     }
 
     try {
-      const loginLink = await stripe.accounts.createLoginLink(
+      const loginLink: Stripe.LoginLink = await stripe.accounts.createLoginLink(
         barberProfile.stripeAccountId
       );
 
@@ -796,27 +817,37 @@ export const getConnectLoginLink = action({
  */
 export const getConnectAccountDetails = action({
   args: {},
-  handler: async (ctx) => {
-    const userId = ctx.userId;
-    if (!userId) {
-      throw new ConvexError("Not authenticated");
-    }
-
-    const user = await ctx.runQuery(api.users.getCurrentUser);
+  handler: async (ctx): Promise<{
+    accountId: string;
+    chargesEnabled: boolean;
+    payoutsEnabled: boolean;
+    detailsSubmitted: boolean;
+    requirements: {
+      currentlyDue: string[];
+      eventuallyDue: string[];
+      pastDue: string[];
+      pendingVerification: string[];
+    };
+    settings: {
+      defaultCurrency: string | undefined;
+      country: string | undefined;
+    };
+  }> => {
+    const user: TConnectUser | null = await ctx.runQuery(api.users.queries.getCurrentUser) as TConnectUser | null;
     if (!user || user.role !== "barber") {
       throw new ConvexError("Not authorized");
     }
 
-    const barberProfile = await ctx.runQuery(api.barbers.getBarberProfileByUserId, {
+    const barberProfile: TBarberStripeProfile = await ctx.runQuery(api.barbers.queries.getBarberProfileByUserId, {
       userId: user._id,
-    });
+    }) as TBarberStripeProfile;
 
     if (!barberProfile?.stripeAccountId) {
       throw new ConvexError("No Stripe account found");
     }
 
     try {
-      const account = await stripe.accounts.retrieve(barberProfile.stripeAccountId);
+      const account: Stripe.Account = await stripe.accounts.retrieve(barberProfile.stripeAccountId);
 
       return {
         accountId: account.id,
@@ -849,14 +880,14 @@ export const getBarberPayouts = action({
     limit: v.optional(v.number()),
     startingAfter: v.optional(v.string()), // Stripe payout ID for cursor pagination
   },
-  handler: async (ctx, args) => {
-    const userId = ctx.userId;
-    if (!userId) {
+  handler: async (ctx, args): Promise<TBarberPayoutsResult> => {
+    const user = await ctx.runQuery(api.users.queries.getCurrentUser);
+    if (!user) {
       throw new ConvexError("Not authenticated");
     }
 
     // Get barber profile with Stripe account ID
-    const barberProfile = await ctx.runQuery(api.barbers.getBarberProfile);
+    const barberProfile: TBarberStripeProfile = await ctx.runQuery(api.barbers.queries.getBarberProfile) as TBarberStripeProfile;
     if (!barberProfile?.stripeAccountId) {
       return {
         payouts: [],
@@ -873,12 +904,12 @@ export const getBarberPayouts = action({
         listParams.starting_after = args.startingAfter;
       }
 
-      const payoutsResponse = await stripe.payouts.list(listParams, {
+      const payoutsResponse: Stripe.ApiList<Stripe.Payout> = await stripe.payouts.list(listParams, {
         stripeAccount: barberProfile.stripeAccountId,
       });
 
       return {
-        payouts: payoutsResponse.data.map((payout) => ({
+        payouts: payoutsResponse.data.map((payout: Stripe.Payout) => ({
           id: payout.id,
           amount: payout.amount,
           currency: payout.currency,
@@ -936,8 +967,8 @@ export const getPaymentIntentStatus = action({
     paymentIntentId: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = ctx.userId;
-    if (!userId) {
+    const user = await ctx.runQuery(api.users.queries.getCurrentUser);
+    if (!user) {
       throw new ConvexError("Not authenticated");
     }
 

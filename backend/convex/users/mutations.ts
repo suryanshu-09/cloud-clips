@@ -107,7 +107,7 @@ export const updateUserProfile = mutation({
     // Get user
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -175,7 +175,7 @@ export const updatePushToken = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -207,7 +207,7 @@ export const removePushToken = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {

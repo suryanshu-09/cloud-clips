@@ -1,5 +1,6 @@
 import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import { requireIdentityEmail } from "../lib/authIdentity";
 
 /**
  * Earnings Queries
@@ -31,7 +32,7 @@ export const getBarberEarningsSummary = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!user) {
@@ -154,7 +155,7 @@ export const getBarberEarningsHistory = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!user) {
@@ -265,7 +266,7 @@ export const getBarberTaxSummary = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!user) {
@@ -372,7 +373,7 @@ export const getBarberTaxYears = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!user) {

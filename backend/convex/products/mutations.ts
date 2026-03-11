@@ -25,7 +25,7 @@ export const createProduct = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user || user.role !== "barber") {
@@ -75,7 +75,7 @@ export const updateProduct = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user || user.role !== "barber") {
@@ -115,7 +115,7 @@ export const deleteProduct = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user || user.role !== "barber") {
@@ -154,7 +154,7 @@ export const updateStock = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user || user.role !== "barber") {

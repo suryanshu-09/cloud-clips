@@ -62,6 +62,12 @@ export const STORAGE_CONFIG = {
 // Type for storage areas
 export type StorageArea = keyof typeof STORAGE_CONFIG;
 
+type StorageConfig = (typeof STORAGE_CONFIG)[StorageArea];
+
+function hasSubfolder(config: StorageConfig): config is StorageConfig & { subfolder: string } {
+  return "subfolder" in config;
+}
+
 // Helper to build storage path
 export function buildStoragePath(
   area: StorageArea,
@@ -69,7 +75,7 @@ export function buildStoragePath(
   fileName: string
 ): string {
   const config = STORAGE_CONFIG[area];
-  if (config.subfolder) {
+  if (hasSubfolder(config)) {
     return `${config.pathPrefix}/${userId}/${config.subfolder}/${fileName}`;
   }
   return `${config.pathPrefix}/${userId}/${fileName}`;
@@ -81,7 +87,7 @@ export function isValidFileType(
   mimeType: string
 ): boolean {
   const config = STORAGE_CONFIG[area];
-  return config.allowedMimeTypes.includes(mimeType as any);
+  return (config.allowedMimeTypes as readonly string[]).includes(mimeType);
 }
 
 // Helper to validate file size

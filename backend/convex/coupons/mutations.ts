@@ -23,7 +23,7 @@ export const createCoupon = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -93,7 +93,7 @@ export const applyDiscount = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -190,7 +190,7 @@ export const redeemCoupon = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -250,7 +250,7 @@ export const toggleCoupon = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -299,7 +299,7 @@ export const updateCoupon = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -358,7 +358,7 @@ export const deleteCoupon = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -400,7 +400,7 @@ export const trackUsage = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {

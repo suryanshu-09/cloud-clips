@@ -1,5 +1,6 @@
 import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import { requireIdentityEmail } from "../lib/authIdentity";
 
 export const getCouponByCode = query({
   args: {
@@ -25,7 +26,7 @@ export const getCouponsByBarber = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!user || (user._id !== args.barberId && user.role !== "admin")) {
@@ -51,7 +52,7 @@ export const getCouponUsage = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!user) {
@@ -109,7 +110,7 @@ export const getCoupons = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!user) {
@@ -165,7 +166,7 @@ export const validateCoupon = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!user) {
@@ -298,7 +299,7 @@ export const getCouponUsageStats = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!user) {
@@ -312,6 +313,7 @@ export const getCouponUsageStats = query({
     let couponUsages;
 
     if (args.couponId) {
+      const couponId = args.couponId;
       const coupon = await ctx.db.get(args.couponId);
       if (!coupon) {
         throw new ConvexError("Coupon not found");
@@ -323,7 +325,7 @@ export const getCouponUsageStats = query({
 
       couponUsages = await ctx.db
         .query("couponUsage")
-        .withIndex("by_coupon", (q) => q.eq("couponId", args.couponId))
+        .withIndex("by_coupon", (q) => q.eq("couponId", couponId))
         .collect();
     } else {
       const coupons = await ctx.db
@@ -370,7 +372,7 @@ export const getMyCouponUsage = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!user) {

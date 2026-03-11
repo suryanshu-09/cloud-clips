@@ -39,7 +39,7 @@ export const blockTimeOff = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) throw new ConvexError("User not found");
@@ -109,7 +109,7 @@ export const deleteTimeOffBlock = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) throw new ConvexError("User not found");

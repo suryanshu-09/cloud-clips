@@ -61,7 +61,7 @@ export async function calculateAverageRating(
 export const getReviewsByBarber = query({
   args: {
     barberId: v.id("users"),
-    cursor: v.optional(v.string()),
+    cursor: v.optional(v.id("reviews")),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -81,10 +81,10 @@ export const getReviewsByBarber = query({
 
     // Apply cursor if provided
     if (args.cursor) {
-      const cursorReview = await ctx.db.get(args.cursor as any);
+      const cursorReview = await ctx.db.get(args.cursor);
       if (cursorReview) {
         reviewsQuery = reviewsQuery.filter((q) =>
-          q.lt("createdAt", cursorReview.createdAt)
+          q.lt(q.field("createdAt"), cursorReview.createdAt)
         );
       }
     }

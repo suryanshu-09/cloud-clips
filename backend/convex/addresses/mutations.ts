@@ -31,7 +31,7 @@ export const addAddress = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -89,7 +89,7 @@ export const updateAddress = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -123,7 +123,7 @@ export const deleteAddress = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -160,7 +160,7 @@ export const setDefaultAddress = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {

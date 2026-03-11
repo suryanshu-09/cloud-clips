@@ -18,7 +18,7 @@ async function requireAdmin(ctx: { auth: { getUserIdentity: () => Promise<{ emai
 
   const user = await ctx.db
     .query("users")
-    .withIndex("by_email", (q: any) => q.eq("email", identity.email))
+    .withIndex("by_email", (q: any) => q.eq("email", identity.email ?? ""))
     .first();
 
   if (!user || user.role !== "admin") {

@@ -1,5 +1,6 @@
 import { query, mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 
 const PLATFORM_FEE_RATE = 0.15; // 15%
 
@@ -13,7 +14,7 @@ async function getAuthenticatedBarber(ctx: any) {
 
   const user = await ctx.db
     .query("users")
-    .withIndex("by_email", (q: any) => q.eq("email", identity.email))
+    .withIndex("by_email", (q: any) => q.eq("email", identity.email ?? ""))
     .first();
 
   if (!user) throw new ConvexError("User not found");
@@ -96,7 +97,7 @@ export const getDashboardStats = query({
       todayAppointments
         .sort((a: any, b: any) => a.scheduledFor - b.scheduledFor)
         .map(async (apt: any) => {
-          const client = await ctx.db.get(apt.clientId);
+          const client = await ctx.db.get(apt.clientId as Id<"users">);
           return {
             _id: apt._id,
             scheduledFor: apt.scheduledFor,

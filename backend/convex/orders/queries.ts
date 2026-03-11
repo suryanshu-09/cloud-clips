@@ -21,7 +21,7 @@ export const getMyOrders = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -75,7 +75,7 @@ export const getOrderById = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -144,7 +144,7 @@ export const getOrdersForBarber = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user || user.role !== "barber") {
@@ -191,7 +191,7 @@ export const getOrderStatus = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -236,7 +236,7 @@ export const getOrderCountByStatus = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {

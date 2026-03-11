@@ -1,5 +1,6 @@
 import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import { requireIdentityEmail } from "../lib/authIdentity";
 
 /**
  * Receipt Queries
@@ -28,7 +29,7 @@ export const getMyReceipts = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!user) {
@@ -96,7 +97,7 @@ export const getReceiptById = query({
     // Verify authorization
     const currentUser = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!currentUser) {
@@ -179,7 +180,7 @@ export const getReceiptByAppointmentId = query({
     // Verify authorization
     const currentUser = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!currentUser) {
@@ -216,7 +217,7 @@ export const getBarberReceipts = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!user) {
@@ -278,7 +279,7 @@ export const getReceiptStats = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!user) {

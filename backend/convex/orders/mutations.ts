@@ -1,5 +1,6 @@
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 
 const shippingAddressValidator = v.object({
   name: v.string(),
@@ -36,7 +37,7 @@ export const createOrder = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -44,7 +45,7 @@ export const createOrder = mutation({
     }
 
     // Group items by barber and validate stock
-    const barberOrders = new Map<string, typeof args.items>();
+    const barberOrders = new Map<Id<"users">, typeof args.items>();
     
     for (const item of args.items) {
       const product = await ctx.db.get(item.productId);
@@ -125,7 +126,7 @@ export const updateOrderStatus = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -241,7 +242,7 @@ export const cancelOrder = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {

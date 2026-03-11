@@ -20,7 +20,7 @@ async function requireAdmin(ctx: {
 
   const admin = await ctx.db
     .query("users")
-    .withIndex("by_email", (q: any) => q.eq("email", identity.email))
+    .withIndex("by_email", (q: any) => q.eq("email", identity.email ?? ""))
     .first();
 
   if (!admin || admin.role !== "admin") {

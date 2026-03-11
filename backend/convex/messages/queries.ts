@@ -16,17 +16,18 @@ export const getConversations = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
       throw new Error("User not found");
     }
 
-    const conversations = await ctx.db
+    const conversations = (await ctx.db
       .query("conversations")
-      .filter((q) => q.contains("participants", [user._id]))
-      .collect();
+      .collect()).filter((conversation) =>
+      conversation.participants.includes(user._id)
+    );
 
     // Enrich with participant details and unread counts
     const enrichedConversations = await Promise.all(
@@ -74,7 +75,7 @@ export const getChatMessages = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -94,24 +95,38 @@ export const getChatMessages = query({
     const limit = Math.min(args.limit || 50, 100); // Cap at 100 messages
 
     // Build query with cursor support
-    let messagesQuery = ctx.db
-      .query("messages")
-      .withIndex("by_conversation_created", (q) =>
-        q.eq("conversationId", args.conversationId)
-      )
-      .order("desc");
+    let messages;
 
-    // Apply cursor if provided (get messages before cursor)
     if (args.cursor) {
       const cursorMessage = await ctx.db.get(args.cursor);
       if (cursorMessage) {
-        messagesQuery = messagesQuery.filter((q) =>
-          q.lt("createdAt", cursorMessage.createdAt)
-        );
+        messages = await ctx.db
+          .query("messages")
+          .withIndex("by_conversation_created", (q) =>
+            q
+              .eq("conversationId", args.conversationId)
+              .lt("createdAt", cursorMessage.createdAt)
+          )
+          .order("desc")
+          .take(limit + 1);
+      } else {
+        messages = await ctx.db
+          .query("messages")
+          .withIndex("by_conversation_created", (q) =>
+            q.eq("conversationId", args.conversationId)
+          )
+          .order("desc")
+          .take(limit + 1);
       }
+    } else {
+      messages = await ctx.db
+        .query("messages")
+        .withIndex("by_conversation_created", (q) =>
+          q.eq("conversationId", args.conversationId)
+        )
+        .order("desc")
+        .take(limit + 1);
     }
-
-    const messages = await messagesQuery.take(limit + 1); // Get one extra to check if there's more
 
     // Check if there are more messages
     const hasMore = messages.length > limit;
@@ -168,7 +183,7 @@ export const getConversation = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -244,17 +259,18 @@ export const getUnreadCount = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
       return 0;
     }
 
-    const conversations = await ctx.db
+    const conversations = (await ctx.db
       .query("conversations")
-      .filter((q) => q.contains("participants", [user._id]))
-      .collect();
+      .collect()).filter((conversation) =>
+      conversation.participants.includes(user._id)
+    );
 
     return conversations.reduce((total, conv) => {
       return total + (conv.unreadCounts?.[user._id.toString()] || 0);
@@ -275,7 +291,7 @@ export const getTypingStatus = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {

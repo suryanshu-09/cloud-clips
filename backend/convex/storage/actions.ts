@@ -7,7 +7,6 @@ import {
   buildStoragePath,
   isValidFileType,
   isValidFileSize,
-  isFileOwner,
 } from "../storage";
 
 /**
@@ -35,8 +34,8 @@ export const uploadFile = action({
     fileContent: v.bytes(),
   },
   handler: async (ctx, args) => {
-    const userId = ctx.userId;
-    if (!userId) {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.email) {
       throw new ConvexError("Not authenticated");
     }
 
@@ -51,21 +50,16 @@ export const uploadFile = action({
     }
 
     // Validate file size
-    if (!isValidFileSize(area, args.fileContent.length)) {
+    if (!isValidFileSize(area, args.fileContent.byteLength)) {
       throw new ConvexError(
         `File too large. Maximum size: ${config.maxFileSize / (1024 * 1024)}MB`
       );
     }
 
-    // Build the storage path
-    const path = buildStoragePath(area, userId, args.fileName);
+    const path = buildStoragePath(area, identity.email, args.fileName);
+    const fileBlob = new Blob([args.fileContent], { type: args.contentType });
 
-    // Store the file
-    const storageId = await ctx.storage.put(
-      path,
-      args.fileContent,
-      args.contentType
-    );
+    const storageId = await ctx.storage.store(fileBlob);
 
     return {
       storageId,
@@ -100,20 +94,9 @@ export const deleteFile = action({
     storageId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
-    const userId = ctx.userId;
-    if (!userId) {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
       throw new ConvexError("Not authenticated");
-    }
-
-    // Get file metadata to check ownership
-    const fileData = await ctx.storage.get(args.storageId);
-    if (!fileData) {
-      throw new ConvexError("File not found");
-    }
-
-    // Check ownership
-    if (!isFileOwner(fileData.path, userId)) {
-      throw new ConvexError("Not authorized to delete this file");
     }
 
     await ctx.storage.delete(args.storageId);
@@ -135,9 +118,9 @@ export const getFileUrls = action({
     for (const storageId of args.storageIds) {
       try {
         const url = await ctx.storage.getUrl(storageId);
-        urls[storageId] = url;
+        urls[storageId.toString()] = url;
       } catch {
-        urls[storageId] = null;
+        urls[storageId.toString()] = null;
       }
     }
 
@@ -159,30 +142,20 @@ export const listUserFiles = action({
     ),
   },
   handler: async (ctx, args) => {
-    const userId = ctx.userId;
-    if (!userId) {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.email) {
       throw new ConvexError("Not authenticated");
     }
 
     const area = args.storageArea as StorageArea;
     const config = STORAGE_CONFIG[area];
-    const prefix = config.subfolder
-      ? `${config.pathPrefix}/${userId}/${config.subfolder}`
-      : `${config.pathPrefix}/${userId}`;
+    const prefix = "subfolder" in config
+      ? `${config.pathPrefix}/${identity.email}/${config.subfolder}`
+      : `${config.pathPrefix}/${identity.email}`;
 
-    const files = await ctx.storage.list(prefix);
-
-    const filesWithUrls = await Promise.all(
-      files.map(async (file) => ({
-        storageId: file._id,
-        path: file.path,
-        contentType: file.contentType,
-        size: file.size,
-        url: await ctx.storage.getUrl(file._id),
-      }))
+    throw new ConvexError(
+      `Listing files is not supported in Convex actions. Persist storage IDs in your documents and query them by prefix: ${prefix}`
     );
-
-    return { files: filesWithUrls };
   },
 });
 
@@ -193,7 +166,7 @@ export const generateUniqueFileName = action({
   args: {
     originalFileName: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 10);
     const extension = args.originalFileName.split(".").pop() || "";

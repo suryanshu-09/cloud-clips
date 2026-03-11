@@ -1,5 +1,6 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
+import { requireIdentityEmail } from "../lib/authIdentity";
 
 /**
  * Notification Queries
@@ -18,7 +19,7 @@ export const getNotifications = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(identity)))
       .first();
 
     if (!user) {
@@ -49,7 +50,7 @@ export const getUnreadNotificationCount = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(identity)))
       .first();
 
     if (!user) {

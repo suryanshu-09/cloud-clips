@@ -25,7 +25,7 @@ export const registerPushToken = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -64,7 +64,7 @@ export const unregisterPushToken = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -95,25 +95,46 @@ export const sendPushNotification = action({
     body: v.string(),
     data: v.optional(v.record(v.string(), v.string())),
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args
+  ): Promise<
+    | { success: false; error: string }
+    | { success: true; sent: number; message: string }
+    | {
+        success: true;
+        sent: number;
+        failed: number;
+        invalidTokensRemoved: number;
+      }
+  > => {
     // Get user's push tokens
-    const user = await ctx.runQuery(api.users.getUserById, {
+    const user: { pushTokens?: string[] } | null = await ctx.runQuery(
+      api.users.queries.getUserById,
+      {
       userId: args.userId,
-    });
+      }
+    );
 
     if (!user) {
       console.error(`sendPushNotification: User ${args.userId} not found`);
       return { success: false, error: "User not found" };
     }
 
-    const pushTokens = user.pushTokens || [];
+    const pushTokens: string[] = user.pushTokens ?? [];
 
     if (pushTokens.length === 0) {
       return { success: true, sent: 0, message: "No push tokens registered" };
     }
 
     // Build Expo push messages for all tokens
-    const messages = pushTokens.map((token) => ({
+    const messages: Array<{
+      to: string;
+      sound: "default";
+      title: string;
+      body: string;
+      data: Record<string, string>;
+    }> = pushTokens.map((token: string) => ({
       to: token,
       sound: "default" as const,
       title: args.title,
@@ -123,7 +144,9 @@ export const sendPushNotification = action({
 
     try {
       // Send via Expo Push API
-      const response = await fetch("https://exp.host/--/api/v2/push/send", {
+      const response: Response = await fetch(
+        "https://exp.host/--/api/v2/push/send",
+        {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -131,7 +154,8 @@ export const sendPushNotification = action({
           "Content-Type": "application/json",
         },
         body: JSON.stringify(messages),
-      });
+        }
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -139,7 +163,7 @@ export const sendPushNotification = action({
         return { success: false, error: `Push API error: ${response.status}` };
       }
 
-      const result = await response.json();
+      const result: { data?: Array<{ status: string; message?: string; details?: { error?: string } }> } = await response.json();
       const tickets = result.data || [];
 
       // Collect invalid tokens to remove
@@ -166,13 +190,16 @@ export const sendPushNotification = action({
       // Remove invalid tokens from the user's record
       if (invalidTokens.length > 0) {
         const remainingTokens = pushTokens.filter(
-          (t) => !invalidTokens.includes(t)
+          (t: string) => !invalidTokens.includes(t)
         );
 
-        await ctx.runMutation(api.notifications.updateUserPushTokens, {
-          userId: args.userId,
-          tokens: remainingTokens,
-        });
+        await ctx.runMutation(
+          api.notifications.tokens.updateUserPushTokens,
+          {
+            userId: args.userId,
+            tokens: remainingTokens,
+          }
+        );
 
         console.log(
           `Removed ${invalidTokens.length} invalid push token(s) for user ${args.userId}`

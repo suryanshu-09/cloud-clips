@@ -1,6 +1,7 @@
 import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import { fromTimestamp, getDateRange, toUTCTimestamp, formatTime } from "../lib/timezone";
+import { requireIdentityEmail } from "../lib/authIdentity";
 
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
@@ -31,7 +32,7 @@ export const getMyAppointments = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(userId)))
       .first();
 
     if (!user) {

@@ -1,6 +1,8 @@
 import { mutation, action } from "../_generated/server";
 import { v } from "convex/values";
-import { api } from "../_generated/api";
+import { api as generatedApi } from "../_generated/api";
+
+const api: any = generatedApi;
 
 /**
  * Message Mutations
@@ -30,7 +32,7 @@ export const sendMessage = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -78,11 +80,18 @@ export const sendMessage = mutation({
 
     // Schedule push notification to recipient
     if (otherParticipantId) {
-      await ctx.scheduler.runAfter(0, api.messages.sendPushNotification, {
-        recipientId: otherParticipantId,
-        senderName: user.name || "Someone",
-        messageContent: args.content,
-        conversationId: args.conversationId,
+      const sendTokenPushNotification = api["notifications/tokens"].sendPushNotification;
+      await (ctx.scheduler.runAfter as any)(0, sendTokenPushNotification, {
+        userId: otherParticipantId,
+        title: `New message from ${user.name || "Someone"}`,
+        body:
+          args.content.length > 100
+            ? `${args.content.substring(0, 100)}...`
+            : args.content,
+        data: {
+          type: "new_message",
+          conversationId: args.conversationId.toString(),
+        },
       });
     }
 
@@ -103,7 +112,7 @@ export const markAsRead = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -116,13 +125,12 @@ export const markAsRead = mutation({
     }
 
     // Get unread messages
-    const messages = await ctx.db
+    const messages = (await ctx.db
       .query("messages")
       .withIndex("by_conversation", (q) =>
         q.eq("conversationId", args.conversationId)
       )
-      .filter((q) => !q.contains("readBy", [user._id]))
-      .collect();
+      .collect()).filter((message) => !message.readBy.includes(user._id));
 
     // Mark all as read
     for (const message of messages) {
@@ -161,7 +169,7 @@ export const createConversation = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -169,12 +177,17 @@ export const createConversation = mutation({
     }
 
     // Check if conversation already exists
-    const existingConversation = await ctx.db
+    const existingConversation = (await ctx.db
       .query("conversations")
-      .filter((q) =>
-        q.eq("participants", [user._id, args.participantId])
-      )
-      .first();
+      .collect()).find((conversation) => {
+      if (conversation.participants.length !== 2) {
+        return false;
+      }
+      return (
+        conversation.participants.includes(user._id) &&
+        conversation.participants.includes(args.participantId)
+      );
+    });
 
     if (existingConversation) {
       return existingConversation;
@@ -229,7 +242,7 @@ export const setTypingStatus = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {
@@ -283,7 +296,7 @@ export const clearTypingStatus = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", userId.email))
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
       .first();
 
     if (!user) {

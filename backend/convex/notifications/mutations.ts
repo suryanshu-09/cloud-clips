@@ -1,5 +1,6 @@
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
+import { requireIdentityEmail } from "../lib/authIdentity";
 
 /**
  * Notification Mutations
@@ -63,7 +64,7 @@ export const markNotificationAsRead = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(identity)))
       .first();
 
     if (!user) {
@@ -100,7 +101,7 @@ export const markAllNotificationsAsRead = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(identity)))
       .first();
 
     if (!user) {
@@ -142,7 +143,7 @@ export const deleteNotification = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .withIndex("by_email", (q) => q.eq("email", requireIdentityEmail(identity)))
       .first();
 
     if (!user) {

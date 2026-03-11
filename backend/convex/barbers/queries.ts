@@ -13,7 +13,7 @@ export const getBarberPortfolioImages = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user || user.role !== "barber") return [];
@@ -71,7 +71,7 @@ export const getBarberProfile = query({
     // Get user
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -213,18 +213,15 @@ export const searchBarbers = query({
       .query("barberProfiles")
       .withIndex("by_available", (q) => q.eq("isAvailable", true));
 
-    // Apply cursor pagination if provided
+    // Fetch barbers with limit + 1 to determine if there are more results
+    let barbers = await barbersQuery.take(limit + 1);
+
     if (args.cursor) {
-      const cursorDoc = await ctx.db.get(args.cursor as any);
-      if (cursorDoc) {
-        barbersQuery = barbersQuery.filter((q) =>
-          q.gt("businessName", cursorDoc.businessName)
-        );
+      const cursorIndex = barbers.findIndex((barber) => barber._id === args.cursor);
+      if (cursorIndex >= 0) {
+        barbers = barbers.slice(cursorIndex + 1);
       }
     }
-
-    // Fetch barbers with limit + 1 to determine if there are more results
-    const barbers = await barbersQuery.take(limit + 1);
 
     // Filter by name match
     const filteredBarbers = barbers.filter((barber) =>
@@ -503,16 +500,14 @@ export const filterBarbers = query({
       .query("barberProfiles")
       .withIndex("by_available", (q) => q.eq("isAvailable", true));
 
+    let barbers = await barbersQuery.take(limit + 1);
+
     if (args.cursor) {
-      const cursorDoc = await ctx.db.get(args.cursor as any);
-      if (cursorDoc) {
-        barbersQuery = barbersQuery.filter((q) =>
-          q.gt("_creationTime", cursorDoc._creationTime)
-        );
+      const cursorIndex = barbers.findIndex((barber) => barber._id === args.cursor);
+      if (cursorIndex >= 0) {
+        barbers = barbers.slice(cursorIndex + 1);
       }
     }
-
-    let barbers = await barbersQuery.take(limit + 1);
 
     // Apply rating filter
     if (args.minRating !== undefined) {
@@ -651,7 +646,7 @@ export const getBarberDashboardStats = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user || user.role !== "barber") {

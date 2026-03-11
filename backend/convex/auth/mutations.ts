@@ -216,7 +216,10 @@ export const resetPassword = mutation({
     // Find user by reset token
     const users = await ctx.db.query("users").collect();
     const user = users.find(
-      (u) => u.resetToken === args.token && u.resetTokenExpiresAt > Date.now()
+      (u) =>
+        u.resetToken === args.token &&
+        u.resetTokenExpiresAt !== undefined &&
+        u.resetTokenExpiresAt > Date.now()
     );
 
     if (!user) {
@@ -259,7 +262,7 @@ export const changePassword = mutation({
     // Get user
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -293,7 +296,7 @@ export const updateUserRole = mutation({
     // Check if current user is admin
     const currentUser = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!currentUser || currentUser.role !== "admin") {
@@ -355,7 +358,7 @@ export const deactivateAccount = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -387,7 +390,7 @@ export const reactivateAccount = mutation({
     // Check if current user is admin
     const currentUser = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!currentUser || currentUser.role !== "admin") {
@@ -425,7 +428,7 @@ export const linkSocialAccount = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -460,7 +463,7 @@ export const unlinkSocialAccount = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -494,6 +497,7 @@ export const verifyEmail = mutation({
     const user = users.find(
       (u) =>
         u.verificationToken === args.token &&
+        u.verificationTokenExpiresAt !== undefined &&
         u.verificationTokenExpiresAt > Date.now()
     );
 
@@ -525,7 +529,7 @@ export const resendVerificationEmail = mutation({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -568,7 +572,7 @@ export const checkRole = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -598,7 +602,7 @@ export const getAuthStatus = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
@@ -636,7 +640,7 @@ export const getLinkedAccounts = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email))
+      .withIndex("by_email", (q) => q.eq("email", identity.email ?? ""))
       .first();
 
     if (!user) {
