@@ -1,5 +1,6 @@
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 const addressValidator = v.object({
   label: v.string(),
@@ -24,7 +25,7 @@ const addressValidator = v.object({
 export const addAddress = mutation({
   args: { address: addressValidator },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new Error("Not authenticated");
     }
@@ -82,7 +83,7 @@ export const updateAddress = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new Error("Not authenticated");
     }
@@ -116,7 +117,7 @@ export const updateAddress = mutation({
 export const deleteAddress = mutation({
   args: { addressId: v.id("addresses") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new Error("Not authenticated");
     }
@@ -153,7 +154,7 @@ export const deleteAddress = mutation({
 export const setDefaultAddress = mutation({
   args: { addressId: v.id("addresses") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new Error("Not authenticated");
     }

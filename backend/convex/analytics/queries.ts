@@ -1,5 +1,6 @@
 import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Admin Analytics Queries
@@ -13,7 +14,7 @@ import { v, ConvexError } from "convex/values";
 
 // Helper: assert the caller is an admin
 async function assertAdmin(ctx: { auth: { getUserIdentity: () => Promise<{ email?: string } | null> }; db: any }) {
-  const identity = await ctx.auth.getUserIdentity();
+  const identity = await getIdentityOrDev(ctx);
   if (!identity) throw new ConvexError("Not authenticated");
 
   const user = await ctx.db

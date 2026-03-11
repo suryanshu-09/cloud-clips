@@ -1,5 +1,6 @@
 import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * User Queries
@@ -15,7 +16,7 @@ import { v, ConvexError } from "convex/values";
 export const getCurrentUser = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       return null;
     }
@@ -59,7 +60,7 @@ export const getUserById = query({
 export const isBarber = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       return false;
     }

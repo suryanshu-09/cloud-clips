@@ -1,6 +1,7 @@
 import { mutation, action } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import { api } from "../_generated/api";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Push Token Management
@@ -18,7 +19,7 @@ export const registerPushToken = mutation({
     token: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }
@@ -57,7 +58,7 @@ export const unregisterPushToken = mutation({
     token: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }

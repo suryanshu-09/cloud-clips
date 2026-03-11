@@ -1,5 +1,6 @@
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Product Mutations
@@ -18,7 +19,7 @@ export const createProduct = mutation({
     tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -68,7 +69,7 @@ export const updateProduct = mutation({
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -108,7 +109,7 @@ export const deleteProduct = mutation({
     productId: v.id("products"),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -147,7 +148,7 @@ export const updateStock = mutation({
     quantity: v.number(), // positive to add, negative to subtract
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }

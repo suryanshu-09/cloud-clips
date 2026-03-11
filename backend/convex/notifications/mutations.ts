@@ -1,6 +1,7 @@
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { requireIdentityEmail } from "../lib/authIdentity";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Notification Mutations
@@ -26,7 +27,7 @@ export const createNotification = mutation({
     data: v.optional(v.record(v.string(), v.string())),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new Error("Not authenticated");
     }
@@ -57,7 +58,7 @@ export const markNotificationAsRead = mutation({
     notificationId: v.id("notifications"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new Error("Not authenticated");
     }
@@ -94,7 +95,7 @@ export const markNotificationAsRead = mutation({
 export const markAllNotificationsAsRead = mutation({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new Error("Not authenticated");
     }
@@ -136,7 +137,7 @@ export const deleteNotification = mutation({
     notificationId: v.id("notifications"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new Error("Not authenticated");
     }

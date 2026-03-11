@@ -1,6 +1,7 @@
 import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import { requireIdentityEmail } from "../lib/authIdentity";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 export const getCouponByCode = query({
   args: {
@@ -19,7 +20,7 @@ export const getCouponsByBarber = query({
     barberId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -45,7 +46,7 @@ export const getCouponUsage = query({
     couponId: v.id("coupons"),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -103,7 +104,7 @@ export const getCoupons = query({
     activeOnly: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -159,7 +160,7 @@ export const validateCoupon = query({
     barberId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -292,7 +293,7 @@ export const getCouponUsageStats = query({
     couponId: v.optional(v.id("coupons")),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -365,7 +366,7 @@ export const getCouponUsageStats = query({
 
 export const getMyCouponUsage: any = query({
   handler: async (ctx) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }

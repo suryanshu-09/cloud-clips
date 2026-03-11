@@ -1,6 +1,7 @@
 import { mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import { calculateAverageRating } from "../reviews";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Review Mutations
@@ -15,7 +16,7 @@ export const submitReview = mutation({
     photos: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -92,7 +93,7 @@ export const respondToReview = mutation({
     response: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -134,7 +135,7 @@ export const reportReview = mutation({
     details: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }

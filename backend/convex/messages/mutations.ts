@@ -1,6 +1,7 @@
 import { mutation, action } from "../_generated/server";
 import { v } from "convex/values";
 import { api } from "../_generated/api";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Message Mutations
@@ -23,7 +24,7 @@ export const sendMessage = mutation({
     }))),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -96,7 +97,7 @@ export const markAsRead = mutation({
     conversationId: v.id("conversations"),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -153,7 +154,7 @@ export const createConversation = mutation({
     initialMessage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -226,7 +227,7 @@ export const setTypingStatus = mutation({
     conversationId: v.id("conversations"),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -280,7 +281,7 @@ export const clearTypingStatus = mutation({
     conversationId: v.id("conversations"),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }

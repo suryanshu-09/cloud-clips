@@ -1,5 +1,6 @@
 import { mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 export const createCoupon = mutation({
   args: {
@@ -16,7 +17,7 @@ export const createCoupon = mutation({
     validUntil: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -86,7 +87,7 @@ export const applyDiscount = mutation({
     barberId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -183,7 +184,7 @@ export const redeemCoupon = mutation({
     couponCode: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -243,7 +244,7 @@ export const toggleCoupon = mutation({
     isActive: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -292,7 +293,7 @@ export const updateCoupon = mutation({
     validUntil: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -351,7 +352,7 @@ export const deleteCoupon = mutation({
     couponId: v.id("coupons"),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -393,7 +394,7 @@ export const trackUsage = mutation({
     discountAmount: v.number(),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }

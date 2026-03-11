@@ -1,6 +1,7 @@
 import { mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import { requireIdentityEmail } from "../lib/authIdentity";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Receipt Mutations
@@ -23,7 +24,7 @@ export const generateReceipt = mutation({
     })),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -133,7 +134,7 @@ export const generateOrderReceipt = mutation({
     })),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -214,7 +215,7 @@ export const updateReceiptRefundStatus = mutation({
     isPartialRefund: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }

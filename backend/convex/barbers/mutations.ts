@@ -1,5 +1,6 @@
 import { mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Barber Mutations
@@ -38,7 +39,7 @@ export const createBarberProfile = mutation({
     timezone: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -126,7 +127,7 @@ export const updateBarberProfile = mutation({
     timezone: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -174,7 +175,7 @@ export const updateStripeAccount = mutation({
   },
   handler: async (ctx, args) => {
     // Check authentication
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }
@@ -218,7 +219,7 @@ export const updatePortfolioImages = mutation({
     portfolioImages: v.array(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -260,7 +261,7 @@ export const addPortfolioImage = mutation({
     imageUrl: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -303,7 +304,7 @@ export const removePortfolioImage = mutation({
     imageUrl: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -351,7 +352,7 @@ export const updateWorkingHours = mutation({
     })),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -392,7 +393,7 @@ export const updateWorkingHours = mutation({
 export const generatePortfolioUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }

@@ -1,5 +1,6 @@
 import { mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Admin Mutations - User Management
@@ -13,7 +14,7 @@ async function requireAdmin(ctx: {
   auth: { getUserIdentity: () => Promise<{ email?: string } | null> };
   db: any;
 }) {
-  const identity = await ctx.auth.getUserIdentity();
+  const identity = await getIdentityOrDev(ctx);
   if (!identity) {
     throw new ConvexError("Not authenticated");
   }

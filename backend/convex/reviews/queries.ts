@@ -1,5 +1,6 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Review Queries
@@ -51,7 +52,7 @@ export const getReviewByAppointment = query({
 export const getMyReviews = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }

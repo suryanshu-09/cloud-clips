@@ -1,6 +1,7 @@
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 const shippingAddressValidator = v.object({
   name: v.string(),
@@ -30,7 +31,7 @@ export const createOrder = mutation({
     couponCode: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -119,7 +120,7 @@ export const updateOrderStatus = mutation({
     trackingNumber: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -187,7 +188,7 @@ export const updatePaymentStatus = mutation({
     paymentIntentId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -197,8 +198,17 @@ export const updatePaymentStatus = mutation({
       throw new Error("Order not found");
     }
 
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", userId.email ?? ""))
+      .first();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
     // Only the client who placed the order or admin can update payment
-    if (order.clientId !== userId.subject && userId.role !== "admin") {
+    if (order.clientId !== user._id && user.role !== "admin") {
       throw new Error("Not authorized");
     }
 
@@ -235,7 +245,7 @@ export const cancelOrder = mutation({
     orderId: v.id("orders"),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }

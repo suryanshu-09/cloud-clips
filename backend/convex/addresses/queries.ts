@@ -1,5 +1,6 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Address Queries
@@ -13,7 +14,7 @@ import { v } from "convex/values";
 export const getAddresses = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       return [];
     }
@@ -53,7 +54,7 @@ export const getAddresses = query({
 export const getDefaultAddress = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       return null;
     }
@@ -99,7 +100,7 @@ export const getDefaultAddress = query({
 export const getAddressById = query({
   args: { addressId: v.id("addresses") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       return null;
     }

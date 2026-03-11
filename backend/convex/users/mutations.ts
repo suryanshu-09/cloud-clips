@@ -1,5 +1,6 @@
 import { mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * User Mutations
@@ -99,7 +100,7 @@ export const updateUserProfile = mutation({
   },
   handler: async (ctx, args) => {
     // Check authentication
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }
@@ -168,7 +169,7 @@ export const updatePushToken = mutation({
     token: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -200,7 +201,7 @@ export const removePushToken = mutation({
     token: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }

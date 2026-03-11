@@ -1,5 +1,6 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Message Queries
@@ -9,7 +10,7 @@ import { v } from "convex/values";
 export const getConversations = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -68,7 +69,7 @@ export const getChatMessages = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -176,7 +177,7 @@ export const getConversation = query({
     conversationId: v.id("conversations"),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -252,7 +253,7 @@ export const getConversation = query({
 export const getUnreadCount = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       return 0;
     }
@@ -284,7 +285,7 @@ export const getTypingStatus = query({
     conversationId: v.id("conversations"),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       return [];
     }

@@ -2,6 +2,7 @@ import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import { fromTimestamp, getDateRange, toUTCTimestamp, formatTime } from "../lib/timezone";
 import { requireIdentityEmail } from "../lib/authIdentity";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
@@ -25,7 +26,7 @@ export const getMyAppointments = query({
     )),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }

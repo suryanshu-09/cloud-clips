@@ -1,5 +1,6 @@
 import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Time Off Queries
@@ -15,7 +16,7 @@ export const getMyTimeOffBlocks = query({
     toDate: v.optional(v.string()),   // "YYYY-MM-DD" — filter end (inclusive)
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) return [];
 
     const user = await ctx.db

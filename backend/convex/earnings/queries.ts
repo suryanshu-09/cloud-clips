@@ -1,6 +1,7 @@
 import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import { requireIdentityEmail } from "../lib/authIdentity";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Earnings Queries
@@ -25,7 +26,7 @@ export const getBarberEarningsSummary = query({
     ),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -148,7 +149,7 @@ export const getBarberEarningsHistory = query({
     endDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -259,7 +260,7 @@ export const getBarberTaxSummary = query({
     year: v.number(),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -366,7 +367,7 @@ export const getBarberTaxSummary = query({
 export const getBarberTaxYears = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }

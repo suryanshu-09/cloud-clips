@@ -1,6 +1,7 @@
 import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Admin Queries - User Management
@@ -11,7 +12,7 @@ import type { Doc } from "../_generated/dataModel";
 
 /** Helper to assert the caller is an admin */
 async function requireAdmin(ctx: { auth: { getUserIdentity: () => Promise<{ email?: string } | null> }; db: any }) {
-  const identity = await ctx.auth.getUserIdentity();
+  const identity = await getIdentityOrDev(ctx);
   if (!identity) {
     throw new ConvexError("Not authenticated");
   }

@@ -1,5 +1,6 @@
 import { mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Time Off Mutations
@@ -34,7 +35,7 @@ export const blockTimeOff = mutation({
     endTime: v.optional(v.string()),   // "HH:mm" — omit for full-day
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) throw new ConvexError("Not authenticated");
 
     const user = await ctx.db
@@ -104,7 +105,7 @@ export const deleteTimeOffBlock = mutation({
     blockId: v.id("timeOffBlocks"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) throw new ConvexError("Not authenticated");
 
     const user = await ctx.db

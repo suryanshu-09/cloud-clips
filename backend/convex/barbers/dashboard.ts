@@ -1,6 +1,7 @@
 import { query, mutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
 import type { Id } from "../_generated/dataModel";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 const PLATFORM_FEE_RATE = 0.15; // 15%
 
@@ -9,7 +10,7 @@ const PLATFORM_FEE_RATE = 0.15; // 15%
  * Throws if not authenticated or not a barber.
  */
 async function getAuthenticatedBarber(ctx: any) {
-  const identity = await ctx.auth.getUserIdentity();
+  const identity = await getIdentityOrDev(ctx);
   if (!identity) throw new ConvexError("Not authenticated");
 
   const user = await ctx.db

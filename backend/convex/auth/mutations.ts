@@ -1,6 +1,7 @@
 import { mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 function generateToken(): string {
   return Math.random().toString(36).substring(2) + Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -249,7 +250,7 @@ export const changePassword = mutation({
     newPassword: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }
@@ -288,7 +289,7 @@ export const updateUserRole = mutation({
     newRole: v.union(v.literal("client"), v.literal("barber"), v.literal("admin")),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }
@@ -351,7 +352,7 @@ export const updateUserRole = mutation({
 export const deactivateAccount = mutation({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }
@@ -382,7 +383,7 @@ export const reactivateAccount = mutation({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }
@@ -421,7 +422,7 @@ export const linkSocialAccount = mutation({
     providerAccountId: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }
@@ -456,7 +457,7 @@ export const unlinkSocialAccount = mutation({
     provider: v.union(v.literal("google"), v.literal("apple")),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }
@@ -522,7 +523,7 @@ export const verifyEmail = mutation({
 export const resendVerificationEmail = mutation({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }
@@ -565,7 +566,7 @@ export const checkRole = query({
     roles: v.array(v.union(v.literal("client"), v.literal("barber"), v.literal("admin"))),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       return { hasRole: false, role: null };
     }
@@ -592,7 +593,7 @@ export const checkRole = query({
 export const getAuthStatus = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       return {
         isAuthenticated: false,
@@ -633,7 +634,7 @@ export const getAuthStatus = query({
 export const getLinkedAccounts = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }

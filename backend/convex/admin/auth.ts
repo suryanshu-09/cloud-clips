@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 type AdminAuthCtx = Pick<QueryCtx | MutationCtx, "auth" | "db">;
 
@@ -17,7 +18,7 @@ export async function getUserByEmail(
 export async function getAuthUserOrNull(
   ctx: AdminAuthCtx,
 ): Promise<Doc<"users"> | null> {
-  const identity = await ctx.auth.getUserIdentity();
+  const identity = await getIdentityOrDev(ctx);
   const email = identity?.email;
   if (!email) {
     return null;

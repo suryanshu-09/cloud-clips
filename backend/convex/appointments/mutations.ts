@@ -1,5 +1,6 @@
 import { mutation, internalMutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Appointment Mutations
@@ -23,7 +24,7 @@ export const bookAppointment = mutation({
     specialRequests: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -112,7 +113,7 @@ export const cancelAppointment = mutation({
     reason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -162,7 +163,7 @@ export const updateAppointmentStatus = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
     }
@@ -209,7 +210,7 @@ export const updatePaymentStatus = mutation({
     paymentIntentId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await ctx.auth.getUserIdentity();
+    const userId = await getIdentityOrDev(ctx);
     if (!userId) {
       throw new ConvexError("Not authenticated");
     }
@@ -251,7 +252,7 @@ export const rescheduleAppointment = mutation({
   },
   handler: async (ctx, args) => {
     // 1. Authenticate user
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }
@@ -340,7 +341,7 @@ export const scheduleAppointmentReminder = mutation({
     reminderMinutesBefore: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }
@@ -519,7 +520,7 @@ export const cancelAppointmentReminder = mutation({
     appointmentId: v.id("appointments"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }

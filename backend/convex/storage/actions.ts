@@ -1,6 +1,7 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 import {
   STORAGE_CONFIG,
   type StorageArea,
@@ -34,7 +35,7 @@ export const uploadFile = action({
     fileContent: v.bytes(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity?.email) {
       throw new ConvexError("Not authenticated");
     }
@@ -94,7 +95,7 @@ export const deleteFile = action({
     storageId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       throw new ConvexError("Not authenticated");
     }
@@ -142,7 +143,7 @@ export const listUserFiles = action({
     ),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity?.email) {
       throw new ConvexError("Not authenticated");
     }

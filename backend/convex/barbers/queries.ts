@@ -1,5 +1,6 @@
 import { query } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
+import { getIdentityOrDev } from "../lib/authIdentity";
 
 /**
  * Get the current barber's portfolio images with resolved URLs
@@ -8,7 +9,7 @@ import { v, ConvexError } from "convex/values";
 export const getBarberPortfolioImages = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) return [];
 
     const user = await ctx.db
@@ -63,7 +64,7 @@ export const getBarberProfile = query({
   args: {},
   handler: async (ctx) => {
     // Check authentication
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       return null;
     }
@@ -639,7 +640,7 @@ function toRadians(degrees: number): number {
 export const getBarberDashboardStats = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
+    const identity = await getIdentityOrDev(ctx);
     if (!identity) {
       return null;
     }

@@ -11,6 +11,7 @@
 import type * as addresses_mutations from "../addresses/mutations.js";
 import type * as addresses_queries from "../addresses/queries.js";
 import type * as admin_announcements from "../admin/announcements.js";
+import type * as admin_auth from "../admin/auth.js";
 import type * as admin_featuredBarbers from "../admin/featuredBarbers.js";
 import type * as admin_mutations from "../admin/mutations.js";
 import type * as admin_productCatalog from "../admin/productCatalog.js";
@@ -27,8 +28,10 @@ import type * as barbers_mutations from "../barbers/mutations.js";
 import type * as barbers_queries from "../barbers/queries.js";
 import type * as coupons_mutations from "../coupons/mutations.js";
 import type * as coupons_queries from "../coupons/queries.js";
+import type * as dev from "../dev.js";
 import type * as earnings_queries from "../earnings/queries.js";
 import type * as index from "../index.js";
+import type * as lib_authIdentity from "../lib/authIdentity.js";
 import type * as lib_timezone from "../lib/timezone.js";
 import type * as messages_mutations from "../messages/mutations.js";
 import type * as messages_queries from "../messages/queries.js";
@@ -62,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   "addresses/mutations": typeof addresses_mutations;
   "addresses/queries": typeof addresses_queries;
   "admin/announcements": typeof admin_announcements;
+  "admin/auth": typeof admin_auth;
   "admin/featuredBarbers": typeof admin_featuredBarbers;
   "admin/mutations": typeof admin_mutations;
   "admin/productCatalog": typeof admin_productCatalog;
@@ -78,8 +82,10 @@ declare const fullApi: ApiFromModules<{
   "barbers/queries": typeof barbers_queries;
   "coupons/mutations": typeof coupons_mutations;
   "coupons/queries": typeof coupons_queries;
+  dev: typeof dev;
   "earnings/queries": typeof earnings_queries;
   index: typeof index;
+  "lib/authIdentity": typeof lib_authIdentity;
   "lib/timezone": typeof lib_timezone;
   "messages/mutations": typeof messages_mutations;
   "messages/queries": typeof messages_queries;
