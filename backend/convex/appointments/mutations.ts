@@ -1,6 +1,5 @@
 import { mutation, internalMutation } from "../_generated/server";
 import { v, ConvexError } from "convex/values";
-import { internal } from "../_generated/api";
 
 /**
  * Appointment Mutations
@@ -378,7 +377,7 @@ export const scheduleAppointmentReminder = mutation({
 
     const delayMs = reminderTime - now;
 
-    await ctx.scheduler.runAfter(delayMs, internal.appointments.mutations.sendAppointmentReminder, {
+    await (ctx.scheduler as any).runAfter(delayMs, sendAppointmentReminder as any, {
       appointmentId: args.appointmentId,
       reminderMinutesBefore: reminderMinutes,
     });

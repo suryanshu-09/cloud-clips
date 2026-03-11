@@ -1,8 +1,6 @@
 import { mutation, action } from "../_generated/server";
 import { v } from "convex/values";
-import { api as generatedApi } from "../_generated/api";
-
-const api: any = generatedApi;
+import { api } from "../_generated/api";
 
 /**
  * Message Mutations
@@ -80,18 +78,11 @@ export const sendMessage = mutation({
 
     // Schedule push notification to recipient
     if (otherParticipantId) {
-      const sendTokenPushNotification = api["notifications/tokens"].sendPushNotification;
-      await (ctx.scheduler.runAfter as any)(0, sendTokenPushNotification, {
-        userId: otherParticipantId,
-        title: `New message from ${user.name || "Someone"}`,
-        body:
-          args.content.length > 100
-            ? `${args.content.substring(0, 100)}...`
-            : args.content,
-        data: {
-          type: "new_message",
-          conversationId: args.conversationId.toString(),
-        },
+      await (ctx.scheduler.runAfter as any)(0, sendPushNotification as any, {
+        recipientId: otherParticipantId,
+        senderName: user.name || "Someone",
+        messageContent: args.content,
+        conversationId: args.conversationId,
       });
     }
 
@@ -334,7 +325,10 @@ export const sendPushNotification = action({
     conversationId: v.id("conversations"),
   },
   handler: async (ctx, args) => {
-    await ctx.runAction(api.notifications.tokens.sendPushNotification, {
+    // @ts-ignore Convex generated reference typing can recurse deeply here.
+    const notificationApi = (api as any).notifications.tokens;
+
+    await ctx.runAction(notificationApi.sendPushNotification, {
       userId: args.recipientId,
       title: `New message from ${args.senderName}`,
       body: args.messageContent.length > 100 

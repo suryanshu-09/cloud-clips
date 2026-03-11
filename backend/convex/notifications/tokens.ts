@@ -109,8 +109,11 @@ export const sendPushNotification = action({
       }
   > => {
     // Get user's push tokens
-    const user: { pushTokens?: string[] } | null = await ctx.runQuery(
-      api.users.queries.getUserById,
+    // @ts-ignore Convex generated API typing can recurse deeply here.
+    const getUserById: any = (api as any).users.queries.getUserById;
+    const runQuery: any = ctx.runQuery;
+    const user: { pushTokens?: string[] } | null = await runQuery(
+      getUserById,
       {
       userId: args.userId,
       }

@@ -22,7 +22,7 @@ import Apple from "@auth/core/providers/apple";
  * - AUTH_APPLE_KEY_ID
  */
 
-export const { auth, signIn, signOut, store } = convexAuth({
+const authConfig: any = convexAuth({
   providers: [
     // Magic Links via Resend email
     Email({
@@ -84,3 +84,5 @@ export const { auth, signIn, signOut, store } = convexAuth({
     }),
   ],
 });
+
+export const { auth, signIn, signOut, store } = authConfig;

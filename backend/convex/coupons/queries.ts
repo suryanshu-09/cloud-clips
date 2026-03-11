@@ -363,7 +363,7 @@ export const getCouponUsageStats = query({
   },
 });
 
-export const getMyCouponUsage = query({
+export const getMyCouponUsage: any = query({
   handler: async (ctx) => {
     const userId = await ctx.auth.getUserIdentity();
     if (!userId) {

@@ -16,8 +16,6 @@ jobs:
   typecheck:
     name: TypeScript Type Check
     runs-on: ubuntu-latest
-    outputs:
-      passed: ${{ steps.typecheck.outputs.passed }}
     defaults:
       run:
         working-directory: ./backend
@@ -36,21 +34,14 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Run TypeScript type check (non-blocking)
-        id: typecheck
-        run: |
-          if npm run typecheck; then
-            echo "passed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "passed=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Backend typecheck has existing baseline errors; deploy is skipped until fixed."
-          fi
+      - name: Run TypeScript type check
+        run: npm run typecheck
 
   deploy:
     name: Deploy to Convex Production
     runs-on: ubuntu-latest
     needs: typecheck
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.typecheck.outputs.passed == 'true'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     defaults:
       run:
         working-directory: ./backend
