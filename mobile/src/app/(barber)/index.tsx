@@ -9,8 +9,10 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAtomValue } from 'jotai';
 import { Card, Button, EarningsChart } from '@/components/ui';
 import { useBarberDashboard } from '@/features/dashboard/hooks/useBarberDashboard';
+import { userRoleAtom, isAuthenticatedAtom } from '@/store/atoms/authAtom';
 
 function formatTime(ts: number): string {
   const d = new Date(ts);
@@ -55,8 +57,32 @@ const STATUS_LABELS: Record<string, string> = {
   no_show: 'No Show',
 };
 
-export default function BarberDashboardScreen() {
+function GuardedBarberDashboard() {
+  const userRole = useAtomValue(userRoleAtom);
+  const isAuthenticated = useAtomValue(isAuthenticatedAtom);
+
+  if (!isAuthenticated) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50 p-4">
+        <Text className="text-lg text-gray-600 text-center">Please log in to continue</Text>
+      </View>
+    );
+  }
+
+  if (userRole !== 'barber') {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50 p-4">
+        <Text className="text-lg text-gray-600 text-center">This screen is for barbers only</Text>
+      </View>
+    );
+  }
+
+  return <BarberDashboardContent />;
+}
+
+function BarberDashboardContent() {
   const router = useRouter();
+
   const {
     todayAppointments,
     todayCount,
@@ -328,3 +354,5 @@ export default function BarberDashboardScreen() {
     </View>
   );
 }
+
+export default GuardedBarberDashboard;

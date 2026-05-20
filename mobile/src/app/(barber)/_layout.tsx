@@ -1,8 +1,43 @@
-import { Tabs } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Tabs, useRouter, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { useAtomValue } from 'jotai';
+import { userRoleAtom, isAuthenticatedAtom } from '@/store/atoms/authAtom';
+import { View, ActivityIndicator } from 'react-native';
 
 export default function BarberLayout() {
+  const router = useRouter();
+  const userRole = useAtomValue(userRoleAtom);
+  const isAuthenticated = useAtomValue(isAuthenticatedAtom);
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    setIsReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isReady) return;
+
+    if (!isAuthenticated) {
+      router.replace('/(auth)/login');
+    } else if (userRole !== 'barber') {
+      router.replace('/(client)');
+    }
+  }, [isReady, isAuthenticated, userRole]);
+
+  if (!isReady) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white">
+        <ActivityIndicator size="large" color="#6366f1" />
+      </View>
+    );
+  }
+
+  if (!isAuthenticated || userRole !== 'barber') {
+    return <Redirect href="/(client)" />;
+  }
+
   return (
     <ErrorBoundary>
       <Tabs
